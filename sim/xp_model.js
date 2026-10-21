@@ -6,9 +6,9 @@ const CONFIG = {
   seed: 1,
   rankCap: 20,
   maxLevel: 3,
-  baseCost: 1000,
-  rankCostStep: 0.1,
-  affinity: 1.5,
+  baseCost: Number(process.env.BASE_COST || 450),
+  rankCostStep: Number(process.env.RANK_STEP || 0.1),
+  affinity: Number(process.env.AFFINITY || 1.5),
 };
 
 const SCHOOLS = {
@@ -21,7 +21,7 @@ const ABILITIES = Object.values(SCHOOLS).flat();
 
 const PROFILES = {
   frontline: { battleProb: 0.25, winProb: 0.75, fieldFrac: 0.4, valorXp: 300, tacticsXp: 200, siegeProb: 0.1, siegeXp: 150, garrisonXp: 0, marchXp: 80, scoutXp: 60, captureProb: 0.05, plunderXp: 400 },
-  garrison: { battleProb: 0.04, winProb: 0.8, fieldFrac: 0, valorXp: 300, tacticsXp: 0, siegeProb: 0.05, siegeXp: 150, garrisonXp: 60, marchXp: 0, scoutXp: 20, captureProb: 0, plunderXp: 0 },
+  garrison: { battleProb: 0.04, winProb: 0.8, fieldFrac: 0, valorXp: 300, tacticsXp: 0, siegeProb: 0.05, siegeXp: 150, garrisonXp: 45, marchXp: 0, scoutXp: 20, captureProb: 0, plunderXp: 0 },
   raider: { battleProb: 0.12, winProb: 0.7, fieldFrac: 0.6, valorXp: 250, tacticsXp: 200, siegeProb: 0, siegeXp: 0, garrisonXp: 0, marchXp: 100, scoutXp: 100, captureProb: 0.08, plunderXp: 400 },
 };
 
@@ -103,11 +103,14 @@ for (const [profileName, profile] of Object.entries(PROFILES)) {
     const ranks = results.map((r) => r.rank).sort((a, b) => a - b);
     const mean = (key) => (results.reduce((s, r) => s + r[key], 0) / results.length).toFixed(1);
     const pct = (n) => ((ranks.filter((r) => r >= n).length / ranks.length) * 100).toFixed(1) + '%';
+    const survivors = results.filter((r) => r.alive).map((r) => r.rank).sort((a, b) => a - b);
     rows.push({
       profile: profileName,
       school,
       survive: ((results.filter((r) => r.alive).length / results.length) * 100).toFixed(0) + '%',
       meanRank: mean('rank'),
+      survMean: survivors.length ? (survivors.reduce((a, b) => a + b, 0) / survivors.length).toFixed(1) : '-',
+      survP95: survivors.length ? percentile(survivors, 0.95) : '-',
       p50: percentile(ranks, 0.5),
       p95: percentile(ranks, 0.95),
       max: ranks[ranks.length - 1],
@@ -122,5 +125,5 @@ for (const [profileName, profile] of Object.entries(PROFILES)) {
   }
 }
 
-console.log(`${CONFIG.gameDays} days, ${cycles} cycles, ${CONFIG.runs} runs per row, affinity x${CONFIG.affinity}`);
+console.log(`${CONFIG.gameDays} days, ${cycles} cycles, ${CONFIG.runs} runs per row, base cost ${CONFIG.baseCost}, rank step ${CONFIG.rankCostStep}, affinity x${CONFIG.affinity}`);
 console.table(rows);
