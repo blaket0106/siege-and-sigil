@@ -148,7 +148,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -163,7 +163,7 @@
       { slug: 'university', name: 'University' },
       { slug: 'rangers', name: 'Rangers' },
     ];
-    const SPEEDS = { slow: 'Slow (2h ticks)', normal: 'Normal (1h)', fast: 'Fast (30m)', quad: 'Quad (15m)' };
+    const SPEEDS = { slow: 'Slow (2h ticks)', normal: 'Normal (1h)', fast: 'Fast (30m)', quad: 'Quad (15m)', turn_based: 'Turn-based' };
     const SIZES = { compact: 'Compact', standard: 'Standard', large: 'Large' };
     const STYLES = { scatter: 'Scatter', continents: 'Continents' };
     const MAX_START = { compact: 4, standard: 7, large: 12 };
@@ -468,6 +468,9 @@
       const victory = h('input', { type: 'number', min: '10', max: '100', step: '5', value: '50' });
       const truce = h('input', { type: 'number', min: '1', max: '500', value: '48' });
       const grace = h('input', { type: 'number', min: '0', max: '500', value: '24' });
+      const perTurn = h('input', { type: 'number', min: '1', max: '48', value: '6' });
+      const turnMins = h('input', { type: 'number', min: '5', max: '10080', value: '1440' });
+      const limit = h('input', { type: 'number', min: '1', placeholder: 'none' });
       const starting = h('input', { type: 'number', min: '1', max: '12', value: '4' });
       const fog = h('input', { type: 'checkbox', checked: true });
       const fill = h('input', { type: 'checkbox' });
@@ -489,7 +492,10 @@
           h('div', {}, h('label', {}, 'Starting castles'), starting),
           h('div', {}, h('label', {}, 'Territory % to win'), victory),
           h('div', {}, h('label', {}, 'Truce length (ticks)'), truce),
-          h('div', {}, h('label', {}, 'Alliance break warning (ticks)'), grace)),
+          h('div', {}, h('label', {}, 'Alliance break warning (ticks)'), grace),
+          h('div', {}, h('label', {}, 'Time limit (ticks, optional)'), limit),
+          h('div', {}, h('label', {}, 'Ticks per turn (turn-based)'), perTurn),
+          h('div', {}, h('label', {}, 'Turn timeout, minutes (turn-based)'), turnMins)),
         hint,
         h('label', { class: 'check' }, fog, 'Fog of war'),
         h('label', { class: 'check' }, fill, 'Fill empty seats with AI players'),
@@ -515,6 +521,11 @@
               fill_with_ai: fill.checked,
               ai_difficulty: Number(difficulty.value),
             };
+            if (limit.value) settings.time_limit_ticks = Number(limit.value);
+            if (speed.value === 'turn_based') {
+              settings.ticks_per_turn = Number(perTurn.value);
+              settings.turn_timeout_minutes = Number(turnMins.value);
+            }
             if (faction) settings.faction_slug = faction;
             const { data, error } = await sb.rpc('create_game', { p_settings: settings });
             if (error) throw error;
@@ -535,13 +546,15 @@
       mount(container);
 
       let schoolsDraft = null;
+      const chatInput = h('input', { type: 'text', maxlength: '500', placeholder: 'Message the lobby' });
 
       const draw = async () => {
         if (state.view !== 'room' || state.roomId !== gameId) return;
-        const [gameRes, playersRes, schoolsRes] = await Promise.all([
+        const [gameRes, playersRes, schoolsRes, chatRes] = await Promise.all([
           sb.from('games').select(GAME_COLS).eq('id', gameId).maybeSingle(),
           sb.from('game_players').select(PLAYER_COLS).eq('game_id', gameId).order('id'),
           sb.rpc('my_starting_schools', { p_game_id: gameId }),
+          sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(60),
         ]);
         if (state.view !== 'room' || state.roomId !== gameId) return;
         const game = gameRes.data;
@@ -569,13 +582,21 @@
             kv('AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'),
             kv('Truce', `${game.truce_ticks} ticks`),
             kv('Alliance break warning', `${game.grace_period_ticks} ticks`),
+            game.time_limit_ticks ? kv('Time limit', `tick ${game.time_limit_ticks}`) : null,
+            game.tick_speed === 'turn_based' ? kv('Turns', `${game.ticks_per_turn} ticks, ${game.turn_timeout_minutes} min timeout`) : null,
             game.status !== 'lobby' ? kv('Tick', game.current_tick) : null)));
 
         const slots = players.map((p) => h('div', { class: 'slot' },
           dots(p.faction_slug),
           h('div', {},
             h('div', { class: 'nm' }, p.display_name, p.user_id === game.created_by ? h('span', { class: 'tag gold' }, 'host') : null, p.user_id === state.session.user.id ? h('span', { class: 'tag green' }, 'you') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
-            h('div', { class: 'fn' }, factionOf(p.faction_slug).name + (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? ' · eliminated' : '')))));
+            h('div', { class: 'fn' }, factionOf(p.faction_slug).name + (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? ' · eliminated' : '')),
+            game.status === 'lobby' && isHost && p.user_id !== state.session.user.id
+              ? h('button', {
+                style: 'padding:2px 8px;font-size:.78rem;margin-top:4px',
+                onclick: (e) => { if (confirm(`Remove ${p.display_name} from the lobby?`)) run(e.currentTarget, async () => { const { error } = await sb.rpc('kick_player', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }); },
+              }, 'Remove')
+              : null)));
         if (game.status === 'lobby') {
           for (let i = players.length; i < game.max_players; i++) {
             slots.push(h('div', { class: 'slot empty' }, game.fill_with_ai ? 'AI player at start' : 'Open seat'));
@@ -666,9 +687,29 @@
             }); },
           }, 'Delete game'));
         }
+        if (me) {
+          const names = new Map(players.map((pl) => [pl.id, pl.display_name]));
+          const send = async () => {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            chatInput.value = '';
+            const { error } = await sb.rpc('send_chat_message', { p_game_id: gameId, p_message: text });
+            if (error) { chatInput.value = text; toast(error.message); return; }
+            await draw();
+          };
+          parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Chat'),
+            h('div', { class: 'chatlist', id: 'roomchat' }, (chatRes.data || []).length
+              ? (chatRes.data || []).slice().reverse().map((m) => h('div', { class: 'chatline' }, h('b', { style: `color:${factionOf((players.find((pl) => pl.id === m.player_id) || {}).faction_slug).color};font-weight:bold` }, `${names.get(m.player_id) || 'Player'}: `), m.message))
+              : h('div', { class: 'empty' }, 'No messages yet.')),
+            h('form', { class: 'composer', onsubmit: (e) => { e.preventDefault(); send(); } }, chatInput, h('button', { type: 'submit', class: 'primary' }, 'Send'))));
+        }
         parts.push(h('div', { class: 'row wrap2' }, actions));
 
+        const focused = document.activeElement === chatInput;
         container.replaceChildren(...parts);
+        const box = document.getElementById('roomchat');
+        if (box) box.scrollTop = box.scrollHeight;
+        if (focused) chatInput.focus();
       };
 
       const kv = (k, v) => h('div', {}, h('b', {}, k), String(v));
@@ -678,8 +719,11 @@
       let debounce = null;
       const kick = () => { clearTimeout(debounce); debounce = setTimeout(draw, 300); };
       const unwatch = watchGame(gameId, kick);
+      const chatChannel = sb.channel('room-chat-' + gameId)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_chat', filter: `game_id=eq.${gameId}` }, kick)
+        .subscribe();
       const timer = setInterval(draw, 20000);
-      state.cleanup.push(() => { clearTimeout(debounce); clearInterval(timer); unwatch(); });
+      state.cleanup.push(() => { clearTimeout(debounce); clearInterval(timer); unwatch(); sb.removeChannel(chatChannel); });
     }
 
 
@@ -739,7 +783,7 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      const ms = { turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
 
       const chatSeenKey = `ss-chatseen-${gameId}-${uid}`;
@@ -982,14 +1026,29 @@
         const g = ms.game;
         if (g.status !== 'active') { nextEl.textContent = ''; return; }
         const interval = TICK_MS[g.tick_speed];
-        if (!interval) { nextEl.textContent = 'turn-based'; return; }
+        if (!interval) {
+          const end = ms.turn && ms.turn.ends_at ? Date.parse(ms.turn.ends_at) - Date.now() : null;
+          nextEl.textContent = end === null ? 'turn-based' : (end > 0 ? `turn ends in ${fmtDuration(end)}` : 'turn due');
+          return;
+        }
         const due = Date.parse(g.last_tick_processed_at) + interval - Date.now();
         nextEl.textContent = due > 0 ? `next tick in ${fmtCountdown(due)}` : 'tick due';
       };
 
+      const canAct = () => ms.game.status === 'active' && ms.me.eliminated_at_tick == null;
+
       const pendingProposals = () => ms.dip.filter((d) => (d.status === 'proposed' || d.status === 'peace_proposed') && d.proposed_by_player_id !== ms.me.id).length;
 
       const castlesOf = (pid) => ms.standings[pid] || 0;
+
+      const turnControl = () => {
+        if (!ms.turn || !ms.turn.turn_based || !canAct()) return null;
+        if (ms.turn.submitted.includes(ms.me.id)) {
+          const waiting = ms.turn.waiting.length;
+          return h('span', { style: 'color:var(--gold2)' }, waiting ? `Turn submitted, waiting for ${waiting} player${waiting === 1 ? '' : 's'}` : 'Turn submitted');
+        }
+        return h('button', { class: 'primary', onclick: order('submit_turn', {}, 'Turn submitted') }, 'Submit turn');
+      };
 
       const drawHud = () => {
         const g = ms.game;
@@ -1000,6 +1059,9 @@
           h('b', {}, g.name),
           h('span', {}, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`),
           nextEl,
+          g.time_limit_ticks && g.status === 'active' ? h('span', { style: 'color:var(--dim)' }, `Ends at tick ${g.time_limit_ticks}`) : null,
+          ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { style: 'color:#e08b82' }, 'You are eliminated') : null,
+          turnControl(),
           h('span', { class: 'grow' }),
           pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; ms.stops = []; render(); drawSide(); } }, `Proposals (${pendingProposals()})`) : null,
           h('span', {}, `Gold ${ms.me.gold}`),
@@ -1021,7 +1083,7 @@
       ];
 
       const buildSection = (t) => {
-        if (t.owner_player_id !== ms.me.id || ms.game.status !== 'active') return null;
+        if (t.owner_player_id !== ms.me.id || !canAct()) return null;
         const mult = ms.game.infra_cost_mult;
         const gold = ms.me.gold;
         const out = [h('b', {}, 'Build')];
@@ -1051,7 +1113,7 @@
 
       const realmSection = () => {
         const g = ms.game;
-        const live = g.status === 'active';
+        const live = canAct();
         const order_ = Object.keys(AREA_NAMES);
         const rows = [...ms.areas].sort((x, y) => order_.indexOf(x.area) - order_.indexOf(y.area)).map((a) => {
           const need = Math.ceil(144 * a.level * g.area_cost_mult);
@@ -1064,6 +1126,15 @@
         const budget = h('input', { type: 'number', min: '1', value: Math.min(100, ms.me.gold) || 1, style: 'width:90px' });
         return [
           h('div', { class: 'sec' }, h('b', {}, 'Realm areas (level, prestige to next)'), rows),
+          live ? h('div', { class: 'sec' }, h('b', {}, 'Surrender'),
+            h('button', {
+              class: 'danger',
+              onclick: (e) => {
+                if (confirm('Concede defeat? You are eliminated at once, your commanders die and your castles become unowned. This cannot be undone.')) {
+                  order('concede_defeat', {}, 'You have conceded')(e);
+                }
+              },
+            }, 'Concede defeat')) : null,
           live ? h('div', { class: 'sec' }, h('b', {}, 'Upgrade everywhere, cheapest first'),
             h('div', { class: 'row wrap2' }, type, budget,
               h('button', {
@@ -1082,7 +1153,7 @@
       }, 'Assault now');
 
       const siegeSection = (t) => {
-        if (ms.game.status !== 'active') return null;
+        if (!canAct()) return null;
         const siegers = ms.cmd.filter((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tickF()));
         if (!siegers.length) return null;
         const troops = siegers.reduce((a, c) => a + c.troops, 0);
@@ -1107,7 +1178,7 @@
       };
 
       const commanderActions = (c) => {
-        if (c.owner_player_id !== ms.me.id || ms.game.status !== 'active') return null;
+        if (c.owner_player_id !== ms.me.id || !canAct()) return null;
         const call = (fn, args, message) => (e) => act(e.currentTarget, async () => {
           const { error } = await sb.rpc(fn, { p_game_id: gameId, ...args });
           if (error) throw error;
@@ -1271,7 +1342,7 @@
           case 'siege_lifted': return `The siege of ${p.territory} was lifted ${p.by === 'sally' ? 'by a sally' : 'by relief forces'}`;
           case 'king_killed': return `${p.name}, king of ${pname(p.player_id)}, was killed`;
           case 'player_eliminated': return `${pname(p.player_id)} was eliminated`;
-          case 'game_won': return `${pname(p.player_id)} won the game`;
+          case 'game_won': return `${pname(p.player_id)} won the game${p.reason === 'time_limit' ? ' at the time limit' : ''}`;
           default: return m.type.replace(/_/g, ' ');
         }
       };
@@ -1521,6 +1592,17 @@
 
       const dipRow = (pid) => ms.dip.find((d) => d.player_a_id === pid || d.player_b_id === pid);
 
+      const sendGoldDialog = (p) => {
+        const amount = h('input', { type: 'number', min: '1', max: String(ms.me.gold), value: String(Math.min(50, ms.me.gold) || 1) });
+        modal(`Send gold to ${p.display_name}`, h('div', {}, h('div', { style: 'color:var(--dim);font-size:.85rem' }, `You have ${ms.me.gold} gold. Gifts cannot be taken back.`), h('label', {}, 'Amount'), amount), (close) => [
+          h('button', { onclick: close }, 'Cancel'),
+          h('button', {
+            class: 'primary',
+            onclick: (e) => order('send_gold', { p_target_player_id: p.id, p_amount: Number(amount.value) }, `Sent ${amount.value} gold to ${p.display_name}`)(e).then(close),
+          }, 'Send'),
+        ]);
+      };
+
       const profileLine = (p) => {
         const pr = p.user_id ? ms.profiles.get(p.user_id) : null;
         if (!pr) return null;
@@ -1528,7 +1610,7 @@
       };
 
       const diplomacyControls = (p) => {
-        if (p.id === ms.me.id || ms.game.status !== 'active' || (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined)) return null;
+        if (p.id === ms.me.id || !canAct() || (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined)) return null;
         const r = dipRow(p.id);
         const st = r ? r.status : 'neutral';
         const target = { p_target_player_id: p.id };
@@ -1646,7 +1728,7 @@
                 h('span', { style: 'color:var(--text)' }, dots(p.faction_slug), p.display_name, p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? h('span', { class: 'tag' }, 'out') : null),
                 h('span', {}, `${n} · ${st === 'neutral' ? '' : st.replace('_', ' ')}`)),
               profileLine(p),
-              p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id && !p.is_ai ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null) : null);
+              p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id && !p.is_ai ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null, p.id !== ms.me.id && !p.is_ai && canAct() && !(p.eliminated_at_tick != null) ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null) : null);
           })));
           parts.push(h('div', { class: 'sec', style: 'color:var(--dim);font-size:.8rem' }, 'Click a castle or commander for details. Drag to pan, scroll to zoom. A gold ring marks a king.'));
         }
@@ -1666,12 +1748,34 @@
         applyView();
       }, { passive: false });
 
+      let pinch = null;
+      const touchDist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+      svg.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 2) return;
+        const mid = { clientX: (e.touches[0].clientX + e.touches[1].clientX) / 2, clientY: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+        pinch = { d: touchDist(e.touches), view: { ...ms.view }, at: toMap(mid) };
+        ms.dragged = true;
+      }, { passive: true });
+      svg.addEventListener('touchmove', (e) => {
+        if (!pinch || e.touches.length !== 2) return;
+        e.preventDefault();
+        const nw = Math.min(ms.full.w * 1.3, Math.max(ms.full.w / 8, pinch.view.w * (pinch.d / touchDist(e.touches))));
+        const k = nw / pinch.view.w;
+        ms.view = { x: pinch.at.x - (pinch.at.x - pinch.view.x) * k, y: pinch.at.y - (pinch.at.y - pinch.view.y) * k, w: nw, h: pinch.view.h * k };
+        applyView();
+      }, { passive: false });
+      svg.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) pinch = null;
+        setTimeout(() => { ms.dragged = false; }, 0);
+      }, { passive: true });
+
       svg.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         const start = { x: e.clientX, y: e.clientY, view: { ...ms.view } };
         const scale = svg.getScreenCTM().a;
         ms.dragged = false;
         const move = (ev) => {
+          if (pinch) return;
           const dx = ev.clientX - start.x;
           const dy = ev.clientY - start.y;
           if (Math.hypot(dx, dy) > 4) ms.dragged = true;
@@ -1738,6 +1842,12 @@
         ms.moments = mo.data;
         ms.inbox = ib.data;
         ms.battles = br.data;
+        if (view.game.tick_speed === 'turn_based' && view.game.status === 'active') {
+          const ts = await sb.rpc('turn_status', { p_game_id: gameId });
+          ms.turn = ts.data || null;
+        } else {
+          ms.turn = null;
+        }
         const humanIds = view.players.filter((p) => p.user_id).map((p) => p.user_id);
         const profRes = await sb.from('profiles').select('user_id, honor, infamy, total_games, total_wins').in('user_id', humanIds);
         ms.profiles = new Map((profRes.data || []).map((x) => [x.user_id, x]));

@@ -1033,7 +1033,6 @@ Runs inside `run_tick` right after production. Each tick, for every in-flight `c
 - `movement_position(movement, tick)` (internal) returns the interpolated map position along the path, for intercepts and the client.
 - Helpers (internal): `are_allied`, `is_friendly_territory`, `has_hostile_siege`.
 - `process_ticks` now also reports `arrivals` and `contacts`.
-- **Not done yet:** open-field intercepts between two moving enemy commanders, and siege-type contacts.
 
 ### 20p. Battles and capture (implemented)
 
@@ -1048,7 +1047,7 @@ Runs in `run_tick` after movement (`resolve_tick_events` = movement, then `resol
 - **Capture:** the territory changes owner with **0 garrison troops** (the surviving attackers stand there as idle commanders and keep their troops), its Treasury level is destroyed and pays `10 × level × (1 + 0.25 × best Plunder level among the attackers)` gold (ledger `salvage`). Industry, Prestige and roads are kept. `effective_influence` is refreshed for both owners. A public `castle_captured` moment is written. The attackers then continue their routes.
 - **Reports:** a `battle` server event; a `combat` inbox message for the attacker and the previous owner (neutral owners get none).
 - `process_ticks` now reports `combats` and a `combat_events` list (territory, winner, captured, survivors, salvage).
-- **Not done yet:** XP from battles, elimination and win checks (a player left with no territory is not yet eliminated), mutual alliance teams fighting as one, honor and infamy. Sieges and open-field fights are in 20q.
+- **Not done yet:** mutual alliance teams fighting as one (allies fight sequentially, deliberately, see 20ab). Sieges and open-field fights are in 20q.
 
 ### 20q. Sieges and open-field fights (implemented)
 
@@ -1064,7 +1063,7 @@ Runs in `run_tick` after movement (`resolve_tick_events` = movement, then `resol
 - **Intercepts:** each tick, every pair of marching enemy commanders (different, non-allied players, both carrying troops, not at a contact) is checked by sweeping their movement over the last tick; if they came within 20.2 units they fight an open-field battle. Ties go to the earlier departure. The loser dies, the winner keeps marching with his survivors. Troopless commanders are never intercepted.
 - **Stale sieges:** sieging commanders whose territory has become friendly turn idle.
 - `process_ticks` `combats` / `combat_events` now include intercepts and reliefs.
-- **Not done yet:** XP, team fights of allied armies, AI behavior, honor and infamy. Win and elimination are in 20r.
+- **Not done yet:** team fights of allied armies (20ab). Win and elimination are in 20r.
 
 ### 20r. Win and elimination (implemented)
 
@@ -1077,7 +1076,7 @@ Runs at the end of every tick (`evaluate_game_end`, last step of `resolve_tick_e
 - **The tick loop stops** at the winning tick: a catch-up batch ends there and later calls do nothing.
 - `check_win_condition(game)` (members): current standing (`total`, `win_at`, `castles` of the leader, `players_alive`, `winner`, `winner_id`, `reason`, plus the game `status` and `winner_player_id`).
 - `process_ticks` now also returns `game_status` and `winner_player_id`.
-- **Not done yet:** honor and infamy, shared allied victory, a time limit, surrender of a whole alliance.
+- **Not done yet:** shared allied victory and surrender of a whole alliance (individual victory only in V1, see 20ab). A time limit is in 20ab.
 - **Concurrency:** `concede_defeat` locks the game row first (the same order `process_game` uses) and refuses unless the game is active; `finish_game` only acts if the game is still `active`, so a game can finish exactly once (profile stats, events and messages are not duplicated).
 
 ### 20s. XP and leveling (implemented)
@@ -1105,7 +1104,7 @@ All numbers live in the table `xp_config` (key / value, readable by signed-in us
   - **Pace:** when a march ends in a contact (enemy, neutral, or besieged castle) the commander gets `pace_per_unit` per unit of road travelled by that leg.
   - **Scout:** each production cycle a commander gets `scout_per_cycle` if an enemy-owned territory or an enemy marching commander is within his scan radius (`45 + 15 × rank + 30 × Scout level`).
 - Tick order gains `award_production_xp` and (cycle ticks) `award_scout_xp` just before the win check.
-- **Not done yet:** a simulation pass over these rates (`sim/xp_model.js` still uses its own rough numbers).
+- **Tuned:** see 20aa for the simulation pass and the current rates.
 
 ### 20t. AI players (implemented)
 
@@ -1120,7 +1119,7 @@ A turn, in order:
 
 - **Refactor:** `hire_commander`, `transfer_troops` and `upgrade_infrastructure` now call internal `*_core(game, player, ...)` versions that the AI shares, so cost rules live in one place.
 - **Observed (3 players, 1 passive human, compact map, 100 ticks):** no errors; difficulty 5 AIs took neutral castles faster (6 castles each vs 5), made 16 upgrades vs 9, and fought 4 battles vs 2; neither attacked the human's heavily garrisoned castles.
-- **Not done yet:** AI proposals and betrayals (AI responds to diplomacy but never initiates it), sieges, sally-outs and relief, roads, Prestige upgrades, hiring beyond the cap, holding back gold.
+- **Not done yet:** AI laying sieges, relief marches, roads, Prestige upgrades, hiring beyond the cap, holding back gold. AI diplomacy is in 20y, garrison leaders in 20aa and sallies in 20ab.
 
 ### 20u. Diplomacy (implemented)
 
@@ -1139,7 +1138,7 @@ Pair status lives in `diplomacy` (neutral, proposed, allied, grace_period, war).
 - **`leave_game(game)`:** lobby only. A member's player row is removed. If the creator leaves, host passes to the earliest-joined remaining human; if none remain the game is deleted. Once a game has started, leaving is `concede_defeat`.
 - **`cancel_game(game)`:** creator only, lobby only. Deletes the game.
 - **`delete_game(game)`:** creator only, finished games only. Deletes the game and all its data (all child tables cascade).
-- **Not done yet:** kicking players, abandoned-lobby cleanup, abandoned active games.
+- **Not done yet:** abandoned active games (see 20ab). Kicking and lobby cleanup are in 20ab.
 
 ### 20w. Map view (implemented, read-only)
 
@@ -1155,7 +1154,7 @@ Pair status lives in `diplomacy` (neutral, proposed, allied, grace_period, war).
 - **Feed and diplomacy (implemented):** the side panel has Info, News and Inbox tabs. News is the readable `game_moments` (public events and the viewer's private ones) rendered as sentences; Inbox is `player_inbox` with an unread count, new items highlighted on first open, then marked read. Both update live (`game_moments` is in the realtime publication). Standings now carry per-player diplomacy controls: Propose alliance, Accept or Decline an incoming proposal, Break alliance (with a confirm), and status text for a pending proposal, a grace period (war tick) or war. The top bar shows an "Alliance proposals (n)" button when proposals are waiting.
 - **Siege orders (implemented):** a castle with sieging commanders gets a dashed red ring on the map and an Under siege section (besiegers and troops). The besieged owner sees their force (garrison plus idle commanders) and a Sally out button (`sally_out`, with a confirm that states the risk). A player with sieging commanders there gets Assault now (`break_siege_and_assault`, confirm). A sieging commander's panel shows the same Assault now, and he can still be ordered to march away.
 - **Chat and messages (implemented):** RPCs `send_chat_message(game, message)` (members, 1 to 500 characters), `create_thread(game, participant_ids, first_message)` (human players only, 2 to 8 players including the sender; an existing thread with exactly the same participants is reused, so a DM is one thread) and `send_thread_message(thread, body)` (participants, 1 to 2000 characters). All trim, reject empty text, and allow at most 8 messages per 10 seconds per player; the tables themselves accept no direct writes (insert, update and delete revoked; only the `last_read_at` column of `thread_participants` stays updatable). UI: a Chat tab with General (everyone in the game) and Messages (thread list with unread dots, new message with a player picker, conversation view). A Message button in Standings opens or starts a DM. Unread counts show on the tab; general chat read position is kept in localStorage, thread read position in `thread_participants.last_read_at`. Live via realtime on `game_chat` and `thread_messages`. Dark faction colors fall back to the faction's second color for readability.
-- **Not done yet:** chat in the lobby, muting or blocking players, diplomacy and messaging UI, event feed, alliance vision of allied Watchtowers levels, touch pinch zoom.
+- **Not done yet:** muting or blocking players, a spectator view for eliminated players beyond the read-only map.
 
 ### 20x. Server-side fog of war (implemented)
 
@@ -1203,6 +1202,16 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 - **XP tuning:** `xp_base_cost` 1000 to 450, `muster_per_troop` 3 to 10, `steward_per_gold` 0.6 to 2.5, `scholar_per_prestige` 1 to 4. Rationale: `sim/xp_model.js` (now defaulting to the production base cost, with `BASE_COST`, `RANK_STEP` and `AFFINITY` overrides and survivor statistics) puts surviving commanders after a 30 day game at rank 8 to 10 (garrison leaders about 8 to 9, fighters about 10), 95th percentile 11 to 13, rank 15 or more rare, and the cap of 20 out of reach, where the old values gave about 4 to 6 and often under 3 for fighters. Measured in the real engine, a garrison leader paid about 15 / 7 / 12 XP per cycle for Muster / Steward / Scholar against the 60 each the model first assumed, hence the three garrison rate raises. A 250 tick AI-only game with the new values reached rank 4 with several 3s, no AI errors.
 - **AI garrisons:** `ai_garrison` (called each AI turn after hiring) makes the idle non-king commander with the fewest troops at each ownerless-garrison castle its garrison leader, so AI commanders earn passive XP like players do (and are skipped by the AI attack loop).
 - **Not done yet:** a custom email sender (needs a domain), XP tuning against real player data.
+
+### 20ab. V1 completion: surrender, gold gifts, turn-based play, limits and lobby tools (implemented)
+
+- **Concede and gifts (UI):** the Realm panel has Concede defeat (confirm; `concede_defeat`). Standings have Send gold for human players (modal; `send_gold`). An eliminated player keeps a read-only map with an "eliminated" notice; all order controls are hidden (`canAct`).
+- **Turn-based games:** the create dialog offers Turn-based with ticks per turn (default 6) and turn timeout in minutes (default 1440). `turn_status(game)` returns the deadline, who has submitted and who is still waited on. The map shows a Submit turn button, then "Turn submitted, waiting for N players", and a countdown to the deadline. All humans submitting, or the deadline passing (cron), runs the turn and clears the flags.
+- **Time limit:** optional `games.time_limit_ticks` (create dialog and lobby page). At the end of the tick that reaches it, if nobody has won, the game ends and the leader wins (most castles, then most troops, then lowest id) with reason `time_limit`; news reads "won the game at the time limit".
+- **Lobby tools:** the host can remove players from a lobby (`kick_player`, lobby only, never themselves). Lobbies older than 7 days are deleted nightly (`cleanup_abandoned_lobbies`, cron `cleanup-abandoned-lobbies` at 03:17). The lobby page has a chat panel (`send_chat_message`, live on `game_chat`).
+- **Touch:** the map supports two-finger pinch zoom (single-finger drag still pans).
+- **AI defense:** `sally_out` is now a wrapper over `sally_core(game, player, territory)`. `ai_defend`, run each AI turn before `ai_commanders`, sallies from a besieged castle when a closed-form duel (siegers striking first) says the sally force wins; difficulty 1 and 2 hold back half the time.
+- **Deliberate V1 decisions (not gaps):** allied commanders fight sequentially, not as one army (who owns a captured castle would be ambiguous); victory is individual, with no shared allied win; a player who simply stops playing is not auto-conceded (their empire can be conquered); the AI never lays sieges.
 
 ---
 
