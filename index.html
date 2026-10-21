@@ -953,7 +953,7 @@
         nextEl.textContent = due > 0 ? `next tick in ${fmtCountdown(due)}` : 'tick due';
       };
 
-      const pendingProposals = () => ms.dip.filter((d) => d.status === 'proposed' && d.proposed_by_player_id !== ms.me.id).length;
+      const pendingProposals = () => ms.dip.filter((d) => (d.status === 'proposed' || d.status === 'peace_proposed') && d.proposed_by_player_id !== ms.me.id).length;
 
       const castlesOf = (pid) => ms.standings[pid] || 0;
 
@@ -967,7 +967,7 @@
           h('span', {}, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`),
           nextEl,
           h('span', { class: 'grow' }),
-          pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; render(); drawSide(); } }, `Alliance proposals (${pendingProposals()})`) : null,
+          pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; render(); drawSide(); } }, `Proposals (${pendingProposals()})`) : null,
           h('span', {}, `Gold ${ms.me.gold}`),
           h('span', {}, `Castles ${castlesOf(ms.me.id)} / ${winAt} to win`),
           g.fog_of_war ? h('label', {}, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null].filter(Boolean));
@@ -1193,6 +1193,8 @@
           case 'game_started': return 'The realms are drawn. The game begins.';
           case 'war_declared': return `${pname(p.by_player_id)} and ${pname(p.against_player_id)} are at war${p.how === 'alliance_broken' ? ' after a broken alliance' : ' after the first attack'}`;
           case 'alliance_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} formed an alliance`;
+          case 'truce_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} agreed a truce until tick ${p.ends_tick}`;
+          case 'truce_ended': return `The truce between ${pname(p.player_a)} and ${pname(p.player_b)} has ended`;
           case 'alliance_broken': return `${pname(p.by_player_id)} broke the alliance with ${pname(p.against_player_id)}`;
           case 'castle_captured': return `${pname(p.to_player_id)} captured ${p.territory}${p.from_player_id ? ' from ' + pname(p.from_player_id) : ''}`;
           case 'siege_started': return `${pname(p.by_player_id)} laid siege to ${p.territory}`;
@@ -1353,18 +1355,30 @@
         const r = dipRow(p.id);
         const st = r ? r.status : 'neutral';
         const target = { p_target_player_id: p.id };
-        if (st === 'neutral') return h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance');
+        const peaceBtn = h('button', { onclick: order('propose_peace', target, `Peace proposed to ${p.display_name}`) }, 'Propose peace');
+        if (st === 'neutral') {
+          return h('div', { class: 'row wrap2' },
+            h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance'),
+            peaceBtn);
+        }
         if (st === 'proposed') {
           if (r.proposed_by_player_id === ms.me.id) return h('span', { style: 'color:var(--dim)' }, 'Alliance proposed, awaiting reply');
           return h('div', { class: 'row' },
             h('button', { class: 'primary', onclick: order('accept_alliance', target, `Allied with ${p.display_name}`) }, 'Accept alliance'),
             h('button', { onclick: order('decline_alliance', target, 'Proposal declined') }, 'Decline'));
         }
+        if (st === 'peace_proposed') {
+          if (r.proposed_by_player_id === ms.me.id) return h('span', { style: 'color:var(--dim)' }, 'Peace proposed, awaiting reply');
+          return h('div', { class: 'row' },
+            h('button', { class: 'primary', onclick: order('accept_peace', target, `Truce agreed with ${p.display_name}`) }, 'Accept peace'),
+            h('button', { onclick: order('decline_peace', target, 'Peace declined') }, 'Decline'));
+        }
+        if (st === 'truce') return h('span', { style: 'color:var(--gold2)' }, `Truce until tick ${r.truce_ends_tick}`);
         if (st === 'allied') {
           return h('button', { class: 'danger', onclick: (e) => { if (confirm(`Break your alliance with ${p.display_name}? War follows after a grace period.`)) order('break_alliance', target, 'Alliance broken. War follows after the grace period')(e); } }, 'Break alliance');
         }
         if (st === 'grace_period') return h('span', { style: 'color:var(--gold2)' }, `Alliance broken. War at tick ${r.grace_ends_tick}`);
-        return h('span', { style: 'color:#e08b82' }, 'At war');
+        return h('div', { class: 'row wrap2' }, h('span', { style: 'color:#e08b82' }, 'At war'), peaceBtn);
       };
 
       const drawSide = () => {
@@ -1441,7 +1455,7 @@
             return h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
               h('div', { class: 'line', style: 'border:none' },
                 h('span', { style: 'color:var(--text)' }, dots(p.faction_slug), p.display_name, p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? h('span', { class: 'tag' }, 'out') : null),
-                h('span', {}, `${n} · ${st === 'neutral' ? '' : st}`)),
+                h('span', {}, `${n} · ${st === 'neutral' ? '' : st.replace('_', ' ')}`)),
               p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id && !p.is_ai ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null) : null);
           })));
           parts.push(h('div', { class: 'sec', style: 'color:var(--dim);font-size:.8rem' }, 'Click a castle or commander for details. Drag to pan, scroll to zoom. A gold ring marks a king.'));

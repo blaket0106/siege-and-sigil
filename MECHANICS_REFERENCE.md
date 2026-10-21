@@ -1128,11 +1128,11 @@ Pair status lives in `diplomacy` (neutral, proposed, allied, grace_period, war).
 
 - **Propose / accept / decline:** `propose_alliance`, `accept_alliance`, `decline_alliance`. Each notifies the other player's inbox. You cannot propose to yourself, twice, while at war, or during a grace period. If both sides propose, the second proposal forms the alliance immediately.
 - **Break:** `break_alliance` moves the pair to `grace_period` for `games.grace_period_ticks` (default 24). Friendly status ends at once. Any of the breaker's or the other player's commanders standing in the other's territory are moved to their owner's nearest territory (`expel_commanders`).
-- **War:** there is no declaration action. War starts automatically when a grace period expires (`advance_diplomacy`, how = alliance_broken) or when the first `battle`, `intercept` or `siege_started` event happens between non-allied players (trigger `game_events_hostile`, how = attack). An attack during a grace period ends it as war immediately. War is permanent in V1.
+- **War:** there is no declaration action. War starts automatically when a grace period expires (`advance_diplomacy`, how = alliance_broken) or when the first `battle`, `intercept` or `siege_started` event happens between non-allied players (trigger `game_events_hostile`, how = attack). An attack during a grace period ends it as war immediately. War ends only through a truce (20y).
 - **Visibility:** alliance formation and breaks are private moments to the two players; war declarations are public.
 - **AI:** `ai_diplomacy` runs at the start of each AI turn and answers pending proposals. Accept chance falls with difficulty (80 / 65 / 50 / 35 / 25% for difficulty 1 to 5; 27 of 30 in test at difficulty 1). It always declines a proposer holding at least 70% of the territories needed to win.
 - **Verified (rolled-back tests):** propose, decline, accept, mutual proposal, all error paths, break with expulsion, grace expiry to war at tick 29, auto-war from a real battle, attack during grace, AI accept rate and leader decline.
-- **Not done yet:** peace, honor and infamy, AI proposing or betraying alliances, allied team fights (allies fight sequentially).
+- **Not done yet:** honor and infamy, allied team fights (allies fight sequentially). Peace and AI diplomacy are in 20y.
 
 ### 20v. Lobby housekeeping (implemented)
 
@@ -1167,6 +1167,23 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 - **News:** in fog games `castle_captured`, `siege_started` and `siege_lifted` moments are stored private to the players involved (trigger `game_moments_fog`); wars, eliminations, king deaths and wins stay public.
 - **Public by design:** map geometry, each player's territory count, who is eliminated, faction and display name.
 - **Known limits:** an enemy marching commander inside your vision reveals its full path and destination; commanders passing out of vision stay drawn until the next refresh (at most the 20 second poll or the next pulse); the home list refreshes by polling every 8 seconds.
+
+### 20y. Peace and AI diplomacy (implemented)
+
+- **Truce:** `propose_peace(game, player)`, `accept_peace`, `decline_peace`. A proposal is allowed from neutral (a non-aggression pact) or war. Statuses: `peace_proposed` (pending, with `prior_status` so a decline restores neutral or war) and `truce` (with `truce_ends_tick`). Both sides proposing forms the truce at once. Accepting sets `truce_ends_tick = tick + games.truce_ticks` (default 48, column only for now) and sends commanders standing in the partner's territory, including besiegers, to their own nearest territory. The truce cannot be broken; it expires back to **neutral** (`advance_diplomacy`), after which either side may attack again.
+- **Enforcement:** `plan_march` refuses any destination owned by a truce partner (so previews, orders, route legs and AI scoring all refuse it with the end tick); `advance_movements` cancels a march that reaches a truce partner's territory (the commander stops idle on the last friendly node, the route is aborted, the owner is told); `resolve_intercepts` skips truce pairs; `mark_war` ignores truce pairs. A truce gives no shared vision and no passage through the other's territory. Alliances cannot be proposed during a truce or while peace is pending.
+- **News:** `truce_formed` and `truce_ended` are public moments; both players also get inbox messages.
+- **Refactor:** `break_alliance_core` and `propose_peace_core` serve both the client RPCs and the AI.
+- **AI diplomacy** (`ai_diplomacy`, run at the start of each AI turn, scaled by `ai_difficulty`):
+  - Answers alliance proposals as before (always declines a proposer holding 70% or more of the win threshold).
+  - Answers peace: accepts 90% when it has fewer castles than the proposer, 15% when it has at least 1.5 times as many, otherwise 80 / 70 / 55 / 45 / 35% by difficulty 1 to 5.
+  - Withdraws its own unanswered proposals after 24 ticks.
+  - Betrays an ally who holds 70% or more of the win threshold: 20 / 35 / 50 / 70 / 90% per turn by difficulty (one betrayal per turn).
+  - Proposes peace to a player it is at war with when it has under 80% of that player's castles (50% per turn, at least 12 ticks into the war or since the last decline).
+  - Proposes an alliance (30% per turn, at most one pending proposal, at most 1 ally at difficulty 1 to 3 and 2 at 4 to 5) to a neutral, non-leading player, preferring close neighbors and players at war with its own enemies; 12 tick cooldown after a decline.
+- **UI:** Standings show Propose alliance and Propose peace (neutral), At war with Propose peace, Accept or Decline for incoming peace, a pending note for outgoing, and Truce until tick N. The top bar counts waiting proposals of either kind.
+- **Verified (rolled-back tests with triggers enabled):** propose, decline restoring war, accept with expulsion, all error paths, order and preview refusal, in-flight march cancelled on arrival, intercepts blocked in truce and happening at war, expiry, marching again after expiry; AI acceptance, proposal, withdrawal and betrayal rates against their targets over many trials; a 60 tick generated game at difficulty 5 with no AI errors, forming two AI alliances.
+- **Not done yet:** a lobby setting for truce length, truce for allies breaking into war, honor and infamy.
 
 ---
 
