@@ -148,6 +148,16 @@
       return guestAttempt;
     }
 
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks';
+    const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
+
+    function watchGame(gameId, onRefresh) {
+      const channel = sb.channel('game:' + gameId, { config: { private: true } })
+        .on('broadcast', { event: 'refresh' }, onRefresh)
+        .subscribe((status) => { if (status === 'SUBSCRIBED') onRefresh(); });
+      return () => sb.removeChannel(channel);
+    }
+
     const SCHOOLS = [
       { slug: 'battleschool', name: 'Battleschool' },
       { slug: 'university', name: 'University' },
@@ -421,14 +431,8 @@
 
       await refresh();
 
-      const timer = setInterval(refresh, 15000);
-      let debounce = null;
-      const kick = () => { clearTimeout(debounce); debounce = setTimeout(refresh, 400); };
-      const channel = sb.channel('home-' + Math.random().toString(36).slice(2))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, kick)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players' }, kick)
-        .subscribe();
-      state.cleanup.push(() => { clearInterval(timer); clearTimeout(debounce); sb.removeChannel(channel); });
+      const timer = setInterval(refresh, 8000);
+      state.cleanup.push(() => clearInterval(timer));
     }
 
     function joinDialog(g) {
@@ -528,9 +532,10 @@
 
       const draw = async () => {
         if (state.view !== 'room' || state.roomId !== gameId) return;
-        const [gameRes, playersRes] = await Promise.all([
-          sb.from('games').select('*').eq('id', gameId).maybeSingle(),
-          sb.from('game_players').select('*').eq('game_id', gameId).order('id'),
+        const [gameRes, playersRes, schoolsRes] = await Promise.all([
+          sb.from('games').select(GAME_COLS).eq('id', gameId).maybeSingle(),
+          sb.from('game_players').select(PLAYER_COLS).eq('game_id', gameId).order('id'),
+          sb.rpc('my_starting_schools', { p_game_id: gameId }),
         ]);
         if (state.view !== 'room' || state.roomId !== gameId) return;
         const game = gameRes.data;
@@ -540,6 +545,7 @@
         }
         const players = playersRes.data || [];
         const me = players.find((p) => p.user_id === state.session.user.id);
+        if (me) me.starting_schools = schoolsRes.data;
         const isHost = game.created_by === state.session.user.id;
 
         const parts = [topbar(), h('div', { class: 'row', style: 'margin-bottom:14px' },
@@ -663,12 +669,9 @@
 
       let debounce = null;
       const kick = () => { clearTimeout(debounce); debounce = setTimeout(draw, 300); };
-      const channel = sb.channel('room-' + gameId)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, kick)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, kick)
-        .subscribe();
+      const unwatch = watchGame(gameId, kick);
       const timer = setInterval(draw, 20000);
-      state.cleanup.push(() => { clearTimeout(debounce); clearInterval(timer); sb.removeChannel(channel); });
+      state.cleanup.push(() => { clearTimeout(debounce); clearInterval(timer); unwatch(); });
     }
 
 
@@ -785,40 +788,12 @@
         return m ? movementPos(m, tf) : null;
       };
 
-      const scanR = (c) => 45 + 15 * rankOf(c) + 30 * ((ms.abil.get(c.id) || {}).scout || 0);
-      const inSources = (pos) => ms.sources.some((s) => Math.hypot(pos.x - s.x, pos.y - s.y) <= s.r);
-
       const computeVis = () => {
-        const vis = new Set();
-        const sources = [];
-        if (!ms.game.fog_of_war) {
-          ms.t.forEach((_, id) => vis.add(id));
-        } else {
-          const tf = tickF();
-          ms.t.forEach((t) => {
-            if (t.owner_player_id === ms.me.id) sources.push({ x: t.x, y: t.y, r: 90 + 60 * ms.wl });
-            else if (t.owner_player_id && isFriend(t.owner_player_id)) sources.push({ x: t.x, y: t.y, r: 90 });
-            if (t.owner_player_id && isFriend(t.owner_player_id)) vis.add(t.id);
-          });
-          ms.cmd.forEach((c) => {
-            if (!isFriend(c.owner_player_id)) return;
-            const pos = cmdPos(c, tf);
-            if (pos) sources.push({ x: pos.x, y: pos.y, r: scanR(c) });
-          });
-          ms.t.forEach((t) => {
-            if (!vis.has(t.id) && sources.some((s) => Math.hypot(t.x - s.x, t.y - s.y) <= s.r)) vis.add(t.id);
-          });
-        }
-        ms.vis = vis;
-        ms.sources = sources;
+        ms.vis = new Set([...ms.t.values()].filter((t) => t.seen).map((t) => t.id));
+        ms.sources = ms.serverSources;
       };
 
-      const commanderSeen = (c, tf) => {
-        if (isFriend(c.owner_player_id) || !ms.game.fog_of_war) return true;
-        if (c.current_territory_id) return ms.vis.has(c.current_territory_id);
-        const pos = cmdPos(c, tf);
-        return pos ? inSources(pos) : false;
-      };
+      const commanderSeen = () => true;
 
       const select = (type, id) => {
         if (ms.dragged) return;
@@ -980,7 +955,7 @@
 
       const pendingProposals = () => ms.dip.filter((d) => d.status === 'proposed' && d.proposed_by_player_id !== ms.me.id).length;
 
-      const castlesOf = (pid) => [...ms.t.values()].filter((t) => t.owner_player_id === pid).length;
+      const castlesOf = (pid) => ms.standings[pid] || 0;
 
       const drawHud = () => {
         const g = ms.game;
@@ -1516,45 +1491,45 @@
       let firstLoad = true;
       const load = async () => {
         if (state.view !== 'map' || state.roomId !== gameId) return;
-        const q = (t) => sb.from(t).select('*').eq('game_id', gameId);
         const res = await Promise.all([
-          sb.from('games').select('*').eq('id', gameId).maybeSingle(),
-          q('game_players'), q('game_territories'), q('commanders'), q('commander_abilities'),
-          q('commander_movements'), q('realm_areas'), q('diplomacy'), q('commander_routes'),
+          sb.rpc('get_game_view', { p_game_id: gameId }),
           sb.from('game_moments').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
           sb.from('player_inbox').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
           sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(150),
           sb.from('message_threads').select('*').eq('game_id', gameId),
           sb.from('thread_participants').select('*').eq('game_id', gameId),
-          ms.edges ? Promise.resolve({ data: ms.edges }) : q('territory_edges'),
+          ms.edges ? Promise.resolve({ data: ms.edges }) : sb.from('territory_edges').select('*').eq('game_id', gameId),
         ]);
         if (state.view !== 'map' || state.roomId !== gameId) return;
+
+        const [vw, mo, ib, ch, th, pt, ed] = res;
+        if (vw.error && vw.error.message.includes('not in this game')) { toast('That game is no longer available.'); return showHome(); }
         const failed = res.find((r) => r.error);
         if (failed) { toast(failed.error.message); return; }
-        const [g, pl, tr, cm, ab, mv, ar, dp, rt, mo, ib, ch, th, pt, ed] = res;
+        const view = vw.data;
         const threadIds = th.data.map((t) => t.id);
         const tm = threadIds.length
           ? await sb.from('thread_messages').select('*').in('thread_id', threadIds).order('id', { ascending: false }).limit(500)
           : { data: [] };
         if (tm.error) { toast(tm.error.message); return; }
         if (state.view !== 'map' || state.roomId !== gameId) return;
-        if (!g.data) { toast('That game is no longer available.'); return showHome(); }
-        ms.game = g.data;
-        ms.players = new Map(pl.data.map((p) => [p.id, p]));
-        ms.me = pl.data.find((p) => p.user_id === uid);
-        if (!ms.me) { toast('You are not in this game.'); return showHome(); }
-        ms.t = new Map(tr.data.map((t) => [t.id, t]));
-        ms.cmd = cm.data.filter((c) => c.status !== 'dead');
+        ms.game = view.game;
+        ms.players = new Map(view.players.map((p) => [p.id, p]));
+        ms.me = ms.players.get(view.me);
+        ms.t = new Map(view.territories.map((t) => [t.id, t]));
+        ms.standings = view.standings;
+        ms.serverSources = view.sources;
+        ms.cmd = view.commanders;
         ms.abil = new Map();
-        ab.data.forEach((a) => {
+        view.abilities.forEach((a) => {
           const m = ms.abil.get(a.commander_id) || {};
           m[a.ability] = a.level;
           ms.abil.set(a.commander_id, m);
         });
-        ms.mov = new Map(mv.data.map((m) => [m.commander_id, m]));
-        ms.areas = ar.data;
-        ms.wl = (ar.data.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
-        ms.dip = dp.data;
+        ms.mov = new Map(view.movements.map((m) => [m.commander_id, m]));
+        ms.areas = view.areas;
+        ms.wl = (view.areas.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
+        ms.dip = view.diplomacy;
         ms.moments = mo.data;
         ms.inbox = ib.data;
         ms.chat = ch.data.slice().reverse();
@@ -1570,15 +1545,15 @@
           if (t) t.msgs.push(m);
         });
         ms.routes = new Map();
-        rt.data.sort((a, b) => a.id - b.id).forEach((r) => ms.routes.set(r.commander_id, r));
+        view.routes.sort((a, b) => a.id - b.id).forEach((r) => ms.routes.set(r.commander_id, r));
         if (!ms.edges) {
           ms.edges = ed.data;
-          ms.cells = voronoiCells([...ms.t.values()], g.data.map_w, g.data.map_h);
+          ms.cells = voronoiCells([...ms.t.values()], view.game.map_w, view.game.map_h);
         }
         if (firstLoad) {
           firstLoad = false;
           const pad = 40;
-          ms.full = { x: -pad, y: -pad, w: g.data.map_w + 2 * pad, h: g.data.map_h + 2 * pad };
+          ms.full = { x: -pad, y: -pad, w: view.game.map_w + 2 * pad, h: view.game.map_h + 2 * pad };
           ms.view = { ...ms.full };
           applyView();
         }
@@ -1590,23 +1565,23 @@
 
       let debounce = null;
       const kick = () => { clearTimeout(debounce); debounce = setTimeout(load, 300); };
+      const unwatch = watchGame(gameId, kick);
       const f = `game_id=eq.${gameId}`;
-      let channel = sb.channel('map-' + gameId).on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, kick);
-      ['game_players', 'game_territories', 'commanders', 'commander_movements', 'diplomacy', 'realm_areas', 'game_moments', 'player_inbox'].forEach((table) => {
+      let channel = sb.channel('map-data-' + gameId);
+      ['diplomacy', 'realm_areas', 'game_moments', 'player_inbox', 'game_chat'].forEach((table) => {
         channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: f }, kick);
       });
-      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: 'game_chat', filter: f }, kick)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'thread_messages' }, kick);
-      channel.subscribe((status) => { if (status === 'SUBSCRIBED') kick(); });
+      channel = channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'thread_messages' }, kick);
+      channel.subscribe();
       const tickTimer = setInterval(() => { if (ms.game) { renderDyn(); updateCountdown(); } }, 1000);
-      const loadTimer = setInterval(load, 30000);
+      const loadTimer = setInterval(load, 20000);
       const onKey = (e) => {
         if (e.key !== 'Escape' || document.activeElement instanceof HTMLInputElement) return;
         if (ms.marching) { ms.marching = false; ms.preview = null; render(); drawSide(); }
         else if (ms.sel) select(null);
       };
       window.addEventListener('keydown', onKey);
-      state.cleanup.push(() => { window.removeEventListener('keydown', onKey); clearTimeout(debounce); clearInterval(tickTimer); clearInterval(loadTimer); sb.removeChannel(channel); });
+      state.cleanup.push(() => { window.removeEventListener('keydown', onKey); clearTimeout(debounce); clearInterval(tickTimer); clearInterval(loadTimer); unwatch(); sb.removeChannel(channel); });
     }
 
     async function onSession(session, event) {
