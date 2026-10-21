@@ -5,24 +5,1640 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Siege & Sigil</title>
   <style>
+    :root {
+      --bg: #0a0a0f;
+      --panel: #14141c;
+      --panel2: #1b1b26;
+      --line: #2e2c3a;
+      --text: #c9b99a;
+      --dim: #7d7466;
+      --gold: #d4a94a;
+      --gold2: #f0cf7d;
+      --red: #c0453a;
+      --green: #5a9a5e;
+    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: #0a0a0f;
-      color: #c9b99a;
-      font-family: 'Georgia', serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      background: radial-gradient(ellipse at top, #15121f 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: Georgia, 'Times New Roman', serif;
+      min-height: 100vh;
     }
-    h1 { font-size: 2.5rem; letter-spacing: 0.1em; }
-    p  { color: #666; font-size: 0.9rem; text-align: center; }
+    h1, h2, h3 { font-weight: normal; letter-spacing: 0.08em; margin: 0; color: var(--gold2); }
+    button, input, select { font: inherit; color: inherit; }
+    input, select {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 9px 11px;
+      width: 100%;
+    }
+    input:focus, select:focus { outline: 1px solid var(--gold); border-color: var(--gold); }
+    label { display: block; font-size: 0.8rem; color: var(--dim); margin: 12px 0 4px; letter-spacing: 0.04em; }
+    button {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: var(--gold); }
+    button:disabled { opacity: 0.45; cursor: default; }
+    button.primary { background: #3a2f12; border-color: var(--gold); color: var(--gold2); }
+    button.primary:hover:not(:disabled) { background: #4d3e17; }
+    button.danger { border-color: #6b2e28; color: #e08b82; }
+    button.link { background: none; border: none; padding: 0; color: var(--gold); text-decoration: underline; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px 48px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 22px; gap: 12px; flex-wrap: wrap; }
+    .topbar .who { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: 0.9rem; }
+    .brand { font-size: 1.5rem; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; margin-bottom: 20px; }
+    .panel > h2 { font-size: 1.1rem; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .auth { max-width: 380px; margin: 12vh auto 0; text-align: center; }
+    .auth h1 { font-size: 2.4rem; margin-bottom: 4px; }
+    .auth .sub { color: var(--dim); margin-bottom: 24px; font-size: 0.9rem; }
+    .auth .panel { text-align: left; }
+    .tabs { display: flex; gap: 0; margin-bottom: 8px; }
+    .tabs button { flex: 1; border-radius: 0; background: none; border: none; border-bottom: 2px solid var(--line); padding: 10px; color: var(--dim); }
+    .tabs button.on { border-bottom-color: var(--gold); color: var(--gold2); }
+    .msg { margin-top: 12px; font-size: 0.85rem; color: var(--gold2); }
+    .row { display: flex; gap: 10px; align-items: center; }
+    .row.wrap2 { flex-wrap: wrap; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+    .list > * { border-top: 1px solid var(--line); padding: 12px 0; }
+    .list > *:first-child { border-top: none; }
+    .game { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .game .name { color: var(--gold2); font-size: 1.02rem; }
+    .game .meta { color: var(--dim); font-size: 0.82rem; margin-top: 3px; }
+    .empty { color: var(--dim); font-style: italic; padding: 8px 0; }
+    .chip { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; border: 1px solid #000; }
+    .dots { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: middle; }
+    .tag { font-size: 0.72rem; border: 1px solid var(--line); border-radius: 10px; padding: 1px 8px; color: var(--dim); margin-left: 6px; }
+    .tag.gold { border-color: var(--gold); color: var(--gold); }
+    .tag.green { border-color: var(--green); color: var(--green); }
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+    .slot { background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 12px; min-height: 64px; display: flex; align-items: center; gap: 10px; }
+    .slot.empty { opacity: 0.5; font-style: italic; color: var(--dim); }
+    .slot .nm { color: var(--gold2); }
+    .slot .fn { color: var(--dim); font-size: 0.8rem; }
+    .factions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 6px; }
+    .fac { display: flex; align-items: center; gap: 8px; padding: 8px 10px; text-align: left; }
+    .fac.on { border-color: var(--gold); background: #2a2210; }
+    .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 16px; font-size: 0.88rem; }
+    .kv b { display: block; color: var(--dim); font-weight: normal; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 12px; overflow-y: auto; z-index: 10; }
+    .modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 6px; padding: 20px; width: 100%; max-width: 520px; }
+    .modal h2 { margin-bottom: 8px; }
+    .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.9rem; color: var(--text); }
+    .check input { width: auto; }
+    #toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 20; width: min(92vw, 460px); }
+    .toast { background: #2a1512; border: 1px solid var(--red); padding: 10px 14px; border-radius: 4px; font-size: 0.9rem; }
+    .toast.ok { background: #14231a; border-color: var(--green); }
+    .maproot { display: flex; flex-direction: column; height: 100vh; }
+    .hud { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 0.88rem; }
+    .hud b { color: var(--gold2); font-weight: normal; letter-spacing: 0.06em; }
+    .hud .grow { flex: 1; }
+    .hud label { margin: 0; display: flex; align-items: center; gap: 6px; color: var(--text); }
+    .hud label input { width: auto; }
+    .mapbody { flex: 1; display: flex; min-height: 0; }
+    .mapwrap { flex: 1; min-width: 0; background: #07070b; position: relative; }
+    .mapwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; user-select: none; }
+    .mapwrap text { font-family: Georgia, serif; pointer-events: none; fill: #d9ccb0; }
+    .side { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 14px; font-size: 0.88rem; }
+    .side h3 { font-size: 1.02rem; margin-bottom: 6px; }
+    .side .sec { margin-top: 16px; }
+    .side .sec > b { display: block; color: var(--dim); font-weight: normal; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
+    .side .line { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid #20202b; }
+    .side .line span:first-child { color: var(--dim); }
+    .cmdrow { width: 100%; text-align: left; margin-top: 6px; display: flex; gap: 8px; align-items: center; }
+    @media (max-width: 760px) { .mapbody { flex-direction: column; } .side { width: auto; max-height: 42vh; border-left: none; border-top: 1px solid var(--line); } }
+    .chatlist { max-height: 46vh; overflow-y: auto; padding: 4px 0; }
+    .chatline { padding: 3px 0; word-break: break-word; }
+    .chatline small { color: var(--dim); margin-left: 6px; }
+    .threadrow { width: 100%; text-align: left; margin-top: 6px; display: block; }
+    .threadrow small { display: block; color: var(--dim); margin-top: 2px; }
+    .composer { display: flex; gap: 8px; margin-top: 10px; }
+    .composer input { flex: 1; }
+    .loading { text-align: center; color: var(--dim); margin-top: 30vh; letter-spacing: 0.2em; }
+    @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <div>
-    <h1>Siege &amp; Sigil</h1>
-    <p>Coming soon.</p>
-  </div>
+  <div id="app"><div class="loading">SIEGE &amp; SIGIL</div></div>
+  <div id="toasts"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+  <script>
+    const SUPABASE_URL = 'https://gyofddvzluokqvrcspxq.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_gthIPHl4f-stVfunZ97bxQ_vO3CMTXT';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const DEV_GUEST = true;
+
+    let guestAttempt = null;
+
+    function startGuest() {
+      if (!guestAttempt) {
+        guestAttempt = sb.auth.signInAnonymously().then(({ error }) => {
+          if (!error) return true;
+          toast('Guest sign-in failed: ' + error.message + '. Enable anonymous sign-ins in the Supabase dashboard.');
+          return false;
+        }).finally(() => { guestAttempt = null; });
+      }
+      return guestAttempt;
+    }
+
+    const SCHOOLS = [
+      { slug: 'battleschool', name: 'Battleschool' },
+      { slug: 'university', name: 'University' },
+      { slug: 'rangers', name: 'Rangers' },
+    ];
+    const SPEEDS = { slow: 'Slow (2h ticks)', normal: 'Normal (1h)', fast: 'Fast (30m)', quad: 'Quad (15m)' };
+    const SIZES = { compact: 'Compact', standard: 'Standard', large: 'Large' };
+    const STYLES = { scatter: 'Scatter', continents: 'Continents' };
+    const MAX_START = { compact: 4, standard: 7, large: 12 };
+
+    const state = {
+      session: null,
+      profile: null,
+      factions: [],
+      view: 'auth',
+      authTab: 'signin',
+      roomId: null,
+      cleanup: [],
+    };
+
+    function h(tag, props, ...kids) {
+      const el = document.createElement(tag);
+      for (const [k, v] of Object.entries(props || {})) {
+        if (v === undefined || v === null || v === false) continue;
+        if (k === 'class') el.className = v;
+        else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+        else if (k === 'value') el.value = v;
+        else if (v === true) el.setAttribute(k, '');
+        else el.setAttribute(k, v);
+      }
+      for (const kid of kids.flat()) {
+        if (kid === null || kid === undefined || kid === false) continue;
+        el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+      }
+      return el;
+    }
+
+    function toast(message, ok) {
+      const t = h('div', { class: 'toast' + (ok ? ' ok' : '') }, message);
+      document.getElementById('toasts').append(t);
+      setTimeout(() => t.remove(), 5500);
+    }
+
+    async function run(btn, fn) {
+      if (btn) btn.disabled = true;
+      try {
+        return await fn();
+      } catch (e) {
+        toast(e.message || String(e));
+      } finally {
+        if (btn && btn.isConnected) btn.disabled = false;
+      }
+    }
+
+    function clearCleanup() {
+      state.cleanup.forEach((fn) => fn());
+      state.cleanup = [];
+    }
+
+    function mount(node) {
+      const app = document.getElementById('app');
+      app.replaceChildren(node);
+    }
+
+    function modal(title, body, actions) {
+      const overlay = h('div', { class: 'overlay' });
+      const close = () => overlay.remove();
+      overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+      overlay.append(h('div', { class: 'modal' }, h('h2', {}, title), body, h('div', { class: 'actions' }, actions(close))));
+      document.body.append(overlay);
+      return close;
+    }
+
+    function factionOf(slug) {
+      return state.factions.find((f) => f.slug === slug) || { slug, name: slug, color: '#555', color2: '#222' };
+    }
+
+    function dots(slug) {
+      const f = factionOf(slug);
+      return h('span', { class: 'dots' },
+        h('span', { class: 'chip', style: `background:${f.color}` }),
+        h('span', { class: 'chip', style: `background:${f.color2}` }));
+    }
+
+    function factionPicker(taken, initial, onPick) {
+      let chosen = initial || null;
+      const wrap = h('div', { class: 'factions' });
+      const draw = () => {
+        const buttons = [
+          h('button', { type: 'button', class: 'fac' + (chosen === null ? ' on' : ''), onclick: () => { chosen = null; onPick(null); draw(); } }, 'Random'),
+          ...state.factions.map((f) =>
+            h('button', {
+              type: 'button',
+              class: 'fac' + (chosen === f.slug ? ' on' : ''),
+              disabled: taken.includes(f.slug),
+              onclick: () => { chosen = f.slug; onPick(f.slug); draw(); },
+            }, dots(f.slug), f.name)),
+        ];
+        wrap.replaceChildren(...buttons);
+      };
+      draw();
+      return wrap;
+    }
+
+    async function loadProfile() {
+      const { data } = await sb.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
+      state.profile = data;
+    }
+
+    async function loadFactions() {
+      if (state.factions.length) return;
+      const { data } = await sb.from('factions').select('*').order('name');
+      state.factions = data || [];
+    }
+
+    function renderAuth(recovery) {
+      let tab = recovery ? 'recovery' : state.authTab;
+      const message = h('div', { class: 'msg' });
+      const email = h('input', { type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
+      const password = h('input', { type: 'password', autocomplete: tab === 'signup' || tab === 'recovery' ? 'new-password' : 'current-password' });
+      const name = h('input', { type: 'text', maxlength: '40', placeholder: 'Shown to other players' });
+      const form = h('form', { novalidate: true });
+
+      const draw = () => {
+        const submit = h('button', { type: 'submit', class: 'primary', style: 'width:100%;margin-top:18px' },
+          { signin: 'Sign in', signup: 'Create account', reset: 'Send reset link', recovery: 'Set new password' }[tab]);
+        const tabs = recovery ? null : h('div', { class: 'tabs' },
+          h('button', { type: 'button', class: tab === 'signin' ? 'on' : '', onclick: () => { state.authTab = tab = 'signin'; draw(); } }, 'Sign in'),
+          h('button', { type: 'button', class: tab === 'signup' ? 'on' : '', onclick: () => { state.authTab = tab = 'signup'; draw(); } }, 'Create account'));
+        const kids = [tabs];
+        if (tab === 'signup') kids.push(h('label', {}, 'Display name'), name);
+        if (tab !== 'recovery') kids.push(h('label', {}, 'Email'), email);
+        if (tab !== 'reset') kids.push(h('label', {}, tab === 'recovery' ? 'New password' : 'Password'), password);
+        kids.push(submit);
+        if (tab === 'signin') kids.push(h('div', { style: 'margin-top:14px;text-align:center' }, h('button', { type: 'button', class: 'link', onclick: () => { tab = 'reset'; draw(); } }, 'Forgot password?')));
+        if (tab === 'reset') kids.push(h('div', { style: 'margin-top:14px;text-align:center' }, h('button', { type: 'button', class: 'link', onclick: () => { tab = 'signin'; draw(); } }, 'Back to sign in')));
+        kids.push(message);
+        form.replaceChildren(...kids.filter(Boolean));
+        message.textContent = '';
+      };
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button[type=submit]');
+        await run(btn, async () => {
+          message.textContent = '';
+          if (tab === 'signin') {
+            const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: password.value });
+            if (error) throw error;
+          } else if (tab === 'signup') {
+            const display = name.value.trim();
+            if (!display) throw new Error('Choose a display name');
+            if (password.value.length < 8) throw new Error('Password must be at least 8 characters');
+            const { data, error } = await sb.auth.signUp({
+              email: email.value.trim(),
+              password: password.value,
+              options: { data: { display_name: display }, emailRedirectTo: location.href.split('#')[0] },
+            });
+            if (error) throw error;
+            if (!data.session) message.textContent = 'Account created. Check your email for a confirmation link, then sign in.';
+          } else if (tab === 'reset') {
+            const { error } = await sb.auth.resetPasswordForEmail(email.value.trim(), { redirectTo: location.href.split('#')[0] });
+            if (error) throw error;
+            message.textContent = 'If that email has an account, a reset link is on its way.';
+          } else {
+            if (password.value.length < 8) throw new Error('Password must be at least 8 characters');
+            const { error } = await sb.auth.updateUser({ password: password.value });
+            if (error) throw error;
+            toast('Password updated', true);
+            await showHome();
+          }
+        });
+      });
+
+      draw();
+      mount(h('div', { class: 'wrap' }, h('div', { class: 'auth' },
+        h('h1', {}, 'Siege & Sigil'),
+        h('div', { class: 'sub' }, 'Castles. Commanders. Kingdoms at war.'),
+        h('div', { class: 'panel' }, form))));
+    }
+
+    function topbar() {
+      const nameEl = h('span', {}, state.profile ? state.profile.display_name : '');
+      return h('div', { class: 'topbar' },
+        h('div', { class: 'brand' }, h('h1', {}, 'Siege & Sigil')),
+        h('div', { class: 'who' },
+          nameEl,
+          h('button', { class: 'link', onclick: renameDialog }, 'rename'),
+          h('button', { onclick: () => sb.auth.signOut() }, DEV_GUEST ? 'New guest' : 'Sign out')));
+    }
+
+    function renameDialog() {
+      const input = h('input', { type: 'text', maxlength: '40', value: state.profile ? state.profile.display_name : '' });
+      modal('Display name', h('div', {}, input), (close) => [
+        h('button', { onclick: close }, 'Cancel'),
+        h('button', {
+          class: 'primary',
+          onclick: (e) => run(e.currentTarget, async () => {
+            const value = input.value.trim();
+            if (!value) throw new Error('Name cannot be empty');
+            const { error } = await sb.from('profiles').update({ display_name: value }).eq('user_id', state.session.user.id);
+            if (error) throw error;
+            await loadProfile();
+            close();
+            await showHome();
+          }),
+        }, 'Save'),
+      ]);
+    }
+
+    function describeGame(g) {
+      return [`${STYLES[g.map_style] || g.map_style} map`, SIZES[g.map_size] || g.map_size, SPEEDS[g.tick_speed] || g.tick_speed,
+        `${Math.round(g.victory_pct * 100)}% to win`, g.fog_of_war ? 'fog of war' : 'no fog', g.fill_with_ai ? 'AI fills empty seats' : null].filter(Boolean).join(' · ');
+    }
+
+    async function showHome() {
+      clearCleanup();
+      state.view = 'home';
+      state.roomId = null;
+      await Promise.all([loadFactions(), state.profile ? null : loadProfile()]);
+
+      const openList = h('div', { class: 'list' });
+      const mineList = h('div', { class: 'list' });
+
+      const refresh = async () => {
+        if (state.view !== 'home') return;
+        const [open, mine] = await Promise.all([
+          sb.rpc('list_open_games'),
+          sb.from('game_players').select('id, faction_slug, games!game_players_game_id_fkey(id, name, status, max_players, current_tick, created_by)').eq('user_id', state.session.user.id).order('id', { ascending: false }),
+        ]);
+        if (state.view !== 'home') return;
+
+        if (open.error) toast(open.error.message);
+        else {
+          openList.replaceChildren(...(open.data.length ? open.data.map(openRow) : [h('div', { class: 'empty' }, 'No open games. Create one.')]));
+        }
+
+        if (mine.error) toast(mine.error.message);
+        else {
+          const rows = (mine.data || []).filter((r) => r.games).sort((a, b) => b.games.id - a.games.id);
+          mineList.replaceChildren(...(rows.length ? rows.map(mineRow) : [h('div', { class: 'empty' }, 'You have not joined any games yet.')]));
+        }
+      };
+
+      const openRow = (g) => h('div', { class: 'game' },
+        h('div', {},
+          h('div', { class: 'name' }, g.name, g.joined ? h('span', { class: 'tag green' }, 'joined') : null),
+          h('div', { class: 'meta' }, `Host ${g.host_name} · ${g.player_count}/${g.max_players} players · ${describeGame(g)}`)),
+        h('div', { class: 'row' },
+          g.joined
+            ? h('button', { class: 'primary', onclick: () => showRoom(g.id) }, 'Open')
+            : h('button', { class: 'primary', disabled: g.player_count >= g.max_players, onclick: () => joinDialog(g) }, g.player_count >= g.max_players ? 'Full' : 'Join')));
+
+      const mineRow = (r) => {
+        const g = r.games;
+        const label = { lobby: 'in lobby', active: 'in progress', finished: 'finished' }[g.status];
+        return h('div', { class: 'game' },
+          h('div', {},
+            h('div', { class: 'name' }, dots(r.faction_slug), g.name, h('span', { class: 'tag' + (g.status === 'active' ? ' gold' : '') }, label)),
+            h('div', { class: 'meta' }, `${factionOf(r.faction_slug).name} · ${g.status === 'lobby' ? 'waiting to start' : 'tick ' + g.current_tick}`)),
+          h('button', { class: 'primary', onclick: () => (g.status === 'lobby' ? showRoom(g.id) : showMap(g.id)) }, g.status === 'lobby' ? 'Open lobby' : 'Open map'));
+      };
+
+      mount(h('div', { class: 'wrap' }, topbar(),
+        h('div', { class: 'panel' },
+          h('h2', {}, 'Open games', h('span', { class: 'row' },
+            h('button', { onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh'),
+            h('button', { class: 'primary', onclick: createDialog }, 'Create game'))),
+          openList),
+        h('div', { class: 'panel' }, h('h2', {}, 'Your games'), mineList)));
+
+      await refresh();
+
+      const timer = setInterval(refresh, 15000);
+      let debounce = null;
+      const kick = () => { clearTimeout(debounce); debounce = setTimeout(refresh, 400); };
+      const channel = sb.channel('home-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, kick)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players' }, kick)
+        .subscribe();
+      state.cleanup.push(() => { clearInterval(timer); clearTimeout(debounce); sb.removeChannel(channel); });
+    }
+
+    function joinDialog(g) {
+      let pick = null;
+      const picker = factionPicker(g.taken_factions, null, (v) => { pick = v; });
+      modal(`Join ${g.name}`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);font-size:.85rem' }, `Host ${g.host_name} · ${describeGame(g)}`), h('label', {}, 'Faction'), picker), (close) => [
+        h('button', { onclick: close }, 'Cancel'),
+        h('button', {
+          class: 'primary',
+          onclick: (e) => run(e.currentTarget, async () => {
+            const { error } = await sb.rpc('join_game', { p_game_id: g.id, p_faction_slug: pick });
+            if (error) throw error;
+            close();
+            await showRoom(g.id);
+          }),
+        }, 'Join game'),
+      ]);
+    }
+
+    function selectOf(options, value) {
+      const el = h('select', {}, Object.entries(options).map(([k, v]) => h('option', { value: k }, v)));
+      el.value = value;
+      return el;
+    }
+
+    function createDialog() {
+      let faction = null;
+      const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s game` });
+      const players = h('input', { type: 'number', min: '2', max: '8', value: '4' });
+      const style = selectOf(STYLES, 'scatter');
+      const size = selectOf(SIZES, 'standard');
+      const speed = selectOf(SPEEDS, 'normal');
+      const victory = h('input', { type: 'number', min: '10', max: '100', step: '5', value: '50' });
+      const starting = h('input', { type: 'number', min: '1', max: '12', value: '4' });
+      const fog = h('input', { type: 'checkbox', checked: true });
+      const fill = h('input', { type: 'checkbox' });
+      const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
+      difficulty.value = '3';
+      const picker = factionPicker([], null, (v) => { faction = v; });
+      const hint = h('div', { style: 'color:var(--dim);font-size:.78rem;margin-top:4px' });
+      const syncHint = () => { hint.textContent = `Up to ${MAX_START[size.value]} starting castles on a ${size.value} map.`; };
+      size.addEventListener('change', syncHint);
+      syncHint();
+
+      const body = h('div', {},
+        h('label', {}, 'Game name'), name,
+        h('div', { class: 'grid2' },
+          h('div', {}, h('label', {}, 'Players (2 to 8)'), players),
+          h('div', {}, h('label', {}, 'Tick speed'), speed),
+          h('div', {}, h('label', {}, 'Map style'), style),
+          h('div', {}, h('label', {}, 'Map size'), size),
+          h('div', {}, h('label', {}, 'Starting castles'), starting),
+          h('div', {}, h('label', {}, 'Territory % to win'), victory)),
+        hint,
+        h('label', { class: 'check' }, fog, 'Fog of war'),
+        h('label', { class: 'check' }, fill, 'Fill empty seats with AI players'),
+        h('div', {}, h('label', {}, 'AI difficulty (1 to 5)'), difficulty),
+        h('label', {}, 'Your faction'), picker);
+
+      modal('Create game', body, (close) => [
+        h('button', { onclick: close }, 'Cancel'),
+        h('button', {
+          class: 'primary',
+          onclick: (e) => run(e.currentTarget, async () => {
+            const settings = {
+              name: name.value.trim() || 'New Game',
+              max_players: Number(players.value),
+              tick_speed: speed.value,
+              map_style: style.value,
+              map_size: size.value,
+              starting_territories: Number(starting.value),
+              victory_pct: Number(victory.value) / 100,
+              fog_of_war: fog.checked,
+              fill_with_ai: fill.checked,
+              ai_difficulty: Number(difficulty.value),
+            };
+            if (faction) settings.faction_slug = faction;
+            const { data, error } = await sb.rpc('create_game', { p_settings: settings });
+            if (error) throw error;
+            close();
+            await showRoom(data);
+          }),
+        }, 'Create'),
+      ]);
+    }
+
+    async function showRoom(gameId) {
+      clearCleanup();
+      state.view = 'room';
+      state.roomId = gameId;
+      await loadFactions();
+
+      const container = h('div', { class: 'wrap' });
+      mount(container);
+
+      let schoolsDraft = null;
+
+      const draw = async () => {
+        if (state.view !== 'room' || state.roomId !== gameId) return;
+        const [gameRes, playersRes] = await Promise.all([
+          sb.from('games').select('*').eq('id', gameId).maybeSingle(),
+          sb.from('game_players').select('*').eq('game_id', gameId).order('id'),
+        ]);
+        if (state.view !== 'room' || state.roomId !== gameId) return;
+        const game = gameRes.data;
+        if (!game) {
+          toast('That game is no longer available.');
+          return showHome();
+        }
+        const players = playersRes.data || [];
+        const me = players.find((p) => p.user_id === state.session.user.id);
+        const isHost = game.created_by === state.session.user.id;
+
+        const parts = [topbar(), h('div', { class: 'row', style: 'margin-bottom:14px' },
+          h('button', { onclick: showHome }, 'Back to games'))];
+
+        parts.push(h('div', { class: 'panel' },
+          h('h2', {}, game.name, h('span', {}, h('span', { class: 'tag' + (game.status === 'active' ? ' gold' : '') }, { lobby: 'lobby', active: 'in progress', finished: 'finished' }[game.status]))),
+          h('div', { class: 'kv' },
+            kv('Map', `${STYLES[game.map_style]} · ${SIZES[game.map_size]}`),
+            kv('Speed', SPEEDS[game.tick_speed] || game.tick_speed),
+            kv('Seats', `${players.length}/${game.max_players}`),
+            kv('Victory', `${Math.round(game.victory_pct * 100)}% of territories`),
+            kv('Fog of war', game.fog_of_war ? 'On' : 'Off'),
+            kv('Starting castles', game.starting_territories),
+            kv('AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'),
+            game.status !== 'lobby' ? kv('Tick', game.current_tick) : null)));
+
+        const slots = players.map((p) => h('div', { class: 'slot' },
+          dots(p.faction_slug),
+          h('div', {},
+            h('div', { class: 'nm' }, p.display_name, p.user_id === game.created_by ? h('span', { class: 'tag gold' }, 'host') : null, p.user_id === state.session.user.id ? h('span', { class: 'tag green' }, 'you') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
+            h('div', { class: 'fn' }, factionOf(p.faction_slug).name + (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? ' · eliminated' : '')))));
+        if (game.status === 'lobby') {
+          for (let i = players.length; i < game.max_players; i++) {
+            slots.push(h('div', { class: 'slot empty' }, game.fill_with_ai ? 'AI player at start' : 'Open seat'));
+          }
+        }
+        parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Players'), h('div', { class: 'slots' }, slots)));
+
+        if (game.status === 'lobby' && me) {
+          const count = 1 + game.starting_commanders;
+          if (!schoolsDraft) schoolsDraft = me.starting_schools && me.starting_schools.length === count ? [...me.starting_schools] : Array(count).fill('');
+          const selects = schoolsDraft.map((val, i) => {
+            const el = h('select', {},
+              h('option', { value: '' }, 'Random'),
+              SCHOOLS.map((s) => h('option', { value: s.slug }, s.name)));
+            el.value = val;
+            el.addEventListener('change', () => { schoolsDraft[i] = el.value; });
+            return h('div', {}, h('label', {}, i === 0 ? 'King' : `Commander ${i}`), el);
+          });
+          const saved = me.starting_schools && me.starting_schools.length ? me.starting_schools.join(', ') : 'all random';
+          parts.push(h('div', { class: 'panel' },
+            h('h2', {}, 'Starting schools'),
+            h('div', { class: 'grid2' }, selects),
+            h('div', { class: 'row', style: 'margin-top:14px' },
+              h('button', {
+                onclick: (e) => run(e.currentTarget, async () => {
+                  const none = schoolsDraft.every((s) => !s);
+                  if (!none && schoolsDraft.some((s) => !s)) throw new Error('Pick a school for every slot, or leave all as Random');
+                  const { error } = await sb.rpc('set_starting_schools', { p_game_id: gameId, p_schools: none ? null : schoolsDraft });
+                  if (error) throw error;
+                  toast('Schools saved', true);
+                  schoolsDraft = null;
+                  await draw();
+                }),
+              }, 'Save schools'),
+              h('span', { style: 'color:var(--dim);font-size:.82rem' }, `Saved: ${saved}`))));
+        }
+
+        const actions = [];
+        if (game.status === 'lobby') {
+          const canStart = isHost && (players.length >= 2 || game.fill_with_ai);
+          if (isHost) {
+            actions.push(h('button', {
+              class: 'primary',
+              disabled: !canStart,
+              onclick: (e) => run(e.currentTarget, async () => {
+                const { error } = await sb.functions.invoke('start-game', { body: { game_id: gameId } });
+                if (error) {
+                  let detail = error.message;
+                  try { detail = (await error.context.json()).error || detail; } catch {}
+                  throw new Error(detail);
+                }
+                toast('The game has begun', true);
+                await showMap(gameId);
+              }),
+            }, 'Start game'));
+            if (!canStart) actions.push(h('span', { style: 'color:var(--dim);font-size:.85rem' }, 'Needs at least 2 players, or enable AI fill.'));
+            actions.push(h('button', {
+              class: 'danger',
+              onclick: (e) => { if (confirm('Cancel this game for everyone?')) run(e.currentTarget, async () => {
+                const { error } = await sb.rpc('cancel_game', { p_game_id: gameId });
+                if (error) throw error;
+                toast('Game cancelled', true);
+                await showHome();
+              }); },
+            }, 'Cancel game'));
+          } else {
+            actions.push(h('span', { style: 'color:var(--dim)' }, 'Waiting for the host to start.'));
+          }
+          if (me) actions.push(h('button', {
+            class: 'danger',
+            onclick: (e) => { if (confirm('Leave this game?')) run(e.currentTarget, async () => {
+              const { error } = await sb.rpc('leave_game', { p_game_id: gameId });
+              if (error) throw error;
+              await showHome();
+            }); },
+          }, 'Leave'));
+        } else if (game.status === 'active') {
+          actions.push(h('button', { class: 'primary', onclick: () => showMap(gameId) }, 'Open map'));
+        } else if (game.status === 'finished') {
+          const winner = players.find((p) => p.id === game.winner_player_id);
+          actions.push(h('span', { style: 'color:var(--gold2)' }, winner ? `Winner: ${winner.display_name}` : 'No winner recorded'), h('button', { onclick: () => showMap(gameId) }, 'Open map'));
+          if (isHost) actions.push(h('button', {
+            class: 'danger',
+            onclick: (e) => { if (confirm('Delete this finished game and all its data?')) run(e.currentTarget, async () => {
+              const { error } = await sb.rpc('delete_game', { p_game_id: gameId });
+              if (error) throw error;
+              await showHome();
+            }); },
+          }, 'Delete game'));
+        }
+        parts.push(h('div', { class: 'row wrap2' }, actions));
+
+        container.replaceChildren(...parts);
+      };
+
+      const kv = (k, v) => h('div', {}, h('b', {}, k), String(v));
+
+      await draw();
+
+      let debounce = null;
+      const kick = () => { clearTimeout(debounce); debounce = setTimeout(draw, 300); };
+      const channel = sb.channel('room-' + gameId)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, kick)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, kick)
+        .subscribe();
+      const timer = setInterval(draw, 20000);
+      state.cleanup.push(() => { clearTimeout(debounce); clearInterval(timer); sb.removeChannel(channel); });
+    }
+
+
+    const TICK_MS = { slow: 7200000, normal: 3600000, fast: 1800000, quad: 900000 };
+    const ABILITY_NAMES = { valor: 'Valor', tactics: 'Tactics', siegecraft: 'Siegecraft', muster: 'Muster', steward: 'Steward', scholar: 'Scholar', pace: 'Pace', scout: 'Scout', plunder: 'Plunder' };
+    const AREA_NAMES = { armory: 'Armory', mint: 'Mint', barracks: 'Barracks', guildhall: 'Guildhall', watchtowers: 'Watchtowers', library: 'Library', stables: 'Stables' };
+
+    function sv(tag, attrs, ...kids) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const [k, v] of Object.entries(attrs || {})) {
+        if (v === undefined || v === null || v === false) continue;
+        if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+        else el.setAttribute(k, v);
+      }
+      for (const kid of kids.flat()) {
+        if (kid === null || kid === undefined || kid === false) continue;
+        el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+      }
+      return el;
+    }
+
+    function clipPoly(poly, a, b, c) {
+      const out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const p = poly[i];
+        const q = poly[(i + 1) % poly.length];
+        const dp = a * p[0] + b * p[1] - c;
+        const dq = a * q[0] + b * q[1] - c;
+        if (dp <= 0) out.push(p);
+        if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) {
+          const t = dp / (dp - dq);
+          out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
+        }
+      }
+      return out;
+    }
+
+    function voronoiCells(sites, w, ht) {
+      const cells = new Map();
+      for (const s of sites) {
+        let poly = [[0, 0], [w, 0], [w, ht], [0, ht]];
+        for (const o of sites) {
+          if (o === s || !poly.length) continue;
+          const a = o.x - s.x;
+          const b = o.y - s.y;
+          poly = clipPoly(poly, a, b, (o.x * o.x + o.y * o.y - s.x * s.x - s.y * s.y) / 2);
+        }
+        cells.set(s.id, poly.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' '));
+      }
+      return cells;
+    }
+
+    async function showMap(gameId) {
+      clearCleanup();
+      state.view = 'map';
+      state.roomId = gameId;
+      await loadFactions();
+      const uid = state.session.user.id;
+      const memKey = `ss-fog-${gameId}-${uid}`;
+      const ms = { chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
+
+      const chatSeenKey = `ss-chatseen-${gameId}-${uid}`;
+      try { ms.chatSeen = Number(localStorage.getItem(chatSeenKey)) || 0; } catch { ms.chatSeen = 0; }
+      ms.chatInput = h('input', { type: 'text', maxlength: '500', placeholder: 'Message everyone' });
+      ms.threadInput = h('input', { type: 'text', maxlength: '2000', placeholder: 'Write a message' });
+      const hud = h('div', { class: 'hud' });
+      const sideEl = h('div', { class: 'side' });
+      const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
+      const L = { cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      svg.append(...Object.values(L));
+      mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' }, h('div', { class: 'mapwrap' }, svg), sideEl)));
+
+      const color = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color : '#6b6b78');
+      const color2 = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color2 : '#2a2a35');
+      const pname = (pid) => (pid && ms.players.get(pid) ? ms.players.get(pid).display_name : 'Unclaimed');
+      const dipStatus = (pid) => {
+        const r = ms.dip.find((d) => d.player_a_id === pid || d.player_b_id === pid);
+        return r ? r.status : 'neutral';
+      };
+      const isFriend = (pid) => pid === ms.me.id || dipStatus(pid) === 'allied';
+      const rankOf = (c) => Object.values(ms.abil.get(c.id) || {}).reduce((a, b) => a + b, 0);
+
+      const tickF = () => {
+        const g = ms.game;
+        const interval = TICK_MS[g.tick_speed];
+        if (!interval || !g.last_tick_processed_at || g.status !== 'active') return g.current_tick;
+        return g.current_tick + Math.min(1, Math.max(0, (Date.now() - Date.parse(g.last_tick_processed_at)) / interval));
+      };
+
+      const movementPos = (m, tf) => {
+        const p = m.path;
+        const a = m.path_arrival_ticks;
+        const n = p.length;
+        if (tf >= a[n - 1]) {
+          const t = ms.t.get(p[n - 1]);
+          return { x: t.x, y: t.y, i: n - 1 };
+        }
+        let i = 0;
+        while (i < n - 2 && a[i + 1] <= tf) i++;
+        const A = ms.t.get(p[i]);
+        const B = ms.t.get(p[i + 1]);
+        const d = a[i + 1] - a[i];
+        const f = d <= 0 ? 1 : Math.min(1, Math.max(0, (tf - a[i]) / d));
+        return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f, i };
+      };
+
+      const cmdPos = (c, tf) => {
+        if (c.current_territory_id) {
+          const t = ms.t.get(c.current_territory_id);
+          return { x: t.x, y: t.y };
+        }
+        const m = ms.mov.get(c.id);
+        return m ? movementPos(m, tf) : null;
+      };
+
+      const scanR = (c) => 45 + 15 * rankOf(c) + 30 * ((ms.abil.get(c.id) || {}).scout || 0);
+      const inSources = (pos) => ms.sources.some((s) => Math.hypot(pos.x - s.x, pos.y - s.y) <= s.r);
+
+      const computeVis = () => {
+        const vis = new Set();
+        const sources = [];
+        if (!ms.game.fog_of_war) {
+          ms.t.forEach((_, id) => vis.add(id));
+        } else {
+          const tf = tickF();
+          ms.t.forEach((t) => {
+            if (t.owner_player_id === ms.me.id) sources.push({ x: t.x, y: t.y, r: 90 + 60 * ms.wl });
+            else if (t.owner_player_id && isFriend(t.owner_player_id)) sources.push({ x: t.x, y: t.y, r: 90 });
+            if (t.owner_player_id && isFriend(t.owner_player_id)) vis.add(t.id);
+          });
+          ms.cmd.forEach((c) => {
+            if (!isFriend(c.owner_player_id)) return;
+            const pos = cmdPos(c, tf);
+            if (pos) sources.push({ x: pos.x, y: pos.y, r: scanR(c) });
+          });
+          ms.t.forEach((t) => {
+            if (!vis.has(t.id) && sources.some((s) => Math.hypot(t.x - s.x, t.y - s.y) <= s.r)) vis.add(t.id);
+          });
+        }
+        ms.vis = vis;
+        ms.sources = sources;
+      };
+
+      const commanderSeen = (c, tf) => {
+        if (isFriend(c.owner_player_id) || !ms.game.fog_of_war) return true;
+        if (c.current_territory_id) return ms.vis.has(c.current_territory_id);
+        const pos = cmdPos(c, tf);
+        return pos ? inSources(pos) : false;
+      };
+
+      const select = (type, id) => {
+        if (ms.dragged) return;
+        if (ms.marching && type === 't') return previewTo(id);
+        ms.marching = false;
+        ms.preview = null;
+        ms.sel = type ? { type, id } : null;
+        if (type) ms.tab = 'info';
+        render();
+        drawSide();
+      };
+
+      const act = (btn, fn) => run(btn, async () => {
+        await fn();
+        await load();
+      });
+
+      const previewTo = async (id) => {
+        const c = ms.cmd.find((x) => x.id === ms.sel.id);
+        if (id === c.current_territory_id) return;
+        ms.preview = { to: id, type: ms.preview ? ms.preview.type : 'assault' };
+        render();
+        drawSide();
+        const { data, error } = await sb.rpc('preview_march', { p_game_id: gameId, p_commander_id: c.id, p_to_territory_id: id });
+        if (!ms.preview || ms.preview.to !== id) return;
+        if (error) ms.preview.error = error.message;
+        else ms.preview.plan = data;
+        render();
+        drawSide();
+      };
+
+      const fmtDuration = (msec) => {
+        const m = Math.max(0, Math.round(msec / 60000));
+        return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+      };
+
+      const render = () => {
+        computeVis();
+        const tf = tickF();
+        ms.t.forEach((t) => {
+          if (ms.vis.has(t.id)) ms.mem[t.id] = { o: t.owner_player_id, tr: t.troops };
+        });
+        try { localStorage.setItem(memKey, JSON.stringify(ms.mem)); } catch {}
+
+        const cells = [];
+        const castles = [];
+        ms.t.forEach((t) => {
+          const seen = ms.vis.has(t.id);
+          const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
+          const selected = ms.sel && ms.sel.type === 't' && ms.sel.id === t.id;
+          cells[selected ? 'push' : 'unshift'](sv('polygon', {
+            points: ms.cells.get(t.id),
+            fill: owner ? color(owner) : '#2a2a38',
+            'fill-opacity': seen ? (owner ? 0.4 : 0.55) : 0.14,
+            stroke: selected ? '#f0cf7d' : '#0a0a0f',
+            'stroke-width': selected ? 3 : 1.5,
+            onclick: () => select('t', t.id),
+          }));
+
+          const r = 8 + 3 * (t.tier || 1);
+          const showTroops = seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war || ms.vis.has(t.id));
+          const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
+          const sieged = ms.cmd.some((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tf));
+          const g = sv('g', { opacity: seen ? 1 : 0.5 },
+            sieged ? sv('circle', { cx: t.x, cy: t.y, r: r + 7, fill: 'none', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '4 4', style: 'pointer-events:none' }) : null,
+            sv('circle', { cx: t.x, cy: t.y, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: () => select('t', t.id) }),
+            ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: t.x, y: t.y + 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
+            sv('text', { x: t.x, y: t.y - r - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'),
+            sv('text', { x: t.x, y: t.y + r + 16, 'text-anchor': 'middle', 'font-size': 14 }, t.name),
+            here.map((c, i) => sv('circle', {
+              cx: t.x + (i - (here.length - 1) / 2) * 17,
+              cy: t.y + r + 32,
+              r: c.role === 'king' ? 8 : 6.5,
+              fill: color(c.owner_player_id),
+              stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : (c.role === 'king' ? '#f0cf7d' : '#000'),
+              'stroke-width': c.role === 'king' ? 2.2 : 1.5,
+              style: 'cursor:pointer',
+              onclick: (e) => { e.stopPropagation(); select('c', c.id); },
+            })));
+          castles.push(g);
+        });
+        L.cells.replaceChildren(...cells);
+        L.castles.replaceChildren(...castles);
+
+        L.edges.replaceChildren(...ms.edges.map((e) => {
+          const A = ms.t.get(e.from_territory_id);
+          const B = ms.t.get(e.to_territory_id);
+          const road = A.has_road && B.has_road;
+          const seen = ms.vis.has(A.id) || ms.vis.has(B.id);
+          return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: road ? '#b8923a' : '#4a4860', 'stroke-width': road ? 2.6 : 1.2, 'stroke-opacity': seen ? 0.85 : 0.25, style: 'pointer-events:none' });
+        }));
+
+        L.rings.replaceChildren(...(ms.rings && ms.game.fog_of_war
+          ? ms.sources.map((s) => sv('circle', { cx: s.x, cy: s.y, r: s.r, fill: 'none', stroke: 'rgba(212,169,74,0.28)', 'stroke-dasharray': '5 5', style: 'pointer-events:none' }))
+          : []));
+
+        const pv = [];
+        if (ms.marching && ms.sel && ms.sel.type === 'c') {
+          const c = ms.cmd.find((x) => x.id === ms.sel.id);
+          const pos = c && cmdPos(c, tf);
+          const stables = (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
+          if (pos) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: 90 + 60 * stables, fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2, 'stroke-dasharray': '2 6', style: 'pointer-events:none' }));
+        }
+        if (ms.preview) {
+          const dest = ms.t.get(ms.preview.to);
+          const ok = !ms.preview.plan || ms.preview.plan.in_range;
+          const tone = ms.preview.error ? '#e0685c' : (ok ? '#7fd08a' : '#e0685c');
+          if (ms.preview.plan) {
+            pv.push(sv('polyline', { points: ms.preview.plan.path.map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4, 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
+          }
+          pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 26, fill: 'none', stroke: tone, 'stroke-width': 3, style: 'pointer-events:none' }));
+        }
+        L.preview.replaceChildren(...pv);
+
+        renderDyn();
+        drawHud();
+      };
+
+      const renderDyn = () => {
+        const tf = tickF();
+        const out = [];
+        ms.cmd.forEach((c) => {
+          if (c.status !== 'moving') return;
+          const m = ms.mov.get(c.id);
+          if (!m || !commanderSeen(c, tf)) return;
+          const pos = movementPos(m, tf);
+          const friend = isFriend(c.owner_player_id);
+          if (friend) {
+            const pts = [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
+            out.push(sv('polyline', { points: pts.join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2, 'stroke-dasharray': '3 5', style: 'pointer-events:none' }));
+          }
+          out.push(sv('circle', {
+            cx: pos.x, cy: pos.y, r: c.role === 'king' ? 9 : 7.5,
+            fill: color(c.owner_player_id),
+            stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : '#f0cf7d',
+            'stroke-width': 2,
+            style: 'cursor:pointer',
+            onclick: (e) => { e.stopPropagation(); select('c', c.id); },
+          }));
+          out.push(sv('text', { x: pos.x, y: pos.y - 13, 'text-anchor': 'middle', 'font-size': 14, style: 'fill:#f0cf7d' }, friend ? c.troops : ''));
+        });
+        L.dyn.replaceChildren(...out);
+      };
+
+      const fmtCountdown = (ms_) => {
+        const s = Math.max(0, Math.round(ms_ / 1000));
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      };
+
+      const nextEl = h('span');
+      const updateCountdown = () => {
+        const g = ms.game;
+        if (g.status !== 'active') { nextEl.textContent = ''; return; }
+        const interval = TICK_MS[g.tick_speed];
+        if (!interval) { nextEl.textContent = 'turn-based'; return; }
+        const due = Date.parse(g.last_tick_processed_at) + interval - Date.now();
+        nextEl.textContent = due > 0 ? `next tick in ${fmtCountdown(due)}` : 'tick due';
+      };
+
+      const pendingProposals = () => ms.dip.filter((d) => d.status === 'proposed' && d.proposed_by_player_id !== ms.me.id).length;
+
+      const castlesOf = (pid) => [...ms.t.values()].filter((t) => t.owner_player_id === pid).length;
+
+      const drawHud = () => {
+        const g = ms.game;
+        const winAt = Math.ceil(ms.t.size * g.victory_pct);
+        const winner = ms.players.get(g.winner_player_id);
+        hud.replaceChildren(...[
+          h('button', { onclick: showHome }, 'Back to games'),
+          h('b', {}, g.name),
+          h('span', {}, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`),
+          nextEl,
+          h('span', { class: 'grow' }),
+          pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; render(); drawSide(); } }, `Alliance proposals (${pendingProposals()})`) : null,
+          h('span', {}, `Gold ${ms.me.gold}`),
+          h('span', {}, `Castles ${castlesOf(ms.me.id)} / ${winAt} to win`),
+          g.fog_of_war ? h('label', {}, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null].filter(Boolean));
+        updateCountdown();
+      };
+
+      const order = (fn, args, message) => (e) => act(e.currentTarget, async () => {
+        const { data, error } = await sb.rpc(fn, { p_game_id: gameId, ...args });
+        if (error) throw error;
+        if (message) toast(typeof message === 'function' ? message(data) : message, true);
+      });
+
+      const INFRA = [
+        { type: 'treasury', name: 'Treasury', col: 'gold_level', base: 500, note: 'gold' },
+        { type: 'recruitment', name: 'Recruitment', col: 'industry_level', base: 1000, note: 'troops' },
+        { type: 'prestige', name: 'Prestige', col: 'prestige_level', base: 4000, note: 'prestige' },
+      ];
+
+      const buildSection = (t) => {
+        if (t.owner_player_id !== ms.me.id || ms.game.status !== 'active') return null;
+        const mult = ms.game.infra_cost_mult;
+        const gold = ms.me.gold;
+        const out = [h('b', {}, 'Build')];
+        INFRA.forEach((i) => {
+          const lvl = t[i.col];
+          const cost = Math.max(1, Math.floor(i.base * (lvl + 1) / t.effective_influence * mult));
+          out.push(h('button', {
+            class: 'cmdrow',
+            disabled: gold < cost,
+            onclick: order('upgrade_infrastructure', { p_territory_id: t.id, p_type: i.type }, (d) => `${i.name} is now level ${d.level}`),
+          }, `${i.name} ${lvl} > ${lvl + 1}`, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${cost} gold`)));
+        });
+        if (t.has_road) {
+          out.push(h('button', { class: 'cmdrow', onclick: order('demolish_road', { p_territory_id: t.id }, 'Road demolished') }, 'Demolish road', h('span', { style: 'color:var(--dim);margin-left:auto' }, 'free')));
+        } else {
+          const cost = Math.max(1, Math.floor(10000 / t.base_influence * mult));
+          out.push(h('button', { class: 'cmdrow', disabled: gold < cost, onclick: order('build_road', { p_territory_id: t.id }, 'Road built') }, 'Build road', h('span', { style: 'color:var(--dim);margin-left:auto' }, `${cost} gold`)));
+        }
+        const hire = ms.game.commander_cost;
+        out.push(h('b', { style: 'margin-top:12px' }, `Hire a commander (${hire} gold)`),
+          h('div', { class: 'row wrap2' }, SCHOOLS.map((sc) => h('button', {
+            disabled: gold < hire,
+            onclick: order('hire_commander', { p_territory_id: t.id, p_school: sc.slug }, (d) => `${d.name} joins${d.role === 'king' ? ' as king' : ''}`),
+          }, sc.name))));
+        return h('div', { class: 'sec' }, out);
+      };
+
+      const realmSection = () => {
+        const g = ms.game;
+        const live = g.status === 'active';
+        const order_ = Object.keys(AREA_NAMES);
+        const rows = [...ms.areas].sort((x, y) => order_.indexOf(x.area) - order_.indexOf(y.area)).map((a) => {
+          const need = Math.ceil(144 * a.level * g.area_cost_mult);
+          return h('div', { class: 'line' },
+            h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[a.area] || a.area}${a.is_active ? ' (active)' : ''}`),
+            h('span', {}, `Lv ${a.level} · ${a.prestige_accumulated}/${need}`),
+            live && !a.is_active ? h('button', { style: 'padding:2px 8px;font-size:.78rem', onclick: order('set_active_area', { p_area: a.area }, `${AREA_NAMES[a.area]} is now the active area`) }, 'Activate') : null);
+        });
+        const type = h('select', {}, INFRA.map((i) => h('option', { value: i.type }, i.name)));
+        const budget = h('input', { type: 'number', min: '1', value: Math.min(100, ms.me.gold) || 1, style: 'width:90px' });
+        return [
+          h('div', { class: 'sec' }, h('b', {}, 'Realm areas (level, prestige to next)'), rows),
+          live ? h('div', { class: 'sec' }, h('b', {}, 'Upgrade everywhere, cheapest first'),
+            h('div', { class: 'row wrap2' }, type, budget,
+              h('button', {
+                onclick: (e) => order('bulk_upgrade_infrastructure', { p_infra_type: type.value, p_budget: Number(budget.value) || 1 }, (d) => `${d.upgraded} upgrades for ${d.spent} gold`)(e),
+              }, 'Spend'))) : null,
+        ];
+      };
+
+      const assaultButton = (t) => h('button', {
+        class: 'danger',
+        onclick: (e) => {
+          if (confirm(`Your besieging commanders at ${t.name} attack the castle now. The defenders get their bonus. Continue?`)) {
+            order('break_siege_and_assault', { p_territory_id: t.id }, (d) => (d.captured ? `${t.name} captured` : 'The assault failed'))(e);
+          }
+        },
+      }, 'Assault now');
+
+      const siegeSection = (t) => {
+        if (ms.game.status !== 'active') return null;
+        const siegers = ms.cmd.filter((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tickF()));
+        if (!siegers.length) return null;
+        const troops = siegers.reduce((a, c) => a + c.troops, 0);
+        const out = [h('b', {}, 'Under siege'),
+          line('Besieged by', [...new Set(siegers.map((c) => pname(c.owner_player_id)))].join(', ')),
+          line('Besiegers', `${siegers.length} commander${siegers.length > 1 ? 's' : ''}, ${troops} troops`)];
+        if (t.owner_player_id === ms.me.id) {
+          const defenders = ms.cmd.filter((c) => c.current_territory_id === t.id && c.status === 'idle' && isFriend(c.owner_player_id));
+          const force = t.troops + defenders.reduce((a, c) => a + c.troops, 0);
+          out.push(line('Your force', `${t.troops} garrison + ${defenders.length} commander${defenders.length === 1 ? '' : 's'} (${force} troops)`),
+            h('div', { style: 'margin-top:8px' }, h('button', {
+              class: 'danger',
+              onclick: (e) => {
+                if (confirm('Sally out? Your garrison and idle commanders here fight the besiegers in the open. Ties go to the besiegers. If you lose, the garrison is emptied and those commanders die.')) {
+                  order('sally_out', { p_territory_id: t.id }, (d) => (d.winner === 'sally' ? `Siege broken. ${d.survivors} survivors` : 'The sally was destroyed'))(e);
+                }
+              },
+            }, 'Sally out')));
+        }
+        if (siegers.some((c) => c.owner_player_id === ms.me.id)) out.push(h('div', { style: 'margin-top:8px' }, assaultButton(t)));
+        return h('div', { class: 'sec' }, out);
+      };
+
+      const commanderActions = (c) => {
+        if (c.owner_player_id !== ms.me.id || ms.game.status !== 'active') return null;
+        const call = (fn, args, message) => (e) => act(e.currentTarget, async () => {
+          const { error } = await sb.rpc(fn, { p_game_id: gameId, ...args });
+          if (error) throw error;
+          if (message) toast(message, true);
+        });
+
+        if (c.status === 'moving') {
+          const route = ms.routes.get(c.id);
+          const m = ms.mov.get(c.id);
+          if (route && route.status === 'recalled' && m) {
+            return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
+              h('div', { style: 'color:var(--gold2)' }, `Recalled. Reaches ${ms.t.get(m.to_territory_id).name} first, then returns to ${ms.t.get(route.origin_territory_id).name}.`));
+          }
+          if (route && route.status === 'aborted' && m) {
+            return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
+              h('div', { style: 'color:var(--gold2)' }, `Halting at ${ms.t.get(m.to_territory_id).name}.`));
+          }
+          return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
+            h('div', { class: 'row wrap2' },
+              h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Will halt at the next stop') }, 'Halt at next stop'),
+              h('button', { onclick: call('recall_route', { p_commander_id: c.id }, 'Recalling to origin') }, 'Recall')));
+        }
+        if ((c.status !== 'idle' && c.status !== 'sieging') || !c.current_territory_id) return null;
+
+        const t = ms.t.get(c.current_territory_id);
+        const out = [h('b', {}, 'Orders')];
+        if (c.status === 'sieging') {
+          out.push(h('div', { style: 'color:var(--gold2);margin-bottom:8px' }, `Besieging ${t.name}. The garrison starves each tick.`),
+            h('div', { style: 'margin-bottom:10px' }, assaultButton(t)));
+        }
+
+        if (t.owner_player_id === ms.me.id) {
+          const amount = h('input', { type: 'number', min: '1', value: ms.xfer, style: 'width:90px', oninput: (e) => { ms.xfer = Math.max(1, Number(e.target.value) || 1); } });
+          out.push(h('div', { class: 'row wrap2', style: 'margin-bottom:10px' },
+            amount,
+            h('button', { onclick: (e) => act(e.currentTarget, async () => {
+              const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: c.id, p_amount: Number(amount.value) || 1 });
+              if (error) throw error;
+            }) }, 'Take'),
+            h('button', { onclick: (e) => act(e.currentTarget, async () => {
+              const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: c.id, p_amount: -(Number(amount.value) || 1) });
+              if (error) throw error;
+            }) }, 'Leave'),
+            h('span', { style: 'color:var(--dim);font-size:.8rem' }, `Garrison ${t.troops}`)));
+        }
+
+        const extras = [];
+        if (t.owner_player_id === ms.me.id && t.garrison_commander_id !== c.id) {
+          extras.push(h('button', { onclick: order('assign_garrison_commander', { p_commander_id: c.id }, 'Now leads the garrison') }, 'Lead garrison'));
+        }
+        if (!ms.cmd.some((x) => x.owner_player_id === ms.me.id && x.role === 'king')) {
+          extras.push(h('button', { onclick: order('crown_commander', { p_commander_id: c.id }, (d) => `Crowned. Takes effect at tick ${d.effective_tick}`) }, 'Crown as king'));
+        }
+        if (extras.length) out.push(h('div', { class: 'row wrap2', style: 'margin-bottom:10px' }, extras));
+
+        if (t.garrison_commander_id === c.id) {
+          out.push(h('div', { style: 'color:var(--dim);margin-bottom:8px' }, 'Leads this garrison and cannot march.'),
+            h('button', { onclick: call('unassign_garrison_commander', { p_territory_id: t.id }, 'Released from the garrison') }, 'Release from garrison'));
+          return h('div', { class: 'sec' }, out);
+        }
+
+        if (!ms.marching) {
+          out.push(h('button', { class: 'primary', onclick: () => { ms.marching = true; ms.preview = null; render(); drawSide(); } }, 'March...'));
+          return h('div', { class: 'sec' }, out);
+        }
+
+        out.push(h('div', { style: 'color:var(--gold2);margin-bottom:8px' }, 'Click a castle on the map to choose the destination.'));
+        const pv = ms.preview;
+        if (pv && pv.error) out.push(h('div', { style: 'color:#e08b82;margin-bottom:8px' }, pv.error));
+        if (pv && !pv.plan && !pv.error) out.push(h('div', { class: 'empty' }, 'Planning route...'));
+        if (pv && pv.plan) {
+          const plan = pv.plan;
+          const dest = ms.t.get(pv.to);
+          const interval = TICK_MS[ms.game.tick_speed];
+          const eta = interval ? ` (about ${fmtDuration((plan.arrival_tick - tickF()) * interval)})` : '';
+          out.push(h('div', {},
+            line('Destination', dest.name),
+            line('Route', plan.path.map((id) => ms.t.get(id).name).join(' > ')),
+            line('Travel', `${plan.travel_ticks} ticks`),
+            line('Arrives', `tick ${plan.arrival_tick}${eta}`),
+            line('Distance / range', `${Math.round(plan.raw_length)} / ${plan.range}`),
+            line('In range', plan.in_range ? (plan.raw_length > plan.range ? 'Yes (single hop)' : 'Yes') : 'No')));
+          const friendly = dest.owner_player_id && isFriend(dest.owner_player_id);
+          if (!friendly) {
+            const type = h('select', { onchange: (e) => { pv.type = e.target.value; } },
+              h('option', { value: 'assault' }, 'Assault the castle'),
+              h('option', { value: 'siege' }, 'Lay siege'));
+            type.value = pv.type;
+            out.push(h('label', {}, 'On arrival'), type);
+          }
+          out.push(h('div', { class: 'row', style: 'margin-top:10px' },
+            h('button', {
+              class: 'primary',
+              disabled: !plan.in_range,
+              onclick: (e) => act(e.currentTarget, async () => {
+                const { data, error } = await sb.rpc('march_commander', { p_game_id: gameId, p_commander_id: c.id, p_to_territory_id: pv.to, p_march_type: pv.type });
+                if (error) throw error;
+                ms.marching = false;
+                ms.preview = null;
+                toast(`Marching. Arrives at tick ${data.arrival_tick}`, true);
+              }),
+            }, 'March')));
+        }
+        out.push(h('div', { style: 'margin-top:10px' }, h('button', { onclick: () => { ms.marching = false; ms.preview = null; render(); drawSide(); } }, 'Cancel')));
+        return h('div', { class: 'sec' }, out);
+      };
+
+      const line = (k, v) => h('div', { class: 'line' }, h('span', {}, k), h('span', {}, v));
+      const cmdRow = (c) => h('button', { class: 'cmdrow', onclick: () => select('c', c.id) },
+        h('span', { class: 'chip', style: `background:${color(c.owner_player_id)}` }),
+        `${c.role === 'king' ? '♛ ' : ''}${c.name}`,
+        h('span', { style: 'color:var(--dim);margin-left:auto' }, `R${rankOf(c)} · ${c.troops}`));
+
+      const momentText = (m) => {
+        const p = m.payload;
+        switch (m.type) {
+          case 'game_started': return 'The realms are drawn. The game begins.';
+          case 'war_declared': return `${pname(p.by_player_id)} and ${pname(p.against_player_id)} are at war${p.how === 'alliance_broken' ? ' after a broken alliance' : ' after the first attack'}`;
+          case 'alliance_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} formed an alliance`;
+          case 'alliance_broken': return `${pname(p.by_player_id)} broke the alliance with ${pname(p.against_player_id)}`;
+          case 'castle_captured': return `${pname(p.to_player_id)} captured ${p.territory}${p.from_player_id ? ' from ' + pname(p.from_player_id) : ''}`;
+          case 'siege_started': return `${pname(p.by_player_id)} laid siege to ${p.territory}`;
+          case 'siege_lifted': return `The siege of ${p.territory} was lifted ${p.by === 'sally' ? 'by a sally' : 'by relief forces'}`;
+          case 'king_killed': return `${p.name}, king of ${pname(p.player_id)}, was killed`;
+          case 'player_eliminated': return `${pname(p.player_id)} was eliminated`;
+          case 'game_won': return `${pname(p.player_id)} won the game`;
+          default: return m.type.replace(/_/g, ' ');
+        }
+      };
+
+      const markRead = async () => {
+        const ids = ms.inbox.filter((i) => !i.is_read).map((i) => i.id);
+        if (!ids.length) return;
+        ms.newIds = new Set(ids);
+        ms.inbox.forEach((i) => { i.is_read = true; });
+        await sb.from('player_inbox').update({ is_read: true }).in('id', ids);
+      };
+
+      const sideTabs = () => {
+        const unread = ms.inbox.filter((i) => !i.is_read).length;
+        const tab = (k, label) => h('button', {
+          class: ms.tab === k ? 'on' : '',
+          onclick: async () => {
+            ms.tab = k;
+            if (k === 'inbox') await markRead();
+            drawSide();
+            drawHud();
+          },
+        }, label);
+        const chatN = chatUnread() + [...ms.threads.values()].filter(threadUnread).length;
+        return h('div', { class: 'tabs' }, tab('info', 'Info'), tab('news', 'News'), tab('inbox', `Inbox${unread ? ` (${unread})` : ''}`), tab('chat', `Chat${chatN && !(ms.tab === 'chat') ? ` (${chatN})` : ''}`));
+      };
+
+      const threadUnread = (t) => t.msgs.some((m) => m.player_id !== ms.me.id && (!t.read || Date.parse(m.created_at) > Date.parse(t.read)));
+      const chatUnread = () => ms.chat.filter((m) => m.player_id !== ms.me.id && m.id > ms.chatSeen).length;
+
+      const markChatSeen = () => {
+        const top = ms.chat.length ? ms.chat[ms.chat.length - 1].id : 0;
+        if (top <= ms.chatSeen) return;
+        ms.chatSeen = top;
+        try { localStorage.setItem(chatSeenKey, String(top)); } catch {}
+      };
+
+      const markThreadRead = (t) => {
+        if (!threadUnread(t)) return;
+        t.read = new Date().toISOString();
+        sb.from('thread_participants').update({ last_read_at: t.read }).eq('thread_id', t.id).eq('player_id', ms.me.id).then(() => {});
+      };
+
+      const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const readable = (pid) => {
+        const c = color(pid);
+        const n = parseInt(c.slice(1), 16);
+        const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+        return lum < 0.3 ? color2(pid) : c;
+      };
+
+      const chatLine = (pid, text, at) => h('div', { class: 'chatline' },
+        h('b', { style: `color:${readable(pid)};font-weight:bold` }, `${pname(pid)}: `), text, h('small', {}, fmtTime(at)));
+
+      const threadTitle = (t) => t.parts.filter((id) => id !== ms.me.id).map(pname).join(', ') || 'Just you';
+
+      const composer = (input, onSend) => h('form', { class: 'composer', onsubmit: (e) => { e.preventDefault(); onSend(); } },
+        input, h('button', { type: 'submit', class: 'primary' }, 'Send'));
+
+      const sendGeneral = async () => {
+        const text = ms.chatInput.value.trim();
+        if (!text) return;
+        ms.chatInput.value = '';
+        const { error } = await sb.rpc('send_chat_message', { p_game_id: gameId, p_message: text });
+        if (error) { ms.chatInput.value = text; toast(error.message); return; }
+        await load();
+      };
+
+      const sendInThread = async (t) => {
+        const text = ms.threadInput.value.trim();
+        if (!text) return;
+        ms.threadInput.value = '';
+        const { error } = await sb.rpc('send_thread_message', { p_thread_id: t.id, p_body: text });
+        if (error) { ms.threadInput.value = text; toast(error.message); return; }
+        await load();
+      };
+
+      const openDm = (pid) => {
+        const want = [ms.me.id, pid].sort((a, b) => a - b).join(',');
+        const t = [...ms.threads.values()].find((x) => [...x.parts].sort((a, b) => a - b).join(',') === want);
+        ms.tab = 'chat';
+        ms.chatTab = 'messages';
+        ms.thread = t ? t.id : null;
+        ms.compose = t ? null : { ids: new Set([pid]) };
+        drawSide();
+      };
+
+      const chatView = () => {
+        const nThreads = [...ms.threads.values()].filter(threadUnread).length;
+        const sub = (k, label) => h('button', {
+          class: ms.chatTab === k ? 'primary' : '',
+          onclick: () => { ms.chatTab = k; ms.thread = null; ms.compose = null; drawSide(); },
+        }, label);
+        const bar = h('div', { class: 'row', style: 'margin:12px 0' }, sub('general', 'General'), sub('messages', `Messages${nThreads ? ` (${nThreads})` : ''}`));
+
+        if (ms.chatTab === 'general') {
+          markChatSeen();
+          return [bar, h('div', { class: 'chatlist', id: 'chatscroll' }, ms.chat.length
+            ? ms.chat.map((m) => chatLine(m.player_id, m.message, m.created_at))
+            : h('div', { class: 'empty' }, 'No messages yet.')), composer(ms.chatInput, sendGeneral)];
+        }
+
+        if (ms.compose) {
+          const humans = [...ms.players.values()].filter((p) => !p.is_ai && p.id !== ms.me.id);
+          const boxes = humans.map((p) => h('label', { class: 'check', style: 'margin-top:6px' },
+            h('input', { type: 'checkbox', checked: ms.compose.ids.has(p.id), onchange: (e) => { if (e.target.checked) ms.compose.ids.add(p.id); else ms.compose.ids.delete(p.id); } }),
+            dots(p.faction_slug), p.display_name));
+          return [bar, h('b', {}, 'New message to'), humans.length ? boxes : h('div', { class: 'empty' }, 'No other human players in this game.'),
+            composer(ms.threadInput, async () => {
+              const text = ms.threadInput.value.trim();
+              if (!text) return;
+              const ids = [...ms.compose.ids];
+              if (!ids.length) { toast('Choose at least one player'); return; }
+              const { data, error } = await sb.rpc('create_thread', { p_game_id: gameId, p_participant_ids: ids, p_first_message: text });
+              if (error) { toast(error.message); return; }
+              ms.threadInput.value = '';
+              ms.compose = null;
+              ms.thread = data;
+              await load();
+            }),
+            h('div', { style: 'margin-top:10px' }, h('button', { onclick: () => { ms.compose = null; drawSide(); } }, 'Cancel'))];
+        }
+
+        const open = ms.thread ? ms.threads.get(ms.thread) : null;
+        if (open) {
+          markThreadRead(open);
+          return [bar, h('div', { class: 'row', style: 'margin-bottom:8px' }, h('button', { onclick: () => { ms.thread = null; drawSide(); } }, 'All messages'), h('b', { style: 'color:var(--gold2);font-weight:normal' }, threadTitle(open))),
+            h('div', { class: 'chatlist', id: 'chatscroll' }, open.msgs.map((m) => chatLine(m.player_id, m.body, m.created_at))),
+            composer(ms.threadInput, () => sendInThread(open))];
+        }
+
+        const list = [...ms.threads.values()].sort((a, b) => (b.msgs.length ? b.msgs[b.msgs.length - 1].id : 0) - (a.msgs.length ? a.msgs[a.msgs.length - 1].id : 0));
+        return [bar, h('button', { class: 'primary', onclick: () => { ms.compose = { ids: new Set() }; drawSide(); } }, 'New message'),
+          list.length ? list.map((t) => {
+            const last = t.msgs[t.msgs.length - 1];
+            return h('button', { class: 'threadrow', onclick: () => { ms.thread = t.id; drawSide(); } },
+              h('span', { style: threadUnread(t) ? 'color:var(--gold2)' : '' }, `${threadUnread(t) ? '\u25CF ' : ''}${threadTitle(t)}`),
+              h('small', {}, last ? `${pname(last.player_id)}: ${last.body.slice(0, 60)}` : 'No messages'));
+          }) : h('div', { class: 'empty', style: 'margin-top:10px' }, 'No conversations yet.')];
+      };
+
+      const feedRow = (tick, text, hot) => h('div', { class: 'line', style: `gap:10px;${hot ? 'color:var(--gold2)' : ''}` },
+        h('span', { style: 'flex:1;color:inherit' }, text),
+        h('span', { style: 'white-space:nowrap' }, `t${tick}`));
+
+      const dipRow = (pid) => ms.dip.find((d) => d.player_a_id === pid || d.player_b_id === pid);
+
+      const diplomacyControls = (p) => {
+        if (p.id === ms.me.id || ms.game.status !== 'active' || (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined)) return null;
+        const r = dipRow(p.id);
+        const st = r ? r.status : 'neutral';
+        const target = { p_target_player_id: p.id };
+        if (st === 'neutral') return h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance');
+        if (st === 'proposed') {
+          if (r.proposed_by_player_id === ms.me.id) return h('span', { style: 'color:var(--dim)' }, 'Alliance proposed, awaiting reply');
+          return h('div', { class: 'row' },
+            h('button', { class: 'primary', onclick: order('accept_alliance', target, `Allied with ${p.display_name}`) }, 'Accept alliance'),
+            h('button', { onclick: order('decline_alliance', target, 'Proposal declined') }, 'Decline'));
+        }
+        if (st === 'allied') {
+          return h('button', { class: 'danger', onclick: (e) => { if (confirm(`Break your alliance with ${p.display_name}? War follows after a grace period.`)) order('break_alliance', target, 'Alliance broken. War follows after the grace period')(e); } }, 'Break alliance');
+        }
+        if (st === 'grace_period') return h('span', { style: 'color:var(--gold2)' }, `Alliance broken. War at tick ${r.grace_ends_tick}`);
+        return h('span', { style: 'color:#e08b82' }, 'At war');
+      };
+
+      const drawSide = () => {
+        const tf = tickF();
+        const sel = ms.sel;
+        const parts = [];
+        if (ms.tab === 'news') {
+          sideEl.replaceChildren(sideTabs(), h('div', { class: 'sec' }, ms.moments.length
+            ? ms.moments.map((m) => feedRow(m.tick, momentText(m)))
+            : h('div', { class: 'empty' }, 'Nothing has happened yet.')));
+          return;
+        }
+        if (ms.tab === 'chat') {
+          const focused = [ms.chatInput, ms.threadInput].includes(document.activeElement) ? document.activeElement : null;
+          const body = chatView();
+          sideEl.replaceChildren(sideTabs(), ...body.flat());
+          const scroller = document.getElementById('chatscroll');
+          if (scroller) scroller.scrollTop = scroller.scrollHeight;
+          if (focused) focused.focus();
+          return;
+        }
+        if (ms.tab === 'inbox') {
+          sideEl.replaceChildren(sideTabs(), h('div', { class: 'sec' }, ms.inbox.length
+            ? ms.inbox.map((i) => feedRow(i.tick, i.title, ms.newIds.has(i.id)))
+            : h('div', { class: 'empty' }, 'No reports yet.')));
+          return;
+        }
+        if (sel && sel.type === 't') {
+          const t = ms.t.get(sel.id);
+          const seen = ms.vis.has(t.id);
+          const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
+          parts.push(h('h3', {}, t.name), h('div', { style: 'color:var(--dim)' }, `Tier ${t.tier}${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + t.terrain : ''}`));
+          parts.push(h('div', { class: 'sec' },
+            line('Owner', owner ? pname(owner) + (seen ? '' : ' (last seen)') : 'Unclaimed'),
+            line('Troops', seen ? t.troops : 'Unknown'),
+            seen ? line('Gold / Industry / Prestige', `${t.gold_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
+            seen ? line('Road', t.has_road ? 'Yes' : 'No') : null,
+            t.garrison_commander_id && seen ? line('Garrison leader', (ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || '') : null));
+          const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
+          if (here.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Commanders here'), here.map(cmdRow)));
+          parts.push(siegeSection(t), buildSection(t));
+          const links = ms.edges.filter((e) => e.from_territory_id === t.id || e.to_territory_id === t.id)
+            .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length }))
+            .sort((a, b) => a.len - b.len);
+          parts.push(h('div', { class: 'sec' }, h('b', {}, 'Roads to'), links.map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, Math.round(l.len))))));
+        } else if (sel && sel.type === 'c') {
+          const c = ms.cmd.find((x) => x.id === sel.id);
+          if (!c || !commanderSeen(c, tf)) {
+            ms.sel = null;
+            drawSide();
+            return;
+          }
+          const ab = ms.abil.get(c.id) || {};
+          const m = ms.mov.get(c.id);
+          parts.push(h('h3', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`),
+            h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}`));
+          parts.push(h('div', { class: 'sec' },
+            line('Rank', rankOf(c)),
+            line('Troops', c.troops),
+            line('Status', c.status),
+            c.current_territory_id ? line('At', ms.t.get(c.current_territory_id).name) : null,
+            c.status === 'moving' && m ? line('Heading to', `${ms.t.get(m.to_territory_id).name} (tick ${m.arrival_tick})`) : null));
+          const known = Object.entries(ab).filter(([, v]) => v > 0);
+          parts.push(h('div', { class: 'sec' }, h('b', {}, 'Abilities'),
+            known.length ? known.map(([k, v]) => line(ABILITY_NAMES[k] || k, v)) : h('div', { class: 'empty' }, 'None yet')));
+          parts.push(commanderActions(c));
+          if (c.current_territory_id) parts.push(h('div', { class: 'sec' }, h('button', { onclick: () => select('t', c.current_territory_id) }, 'Show territory')));
+        } else {
+          const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
+          parts.push(h('h3', {}, 'Realm'), ...realmSection());
+          parts.push(h('div', { class: 'sec' }, h('b', {}, 'Standings'), pl.map(({ p, n }) => {
+            const st = p.id === ms.me.id ? 'you' : dipStatus(p.id);
+            const ctl = diplomacyControls(p);
+            return h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+              h('div', { class: 'line', style: 'border:none' },
+                h('span', { style: 'color:var(--text)' }, dots(p.faction_slug), p.display_name, p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? h('span', { class: 'tag' }, 'out') : null),
+                h('span', {}, `${n} · ${st === 'neutral' ? '' : st}`)),
+              p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id && !p.is_ai ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null) : null);
+          })));
+          parts.push(h('div', { class: 'sec', style: 'color:var(--dim);font-size:.8rem' }, 'Click a castle or commander for details. Drag to pan, scroll to zoom. A gold ring marks a king.'));
+        }
+        sideEl.replaceChildren(sideTabs(), ...parts.filter(Boolean));
+      };
+
+      const toMap = (e) => new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+      const applyView = () => svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
+
+      svg.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const pt = toMap(e);
+        const v = ms.view;
+        const nw = Math.min(ms.full.w * 1.3, Math.max(ms.full.w / 8, v.w * Math.exp(e.deltaY * 0.0015)));
+        const k = nw / v.w;
+        ms.view = { x: pt.x - (pt.x - v.x) * k, y: pt.y - (pt.y - v.y) * k, w: nw, h: v.h * k };
+        applyView();
+      }, { passive: false });
+
+      svg.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        const start = { x: e.clientX, y: e.clientY, view: { ...ms.view } };
+        const scale = svg.getScreenCTM().a;
+        ms.dragged = false;
+        const move = (ev) => {
+          const dx = ev.clientX - start.x;
+          const dy = ev.clientY - start.y;
+          if (Math.hypot(dx, dy) > 4) ms.dragged = true;
+          if (!ms.dragged) return;
+          ms.view = { ...start.view, x: start.view.x - dx / scale, y: start.view.y - dy / scale };
+          applyView();
+        };
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          setTimeout(() => { ms.dragged = false; }, 0);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      });
+
+      svg.addEventListener('click', (e) => {
+        if (e.target === svg) select(null);
+      });
+
+      let firstLoad = true;
+      const load = async () => {
+        if (state.view !== 'map' || state.roomId !== gameId) return;
+        const q = (t) => sb.from(t).select('*').eq('game_id', gameId);
+        const res = await Promise.all([
+          sb.from('games').select('*').eq('id', gameId).maybeSingle(),
+          q('game_players'), q('game_territories'), q('commanders'), q('commander_abilities'),
+          q('commander_movements'), q('realm_areas'), q('diplomacy'), q('commander_routes'),
+          sb.from('game_moments').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
+          sb.from('player_inbox').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
+          sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(150),
+          sb.from('message_threads').select('*').eq('game_id', gameId),
+          sb.from('thread_participants').select('*').eq('game_id', gameId),
+          ms.edges ? Promise.resolve({ data: ms.edges }) : q('territory_edges'),
+        ]);
+        if (state.view !== 'map' || state.roomId !== gameId) return;
+        const failed = res.find((r) => r.error);
+        if (failed) { toast(failed.error.message); return; }
+        const [g, pl, tr, cm, ab, mv, ar, dp, rt, mo, ib, ch, th, pt, ed] = res;
+        const threadIds = th.data.map((t) => t.id);
+        const tm = threadIds.length
+          ? await sb.from('thread_messages').select('*').in('thread_id', threadIds).order('id', { ascending: false }).limit(500)
+          : { data: [] };
+        if (tm.error) { toast(tm.error.message); return; }
+        if (state.view !== 'map' || state.roomId !== gameId) return;
+        if (!g.data) { toast('That game is no longer available.'); return showHome(); }
+        ms.game = g.data;
+        ms.players = new Map(pl.data.map((p) => [p.id, p]));
+        ms.me = pl.data.find((p) => p.user_id === uid);
+        if (!ms.me) { toast('You are not in this game.'); return showHome(); }
+        ms.t = new Map(tr.data.map((t) => [t.id, t]));
+        ms.cmd = cm.data.filter((c) => c.status !== 'dead');
+        ms.abil = new Map();
+        ab.data.forEach((a) => {
+          const m = ms.abil.get(a.commander_id) || {};
+          m[a.ability] = a.level;
+          ms.abil.set(a.commander_id, m);
+        });
+        ms.mov = new Map(mv.data.map((m) => [m.commander_id, m]));
+        ms.areas = ar.data;
+        ms.wl = (ar.data.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
+        ms.dip = dp.data;
+        ms.moments = mo.data;
+        ms.inbox = ib.data;
+        ms.chat = ch.data.slice().reverse();
+        ms.threads = new Map(th.data.map((t) => [t.id, { id: t.id, parts: [], msgs: [], read: null }]));
+        pt.data.forEach((x) => {
+          const t = ms.threads.get(x.thread_id);
+          if (!t) return;
+          t.parts.push(x.player_id);
+          if (x.player_id === ms.me.id) t.read = x.last_read_at;
+        });
+        tm.data.slice().reverse().forEach((m) => {
+          const t = ms.threads.get(m.thread_id);
+          if (t) t.msgs.push(m);
+        });
+        ms.routes = new Map();
+        rt.data.sort((a, b) => a.id - b.id).forEach((r) => ms.routes.set(r.commander_id, r));
+        if (!ms.edges) {
+          ms.edges = ed.data;
+          ms.cells = voronoiCells([...ms.t.values()], g.data.map_w, g.data.map_h);
+        }
+        if (firstLoad) {
+          firstLoad = false;
+          const pad = 40;
+          ms.full = { x: -pad, y: -pad, w: g.data.map_w + 2 * pad, h: g.data.map_h + 2 * pad };
+          ms.view = { ...ms.full };
+          applyView();
+        }
+        render();
+        drawSide();
+      };
+
+      await load();
+
+      let debounce = null;
+      const kick = () => { clearTimeout(debounce); debounce = setTimeout(load, 300); };
+      const f = `game_id=eq.${gameId}`;
+      let channel = sb.channel('map-' + gameId).on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, kick);
+      ['game_players', 'game_territories', 'commanders', 'commander_movements', 'diplomacy', 'realm_areas', 'game_moments', 'player_inbox'].forEach((table) => {
+        channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: f }, kick);
+      });
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: 'game_chat', filter: f }, kick)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'thread_messages' }, kick);
+      channel.subscribe((status) => { if (status === 'SUBSCRIBED') kick(); });
+      const tickTimer = setInterval(() => { if (ms.game) { renderDyn(); updateCountdown(); } }, 1000);
+      const loadTimer = setInterval(load, 30000);
+      const onKey = (e) => {
+        if (e.key !== 'Escape' || document.activeElement instanceof HTMLInputElement) return;
+        if (ms.marching) { ms.marching = false; ms.preview = null; render(); drawSide(); }
+        else if (ms.sel) select(null);
+      };
+      window.addEventListener('keydown', onKey);
+      state.cleanup.push(() => { window.removeEventListener('keydown', onKey); clearTimeout(debounce); clearInterval(tickTimer); clearInterval(loadTimer); sb.removeChannel(channel); });
+    }
+
+    async function onSession(session, event) {
+      state.session = session;
+      if (!session) {
+        clearCleanup();
+        state.profile = null;
+        state.view = 'auth';
+        if (DEV_GUEST && await startGuest()) return;
+        renderAuth(false);
+        return;
+      }
+      if (event === 'PASSWORD_RECOVERY') {
+        state.view = 'recovery';
+        renderAuth(true);
+        return;
+      }
+      if (state.view === 'recovery') return;
+      if (state.view === 'home' || state.view === 'room' || state.view === 'map') return;
+      await loadProfile();
+      await showHome();
+    }
+
+    sb.auth.onAuthStateChange((event, session) => {
+      setTimeout(() => onSession(session, event), 0);
+    });
+
+    sb.auth.getSession().then(async ({ data }) => {
+      if (data.session) return;
+      if (DEV_GUEST && await startGuest()) return;
+      renderAuth(false);
+    });
+  </script>
 </body>
 </html>
