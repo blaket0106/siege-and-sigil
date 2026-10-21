@@ -731,11 +731,13 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      const ms = { battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
 
       const chatSeenKey = `ss-chatseen-${gameId}-${uid}`;
       try { ms.chatSeen = Number(localStorage.getItem(chatSeenKey)) || 0; } catch { ms.chatSeen = 0; }
+      const battleSeenKey = `ss-battleseen-${gameId}-${uid}`;
+      try { ms.battleSeen = Number(localStorage.getItem(battleSeenKey)) || 0; } catch { ms.battleSeen = 0; }
       ms.chatInput = h('input', { type: 'text', maxlength: '500', placeholder: 'Message everyone' });
       ms.threadInput = h('input', { type: 'text', maxlength: '2000', placeholder: 'Write a message' });
       const hud = h('div', { class: 'hud' });
@@ -1215,7 +1217,7 @@
       };
 
       const sideTabs = () => {
-        const unread = ms.inbox.filter((i) => !i.is_read).length;
+        const unread = ms.inbox.filter((i) => !i.is_read).length + battlesUnread();
         const tab = (k, label) => h('button', {
           class: ms.tab === k ? 'on' : '',
           onclick: async () => {
@@ -1344,6 +1346,100 @@
           }) : h('div', { class: 'empty', style: 'margin-top:10px' }, 'No conversations yet.')];
       };
 
+      const KIND_LABELS = { assault: 'Assault', sally: 'Sally', relief: 'Relief', intercept: 'Intercept' };
+      const ROLE_LABELS = { attacker: 'Attackers', defender: 'Defenders', sally: 'Sally force', siege: 'Besiegers', relief: 'Relief force', marching: 'Marching force' };
+
+      const sidePlayers = (side) => [...new Set([side.player_id, ...side.commanders.map((c) => c.owner_player_id)].filter(Boolean))];
+      const battleMeta = (b) => {
+        const sides = b.report.sides;
+        const mine = sides.findIndex((sd) => sidePlayers(sd).includes(ms.me.id));
+        const other = sides[mine === 0 ? 1 : 0];
+        return {
+          mine,
+          won: mine === b.report.winner,
+          opponents: other ? (sidePlayers(other).map(pname).join(', ') || 'Neutral garrison') : '',
+        };
+      };
+
+      const battlesUnread = () => ms.battles.filter((b) => b.id > ms.battleSeen).length;
+      const markBattlesSeen = () => {
+        const top = ms.battles.length ? ms.battles[0].id : 0;
+        if (top <= ms.battleSeen) return;
+        ms.battleSeen = top;
+        try { localStorage.setItem(battleSeenKey, String(top)); } catch {}
+      };
+
+      const openBattle = (id) => {
+        ms.tab = 'inbox';
+        ms.inboxTab = 'battles';
+        ms.report = id;
+        drawSide();
+        drawHud();
+      };
+
+      const battleRow = (b) => {
+        const m = battleMeta(b);
+        return h('button', { class: 'threadrow', onclick: () => openBattle(b.id) },
+          h('span', { style: `color:${m.won ? '#7fd08a' : '#e08b82'}` }, `${m.won ? 'Victory' : 'Defeat'} · ${KIND_LABELS[b.kind]} ${b.territory_name ? 'at ' + b.territory_name : 'in the field'}`),
+          h('small', {}, `Tick ${b.tick} · against ${m.opponents}`));
+      };
+
+      const abilityChips = (abilities) => Object.entries(abilities).map(([k, v]) => `${ABILITY_NAMES[k] || k} ${v}`).join(', ');
+
+      const battleChart = (b) => {
+        const rounds = b.report.rounds;
+        const sides = b.report.sides;
+        const pts = [[sides[0].troops, sides[1].troops], ...rounds];
+        const W = 300;
+        const H = 110;
+        const maxT = Math.max(1, ...pts.flat());
+        const x = (i) => (pts.length === 1 ? 0 : (i / (pts.length - 1)) * W);
+        const y = (v) => H - (v / maxT) * (H - 6) - 3;
+        const colorOf = (sd) => color(sd.player_id || (sd.commanders[0] && sd.commanders[0].owner_player_id));
+        const trace = (k) => sv('polyline', { points: pts.map((pt, i) => `${x(i).toFixed(1)},${y(pt[k]).toFixed(1)}`).join(' '), fill: 'none', stroke: colorOf(sides[k]), 'stroke-width': 2.2, 'stroke-linejoin': 'round' });
+        const cursor = sv('line', { x1: W, y1: 0, x2: W, y2: H, stroke: '#f0cf7d', 'stroke-width': 1, 'stroke-dasharray': '3 3' });
+        const label = h('div', { style: 'color:var(--gold2);margin-top:4px' });
+        const show = (i) => {
+          cursor.setAttribute('x1', x(i)); cursor.setAttribute('x2', x(i));
+          const [a, c] = pts[i];
+          label.textContent = i === 0 ? `Before the fight: ${a} v ${c}` : `After strike ${i}: ${a} v ${c}`;
+        };
+        const slider = h('input', { type: 'range', min: '0', max: String(pts.length - 1), value: String(pts.length - 1), style: 'width:100%;margin-top:6px', oninput: (e) => show(Number(e.target.value)) });
+        show(pts.length - 1);
+        return h('div', { class: 'sec' }, h('b', {}, 'Replay'),
+          h('div', { style: 'color:var(--dim);margin-bottom:4px' }, `${ROLE_LABELS[sides[b.report.first].role]} strike first, then the sides alternate. Left value is ${ROLE_LABELS[sides[0].role]}.`),
+          sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', style: 'background:#0a0a0f;border:1px solid var(--line);border-radius:4px;touch-action:auto;cursor:default' }, trace(0), trace(1), cursor),
+          slider, label,
+          b.report.rounds_truncated ? h('div', { style: 'color:var(--dim);margin-top:4px' }, 'Replay shortened to the first 400 strikes.') : null);
+      };
+
+      const battleDetail = (b) => {
+        const r = b.report;
+        const m = battleMeta(b);
+        const sideCard = (sd) => h('div', { class: 'sec' },
+          h('b', {}, `${ROLE_LABELS[sd.role]}${sd.died ? ' · destroyed' : ' · held'}`),
+          line('Commander', sidePlayers(sd).map(pname).join(', ') || 'Neutral garrison'),
+          line('Troops', sd.garrison ? `${sd.troops} (${sd.garrison} in the garrison)` : sd.troops),
+          line('Damage per strike', sd.damage),
+          sd.commanders.map((c) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+            h('div', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`, h('span', { style: 'color:var(--dim)' }, ` · ${c.school} · rank ${c.rank} · ${c.troops} troops`)),
+            Object.keys(c.abilities).length ? h('div', { style: 'color:var(--dim);font-size:.8rem' }, abilityChips(c.abilities)) : null)));
+        return [
+          h('div', { class: 'row', style: 'margin:10px 0' }, h('button', { onclick: () => { ms.report = null; drawSide(); } }, 'All battles')),
+          h('h3', {}, `${KIND_LABELS[b.kind]} ${b.territory_name ? 'at ' + b.territory_name : 'in the field'}`),
+          h('div', { style: 'color:var(--dim)' }, `Tick ${b.tick}`),
+          h('div', { class: 'sec' },
+            h('div', { style: `font-size:1.1rem;color:${m.won ? '#7fd08a' : '#e08b82'}` }, m.won ? 'Victory' : 'Defeat'),
+            line('Survivors', `${r.survivors} (${ROLE_LABELS[r.sides[r.winner].role]})`),
+            r.captured ? line('Castle', 'Captured') : null,
+            r.salvage ? line('Salvage', `${r.salvage} gold`) : null,
+            r.from_siege && b.kind === 'assault' ? line('Origin', 'Assault from a siege') : null),
+          battleChart(b),
+          sideCard(r.sides[0]),
+          sideCard(r.sides[1]),
+        ];
+      };
+
       const feedRow = (tick, text, hot) => h('div', { class: 'line', style: `gap:10px;${hot ? 'color:var(--gold2)' : ''}` },
         h('span', { style: 'flex:1;color:inherit' }, text),
         h('span', { style: 'white-space:nowrap' }, `t${tick}`));
@@ -1401,9 +1497,19 @@
           return;
         }
         if (ms.tab === 'inbox') {
-          sideEl.replaceChildren(sideTabs(), h('div', { class: 'sec' }, ms.inbox.length
-            ? ms.inbox.map((i) => feedRow(i.tick, i.title, ms.newIds.has(i.id)))
-            : h('div', { class: 'empty' }, 'No reports yet.')));
+          const sub = (k, label) => h('button', { class: ms.inboxTab === k ? 'primary' : '', onclick: () => { ms.inboxTab = k; ms.report = null; drawSide(); drawHud(); } }, label);
+          if (ms.inboxTab === 'battles') markBattlesSeen();
+          const bar = h('div', { class: 'row', style: 'margin:12px 0' }, sub('reports', 'Reports'), sub('battles', `Battles${ms.battles.length ? ` (${ms.battles.length})` : ''}`));
+          const open = ms.report ? ms.battles.find((x) => x.id === ms.report) : null;
+          let body;
+          if (ms.inboxTab === 'battles') {
+            body = open ? battleDetail(open) : [ms.battles.length ? ms.battles.map(battleRow) : h('div', { class: 'empty' }, 'No battles yet.')];
+          } else {
+            body = [h('div', { class: 'sec' }, ms.inbox.length
+              ? ms.inbox.map((i) => feedRow(i.tick, i.title, ms.newIds.has(i.id)))
+              : h('div', { class: 'empty' }, 'No reports yet.'))];
+          }
+          sideEl.replaceChildren(sideTabs(), bar, ...body.flat());
           return;
         }
         if (sel && sel.type === 't') {
@@ -1419,6 +1525,8 @@
             t.garrison_commander_id && seen ? line('Garrison leader', (ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || '') : null));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
           if (here.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Commanders here'), here.map(cmdRow)));
+          const fought = ms.battles.filter((b) => b.territory_id === t.id);
+          if (fought.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Battles here'), fought.map(battleRow)));
           parts.push(siegeSection(t), buildSection(t));
           const links = ms.edges.filter((e) => e.from_territory_id === t.id || e.to_territory_id === t.id)
             .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length }))
@@ -1509,6 +1617,7 @@
           sb.rpc('get_game_view', { p_game_id: gameId }),
           sb.from('game_moments').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
           sb.from('player_inbox').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
+          sb.from('battle_reports').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
           sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(150),
           sb.from('message_threads').select('*').eq('game_id', gameId),
           sb.from('thread_participants').select('*').eq('game_id', gameId),
@@ -1516,7 +1625,7 @@
         ]);
         if (state.view !== 'map' || state.roomId !== gameId) return;
 
-        const [vw, mo, ib, ch, th, pt, ed] = res;
+        const [vw, mo, ib, br, ch, th, pt, ed] = res;
         if (vw.error && vw.error.message.includes('not in this game')) { toast('That game is no longer available.'); return showHome(); }
         const failed = res.find((r) => r.error);
         if (failed) { toast(failed.error.message); return; }
@@ -1546,6 +1655,7 @@
         ms.dip = view.diplomacy;
         ms.moments = mo.data;
         ms.inbox = ib.data;
+        ms.battles = br.data;
         ms.chat = ch.data.slice().reverse();
         ms.threads = new Map(th.data.map((t) => [t.id, { id: t.id, parts: [], msgs: [], read: null }]));
         pt.data.forEach((x) => {

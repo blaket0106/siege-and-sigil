@@ -1185,6 +1185,15 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 - **Verified (rolled-back tests with triggers enabled):** propose, decline restoring war, accept with expulsion, all error paths, order and preview refusal, in-flight march cancelled on arrival, intercepts blocked in truce and happening at war, expiry, marching again after expiry; AI acceptance, proposal, withdrawal and betrayal rates against their targets over many trials; a 60 tick generated game at difficulty 5 with no AI errors, forming two AI alliances.
 - **Not done yet:** a lobby setting for truce length, truce for allies breaking into war, honor and infamy.
 
+### 20z. Battle reports (implemented)
+
+- **Table `battle_reports`** (`game_id`, `tick`, `kind` of assault / sally / relief / intercept, `territory_id`, `territory_name`, `involved_player_ids`, `report` jsonb). Readable only by the players involved (RLS on `involved_player_ids`); nothing is public beyond the existing news lines, so fog is unaffected. No direct writes.
+- **Recording:** `record_battle_report(...)` (internal) is called by `fight_castle` (assault, including assaults launched from a siege), `sally_out`, `resolve_relief` and `resolve_intercepts`, after the outcome is computed and before anyone dies or troops are reallocated, so commander snapshots show pre-battle troops. Castle salvage is added to the report when the castle is taken. Involved players are both sides' lead players plus the owners of every commander who fought (so allied defenders get the report).
+- **Report JSON:** `sides[0..1]` (role, `player_id`, garrison, total troops, damage per strike, `died`, and each commander's id, name, school, role, owner, troops, rank and non-zero abilities), `first` (side index that strikes first), `winner`, `survivors`, `rounds` (troops of side 0 and side 1 after each strike; capped at 400 strikes with `rounds_truncated`), `captured`, `salvage`, `from_siege`. Sides: assault is attacker (0) and defender (1, strikes first); sally is sally force (0) and besiegers (1); relief is relief force (0) and besiegers (1); intercepts are the two marching commanders. Initiative decides `first` for open-field fights, with the existing tie rules.
+- **Replay arithmetic:** strikes alternate starting with the first side, each removing the other's damage from its troops; the final entry matches the engine's closed-form `duel` result (checked over 300 random fights).
+- **UI:** Inbox tab has Reports (the old messages) and Battles. Battles lists fights with result, place, tick and opponents, and a count of unseen ones is added to the Inbox badge. A detail view shows the result, survivors, capture and salvage, a replay chart with a slider, and a card per side with its commanders, ranks and abilities. A castle's panel lists Battles here.
+- **Limits:** fights before this migration have no report (only their inbox message); intercept reports have no location; XP earned is not recorded.
+
 ---
 
 *Source: `/Users/blaketaylor/Documents/Claude/Personal Game Code/Westeros/index.html` commit 483eb15. Distilled October 2026.*
