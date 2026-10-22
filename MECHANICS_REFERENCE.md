@@ -24,7 +24,7 @@ Distilled from the Westeros codebase (commit 483eb15). Theme-agnostic. This is t
 | `name` | text | |
 | `tier` | int | 1, 2, or 3 |
 | `region` | text | Geographic region label |
-| `base_influence` | int | Base strategic weight. Higher → cheaper upgrades there. |
+| `natural_resources` | int | Base strategic weight. Higher → cheaper upgrades there. |
 | `map_x` | float | Normalized [0,1] x position on generated map |
 | `map_y` | float | Normalized [0,1] y position on generated map |
 
@@ -69,7 +69,7 @@ Distilled from the Westeros codebase (commit 483eb15). Theme-agnostic. This is t
 | `fog_of_war` | bool | |
 | `starting_gold` | int | |
 | `starting_garrison` | int | |
-| `starting_gold_level` | int | |
+| `starting_treasury_level` | int | |
 | `starting_industry_level` | int | |
 | `starting_prestige_level` | int | |
 | `fill_with_ai` | bool | |
@@ -101,11 +101,11 @@ Distilled from the Westeros codebase (commit 483eb15). Theme-agnostic. This is t
 | `territory_slug` | text FK | |
 | `owner_player_id` | int FK | null = unowned |
 | `troops` | int | Garrison troops |
-| `gold_level` | int | Treasury level |
+| `treasury_level` | int | Treasury level |
 | `industry_level` | int | Recruitment level |
 | `prestige_level` | int | Prestige level |
 | `has_road` | bool | Kings Road equivalent |
-| `effective_influence` | int | Computed: `(laws_level × 5) + base_influence` |
+| `resources` | int | Computed: `(laws_level × 5) + natural_resources` |
 | `troop_accum` | float | Fractional troop accumulator (carries between ticks) |
 
 **`commanders`**
@@ -263,7 +263,7 @@ Runs every `production_cycle_ticks` ticks (configurable, default 12).
 
 ### 3a. Gold
 ```
-gold_added_per_cycle = sum(territory.gold_level) × (10 + coinCouncilLevel × 2)
+gold_added_per_cycle = sum(territory.treasury_level) × (10 + coinCouncilLevel × 2)
 ```
 
 Gold is paid as a lump sum at the end of each cycle.
@@ -291,13 +291,13 @@ Prestige flows entirely to the player's current focus council seat each tick. Gr
 ### 4a. Three Tracks per Territory
 | Track | Stat | Effect |
 |---|---|---|
-| Treasury | `gold_level` | Gold income each cycle |
+| Treasury | `treasury_level` | Gold income each cycle |
 | Recruitment | `industry_level` | Troop production each cycle |
 | Prestige | `prestige_level` | Prestige per tick toward council |
 
 ### 4b. Upgrade Cost Formula
 ```
-cost = floor(base × (currentLevel + 1) / effective_influence × infra_cost_mult)
+cost = floor(base × (currentLevel + 1) / resources × infra_cost_mult)
 ```
 
 | Track | Base Cost |
@@ -305,16 +305,16 @@ cost = floor(base × (currentLevel + 1) / effective_influence × infra_cost_mult
 | Treasury | 500 |
 | Recruitment | 1000 |
 | Prestige | 4000 |
-| Road | `floor(10000 / base_influence)` |
+| Road | `floor(10000 / natural_resources)` |
 
-`effective_influence = (laws_council_level × 5) + territory.base_influence`
+`resources = (laws_council_level × 5) + territory.natural_resources`
 
 Higher influence = cheaper upgrades at that territory.
 
 ### 4c. Bulk Upgrade
 RPC: `bulk_upgrade_infrastructure(p_game_id, p_infra_type, p_budget)` → `{upgraded, spent}`
 
-Automatically upgrades the cheapest available territories of the chosen type until budget is exhausted. Uses `effective_influence` to find cheapest options first.
+Automatically upgrades the cheapest available territories of the chosen type until budget is exhausted. Uses `resources` to find cheapest options first.
 
 ---
 
@@ -537,7 +537,7 @@ In fog-of-war games, enemy troop counts at territories outside scan range are hi
 | Commander General | Hand of the King | Combat attack damage (`atkDmg` formula) |
 | Treasurer | Master of Coin | Gold income multiplier (+2 gold per treasury level per council level) |
 | Marshal | Lord Commander | Troop production (`troops = industry × (level + 4)`) |
-| Steward | Master of Laws | Upgrade cost reduction via `effective_influence = laws×5 + base_influence` |
+| Steward | Master of Laws | Upgrade cost reduction via `resources = laws×5 + natural_resources` |
 | Spymaster | Master of Whisperers | Fog of war scan radius; open-field combat initiative |
 | Scholar | Grand Maester | Bonus prestige investment each cycle (random seat) |
 | Cavalry Master | Master of Horses | March range (`90 + horses×60` leagues) |
@@ -568,7 +568,7 @@ Invested into a **random non-focus** seat each production cycle. Accelerates cou
 ### 10e. Individual Seat Formulas
 **Treasurer (Coin):**
 ```
-gold_per_cycle = sum(territory.gold_level) × (10 + coin_level × 2)
+gold_per_cycle = sum(territory.treasury_level) × (10 + coin_level × 2)
 ```
 
 **Marshal (Lord Commander):**
@@ -578,7 +578,7 @@ troops_per_cycle_per_territory = industry_level × (marshal_level + 4)
 
 **Steward (Laws):**
 ```
-effective_influence = (laws_level × 5) + territory.base_influence
+resources = (laws_level × 5) + territory.natural_resources
 ```
 This reduces all upgrade costs at every territory.
 
@@ -815,7 +815,7 @@ These existed in Westeros but are explicitly excluded from V1:
 - **Map size = territories per player**, multiplied by player count. Presets: compact 6, standard 9, large 14.
 - **Spacing is held constant (~150 units).** Map dimensions (`games.map_w`, `games.map_h`) grow with territory count so scan radius (150) and march range (150) stay balanced at every size.
 - **Coordinates are absolute map units** stored on `game_territories`, not normalized [0,1]. This replaces `MAP_NATIVE_W/H`; fog and march formulas use game units directly.
-- **Territories are per-game.** The static `territories` table is removed; name, `x`, `y`, `tier`, `base_influence`, `terrain` live on `game_territories`. Names are procedurally generated.
+- **Territories are per-game.** The static `territories` table is removed; name, `x`, `y`, `tier`, `natural_resources`, `terrain` live on `game_territories`. Names are procedurally generated.
 
 ### 20c. Starting positions
 - **`starting_territories` setting, default 4:** 1 tier-3 capital + 3 tier-1.
@@ -851,7 +851,7 @@ These existed in Westeros but are explicitly excluded from V1:
 - **Geometry:** map is a disc of radius `150 × sqrt(territories / pi)` inside a square (`map_w = map_h = 2 × (radius + 60)`), giving about 150 units between neighbors. Points come from dart-throwing with a minimum distance (0.7 × 150 scatter, 0.55 continents), relaxed 4% per retry.
 - **Adjacency:** Delaunay triangulation, symmetrized across rotations by orbit majority (breaks float ties). Edges longer than the prune limit (2.0 × 150 scatter, 1.4 continents) are removed, then the shortest removed edges are added back, as full rotation orbits, until the graph is connected. Those added edges are the chokepoints.
 - **Per-player territories:** compact 6, standard 9, large 14; start `starting_territories` (default 4: 1 tier-3 capital + 3 tier-1); at least 2 neutral per player. Neutral tier 2 = 40% of neutrals, taken nearest the center.
-- **Placeholder values:** `base_influence` tier 1/2/3 = 2/4/6; owned `effective_influence` = base + 5 (Guildhall level 1), neutral = base. Neutral garrison = `starting_garrison × tier`; neutral levels: gold = tier - 1, industry 1, prestige 0 (so captured neutrals pay salvage and produce troops). Owned territories take garrison and levels from the game settings.
+- **Placeholder values:** `natural_resources` tier 1/2/3 = 2/4/6; owned `resources` = base + 5 (Guildhall level 1), neutral = base. Neutral garrison = `starting_garrison × tier`; neutral levels: gold = tier - 1, industry 1, prestige 0 (so captured neutrals pay salvage and produce troops). Owned territories take garrison and levels from the game settings.
 - **Names:** prefix + suffix (e.g. Ashford), unique per game. `region` is unused in V1.
 - **Entry point:** edge function `start-game` (see 20k). It calls `start_game`, which calls `commit_world`; `commit_world` validates the layout and writes territories, edges, ownership and capitals, and is executable by `service_role` only.
 - **Known weak spot:** `continents` is a first pass (tighter clusters, a few bridge edges) and has not been checked visually.
@@ -987,14 +987,14 @@ All are client-callable (signed-in players) and require an active game and a non
 
 - `hire_commander(game, territory, school)`: territory must be owned; costs `games.commander_cost` (flat); new commander appears idle at that territory with 0 troops and +1 in a random ability of the school. If the player has no living commander at all, the hire is crowned king with `coronation_tick = current_tick + coronation_ticks`.
 - `transfer_troops(game, commander, amount)`: commander must be idle at one of your territories; positive moves garrison to commander, negative the reverse.
-- `upgrade_infrastructure(game, territory, type)`: `type` is `treasury` / `recruitment` / `prestige` (levels `gold_level` / `industry_level` / `prestige_level`). Cost `floor(base × (level + 1) / effective_influence × infra_cost_mult)` with base 500 / 1000 / 4000, minimum 1. No level cap.
+- `upgrade_infrastructure(game, territory, type)`: `type` is `treasury` / `recruitment` / `prestige` (levels `treasury_level` / `industry_level` / `prestige_level`). Cost `floor(base × (level + 1) / resources × infra_cost_mult)` with base 500 / 1000 / 4000, minimum 1. No level cap.
 - `bulk_upgrade_infrastructure(game, type, budget)`: repeatedly upgrades the currently cheapest owned territory until the budget (capped at your gold) runs out. Returns `{upgraded, spent}`; one ledger row.
-- `build_road(game, territory)`: cost `floor(10000 / base_influence × infra_cost_mult)`. `demolish_road` is free and refunds nothing.
+- `build_road(game, territory)`: cost `floor(10000 / natural_resources × infra_cost_mult)`. `demolish_road` is free and refunds nothing.
 - `send_gold(game, target_player, amount)`: ledger rows for both sides, inbox message for the receiver. Not allowed to self or to eliminated players.
 - `set_active_area(game, area)`: sets the single active project; progress in other areas is kept.
 - `assign_garrison_commander(game, commander)` / `unassign_garrison_commander(game, territory)`: the commander must be idle at one of your territories. Assigning replaces any current garrison commander there.
 - `crown_commander(game, commander)`: only when you have no living king; effective after `coronation_ticks`. King effects are active when `role = 'king'`, alive, and `coronation_tick` is null or reached (start-of-game kings have a null tick).
-- Internal (no client access): `acting_player`, `infra_cost`, `add_area_prestige` (adds prestige to an area and levels it up at `ceil(144 × level × area_cost_mult)` per level; Guildhall level-ups refresh `effective_influence`), `refresh_effective_influence` (`base_influence + 5 × Guildhall level`; also needed after a capture).
+- Internal (no client access): `acting_player`, `infra_cost`, `add_area_prestige` (adds prestige to an area and levels it up at `ceil(144 × level × area_cost_mult)` per level; Guildhall level-ups refresh `resources`), `refresh_effective_influence` (`natural_resources + 5 × Guildhall level`; also needed after a capture).
 - Not built: heir designation, area prestige flow (tick engine), commander disbanding.
 
 ### 20m. Movement (orders implemented; execution is the tick engine's job)
@@ -1017,7 +1017,7 @@ All are client-callable (signed-in players) and require an active game and a non
 - `run_tick(game)` per tick, in order: increment `current_tick`; troop production; prestige flow; and on every `production_cycle_ticks`-th tick: gold payout, Library bonus, intel snapshot. Combat, movement and sieges will slot in between production and the win check.
 - **Troops:** per territory per tick `industry_level × (Barracks level + 4) × (1 + 0.10 × Muster) / production_cycle_ticks`, accumulated in `troop_accum`; the whole part is added immediately.
 - **Prestige:** per player per tick `Σ prestige_level × (1 + 0.10 × Scholar)`, accumulated in `game_players.prestige_accum`; the whole part goes to the active area through `add_area_prestige`.
-- **Gold (cycle end):** per player `floor(Σ gold_level × (10 + 2 × Mint level) × (1 + 0.10 × Steward))`, one `production` ledger row.
+- **Gold (cycle end):** per player `floor(Σ treasury_level × (10 + 2 × Mint level) × (1 + 0.10 × Steward))`, one `production` ledger row.
 - **Library (cycle end):** `72 × Library level` prestige into a random non-active area.
 - **Ability levels used here:** a territory uses the level of its garrison commander or the king's floor (king level - 1, active after `coronation_tick`), whichever is higher.
 - **Intel snapshot (cycle end):** per player territories, gold, troops, commanders, infrastructure totals and area levels, one row per tick.
@@ -1044,7 +1044,7 @@ Runs in `run_tick` after movement (`resolve_tick_events` = movement, then `resol
 - **Outcome (defender strikes first):** `R_att = ceil(attackerTroops / defenderDamage)`, `R_def = ceil(defenderTroops / attackerDamage)`. If `R_att <= R_def` the defender wins with `defenderTroops - (R_att - 1) × attackerDamage` survivors; otherwise the attacker wins with `attackerTroops - R_def × defenderDamage`. An undefended territory (0 troops) always falls, even to a commander with 0 troops. An attacker with 0 troops against any defender loses.
 - **Survivors** are shared among the winning side's commanders (and the garrison) in proportion to their troops, with any rounding remainder going to the largest.
 - **Losing side:** every commander on it dies (status `dead`, troops 0, movement and active routes cleared, garrison assignment cleared). A killed king writes a public `king_killed` moment.
-- **Capture:** the territory changes owner with **0 garrison troops** (the surviving attackers stand there as idle commanders and keep their troops), its Treasury level is destroyed and pays `10 × level × (1 + 0.25 × best Plunder level among the attackers)` gold (ledger `salvage`). Industry, Prestige and roads are kept. `effective_influence` is refreshed for both owners. A public `castle_captured` moment is written. The attackers then continue their routes.
+- **Capture:** the territory changes owner with **0 garrison troops** (the surviving attackers stand there as idle commanders and keep their troops), its Treasury level is destroyed and pays `10 × level × (1 + 0.25 × best Plunder level among the attackers)` gold (ledger `salvage`). Industry, Prestige and roads are kept. `resources` is refreshed for both owners. A public `castle_captured` moment is written. The attackers then continue their routes.
 - **Reports:** a `battle` server event; a `combat` inbox message for the attacker and the previous owner (neutral owners get none).
 - `process_ticks` now reports `combats` and a `combat_events` list (territory, winner, captured, survivors, salvage).
 - **Not done yet:** nothing known. Allied attackers fight as one side (20ab, team assaults); sieges and open-field fights are in 20q.
@@ -1070,7 +1070,7 @@ Runs in `run_tick` after movement (`resolve_tick_events` = movement, then `resol
 Runs at the end of every tick (`evaluate_game_end`, last step of `resolve_tick_events`) and from `concede_defeat`.
 
 - **Elimination:** a player who owns no territory at the end of a tick is eliminated (`eliminated_at_tick`), all of their commanders die, they receive an "eliminated" message and a public `player_eliminated` moment is written. Eliminated players cannot act (`acting_player` refuses them) and are skipped by production and turn-based submission.
-- **Concede** (`concede_defeat(game)`): the same, immediately, and the player's territories become **unowned** (troops and infrastructure stay; `effective_influence` falls back to base). The win check then runs at once.
+- **Concede** (`concede_defeat(game)`): the same, immediately, and the player's territories become **unowned** (troops and infrastructure stay; `resources` falls back to base). The win check then runs at once.
 - **Victory:** (1) **territory:** a living player owns at least `ceil(total territories × victory_pct)` (default 50%); (2) **last standing:** only one living player remains. If several qualify in the same tick, the one with the most territories wins, then the most troops (garrisons plus commanders), then the lowest id.
 - **Finishing:** the game becomes `finished` with `winner_player_id`, a final intel snapshot is taken, every human gets a `Victory` or `Defeat` system message (`kind: game_over`), a public `game_won` moment and a `game_finished` event are written, and profiles get `total_games + 1` (and `total_wins + 1` for the winner). Honor and infamy are not awarded yet.
 - **The tick loop stops** at the winning tick: a catch-up batch ends there and later calls do nothing.
@@ -1150,7 +1150,7 @@ Pair status lives in `diplomacy` (neutral, proposed, allied, grace_period, war).
 - **Panels:** top bar (tick, countdown to next tick, gold, castles toward the win threshold, scan-ring toggle); side panel for the realm and standings, a selected castle (owner, troops, levels, commanders, roads), or a selected commander (rank, troops, status, abilities).
 - **Live updates:** realtime on games, game_players, game_territories, commanders, commander_movements, diplomacy and realm_areas, plus a 30 second poll as a backstop.
 - **Marching orders (implemented):** select an own idle commander to get an Orders panel. Take or Leave garrison troops (`transfer_troops`); release a garrison leader (`unassign_garrison_commander`). March... turns on destination mode: a gold dotted ring shows the Stables range around the commander, clicking a castle calls `preview_march` and draws the route (green in range, red not) with travel ticks, arrival tick and real-time estimate, and non-friendly destinations offer Assault or Siege on arrival. March calls `march_commander`. A marching commander can be halted at the next stop (`abort_route`) or recalled (`recall_route`); the panel shows the halted or recalled state. Escape cancels destination mode. Multi-stop routes are in the UI (20aa).
-- **Economy orders (implemented):** selecting an own castle shows a Build section: Treasury, Recruitment and Prestige upgrades with their live cost (`floor(base x (level + 1) / effective_influence x infra_cost_mult)`), build or demolish road, and Hire a commander by school at that castle (`hire_commander`). Realm panel: each area's level and prestige toward the next level (`ceil(144 x level x area_cost_mult)`), Activate to change the active area, and a bulk upgrade (type and gold budget, cheapest castle first). Commander panel: Lead garrison, and Crown as king when the realm has none. Buttons are disabled when gold is short; server errors appear as toasts.
+- **Economy orders (implemented):** selecting an own castle shows a Build section: Treasury, Recruitment and Prestige upgrades with their live cost (`floor(base x (level + 1) / resources x infra_cost_mult)`), build or demolish road, and Hire a commander by school at that castle (`hire_commander`). Realm panel: each area's level and prestige toward the next level (`ceil(144 x level x area_cost_mult)`), Activate to change the active area, and a bulk upgrade (type and gold budget, cheapest castle first). Commander panel: Lead garrison, and Crown as king when the realm has none. Buttons are disabled when gold is short; server errors appear as toasts.
 - **Feed and diplomacy (implemented):** the side panel has Info, News and Inbox tabs. News is the readable `game_moments` (public events and the viewer's private ones) rendered as sentences; Inbox is `player_inbox` with an unread count, new items highlighted on first open, then marked read. Both update live (`game_moments` is in the realtime publication). Standings now carry per-player diplomacy controls: Propose alliance, Accept or Decline an incoming proposal, Break alliance (with a confirm), and status text for a pending proposal, a grace period (war tick) or war. The top bar shows an "Alliance proposals (n)" button when proposals are waiting.
 - **Siege orders (implemented):** a castle with sieging commanders gets a dashed red ring on the map and an Under siege section (besiegers and troops). The besieged owner sees their force (garrison plus idle commanders) and a Sally out button (`sally_out`, with a confirm that states the risk). A player with sieging commanders there gets Assault now (`break_siege_and_assault`, confirm). A sieging commander's panel shows the same Assault now, and he can still be ordered to march away.
 - **Chat and messages (implemented):** RPCs `send_chat_message(game, message)` (members, 1 to 500 characters), `create_thread(game, participant_ids, first_message)` (human players only, 2 to 8 players including the sender; an existing thread with exactly the same participants is reused, so a DM is one thread) and `send_thread_message(thread, body)` (participants, 1 to 2000 characters). All trim, reject empty text, and allow at most 8 messages per 10 seconds per player; the tables themselves accept no direct writes (insert, update and delete revoked; only the `last_read_at` column of `thread_participants` stays updatable). UI: a Chat tab with General (everyone in the game) and Messages (thread list with unread dots, new message with a player picker, conversation view). A Message button in Standings opens or starts a DM. Unread counts show on the tab; general chat read position is kept in localStorage, thread read position in `thread_participants.last_read_at`. Live via realtime on `game_chat` and `thread_messages`. Dark faction colors fall back to the faction's second color for readability.
@@ -1271,3 +1271,16 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 ---
 
 *Source: `/Users/blaketaylor/Documents/Claude/Personal Game Code/Westeros/index.html` commit 483eb15. Distilled October 2026.*
+
+### 20ac. Natural resources, roads as warp gates, Treasury (implemented)
+
+Supersedes the tier and influence rules in sections 5 and 10 where they conflict.
+
+- **Treasury:** the castle infrastructure that produces gold is `treasury_level` (was `gold_level`) and the lobby setting is `starting_treasury_level`. Gold stays the currency.
+- **Natural resources:** every castle has `natural_resources` (1 to 60, was `base_influence`), and `resources` (was `effective_influence`) is natural resources plus 5 per Guildhall level, so Guildhall is the Terraforming tech: `resources = natural + 5 x level`. Upgrade cost is `base x (level + 1) / resources x infra_cost_mult` with bases 1250 Treasury, 2500 Recruitment, 10000 Prestige. The client draws a halo around each castle sized by natural resources.
+- **Tiers follow resources:** 1 to 20 is Tier 1, 21 to 40 Tier 2, 41 to 60 Tier 3.
+- **Standard start:** every seat starts with 4 castles with identical resources: a Tier 3 capital (50), a Tier 2 (30) and two Tier 1 (12, 12). Custom games may set 1 to 4 starting castles.
+- **Neutral castles:** placed at random over the map (clumps and voids, only the home clusters are symmetric), with resources split 3 : 2 : 1 across Tier 1 : 2 : 3, values uniform inside each tier's range. Garrison is `starting_garrison x tier`.
+- **Roads (warp gate logic):** a road is a per-castle build costing `30 x resources x infra_cost_mult` gold (richer castles cost more). A march between two castles that both have a road moves at `sqrt(Stables level + 3)` times the normal speed (about 2x at Stables 1, 3x at Stables 6). Range still applies: you cannot march to a castle outside march range, the bonus only changes the time. If either road is demolished while a commander is travelling the link, the remaining distance reverts to base speed immediately (arrival tick recomputed). Capturing a castle destroys its road. This applies to free-travel games.
+- **Readout:** zoomed in, the map shows `Treasury / Industry / Prestige` above each castle's garrison.
+- **Tests:** `supabase/tests/roads_resources.sql` (9 checks), `generator.test.js` (17).

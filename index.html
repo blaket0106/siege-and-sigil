@@ -124,6 +124,8 @@
     .loading { text-align: center; color: var(--dim); margin-top: 30vh; letter-spacing: 0.2em; }
     @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
     @media (pointer: coarse) { button:not(.link), select, input:not([type="checkbox"]) { min-height: 44px; } .hud { gap: 8px 12px; } }
+    .zoomonly { display: none; }
+    svg.zoomed .zoomonly { display: inline; }
   </style>
 </head>
 <body>
@@ -149,7 +151,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -354,7 +356,7 @@
     const HELP = [
       ['Goal', 'Hold the share of castles shown in the top bar ("Castles x / y to win"). The first player to reach it wins. Lose your last castle and you are eliminated.'],
       ['Time', 'The game advances in ticks. Orders you give take effect as ticks pass; the countdown shows the next tick. Turn-based games advance when everyone ends their turn or the deadline passes.'],
-      ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for influence. Higher tiers earn more.'],
+      ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for research. Natural resources set the tier (1 to 20 is Tier 1, 21 to 40 Tier 2, 41 to 60 Tier 3) and make upgrades cheaper; the halo around a castle shows how rich it is. Build a road at two castles to march between them faster.'],
       ['Commanders', 'Commanders lead troops. Hire more, spend gold on their abilities and move troops between a commander and a castle. A commander left in a castle garrisons it.'],
       ['Marching', 'Select a commander and choose March, then click a destination. In free-travel games you can march straight to any castle within your range (Stables extends it); the ground between decides the time: forest, hills and high ground slow a march, fords and passes slow it more; the sea, rivers and mountain ranges block a direct march, so cross at a ford (bridge icon) or a mountain pass and chain stops with a multi-stop route. Otherwise armies follow roads through friendly castles.'],
       ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list. A defeated commander may be captured instead of killed: the captor can ransom, release or execute them, and captives sometimes escape. A commander who wins five battles earns a name and a bonus; losing a king or a named commander costs prestige and lowers production for a while.'],
@@ -1334,10 +1336,12 @@
           const reach = ms.reachable ? ms.reachable.has(t.id) || (ms.sel && ms.sel.type === 'c' && (ms.cmd.find((x) => x.id === ms.sel.id) || {}).current_territory_id === t.id) : true;
           const g = sv('g', { transform: `translate(${t.x},${t.y}) scale(${k})`, opacity: (seen ? 1 : 0.5) * (reach ? 1 : 0.4) },
             sieged ? sv('circle', { cx: 0, cy: 0, r: r + 7, fill: 'none', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '4 4', style: 'pointer-events:none' }) : null,
+            ms.terr && t.natural_resources ? sv('circle', { cx: 0, cy: 0, r: 16 + 0.55 * t.natural_resources, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.35, 'stroke-width': 1.5, style: 'pointer-events:none' }) : null,
             ms.terr
               ? sv('g', { style: 'cursor:pointer', onclick: pick }, castleSprite(tier, t.terrain, owner ? color(owner) : '#8a8a96'))
               : sv('circle', { cx: 0, cy: 0, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }),
             !ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: 0, y: 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
+            showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'zoomonly', x: 0, y: -r - 25, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f0cf7d;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
             sv('text', { x: 0, y: -r - 5, 'text-anchor': 'middle', 'font-size': 17, style: `fill:#fff;font-weight:bold${ms.terr ? ';paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : ''}` }, showTroops ? t.troops : '?'),
             sv('text', { x: 0, y: rBot + 16, 'text-anchor': 'middle', 'font-size': 14, style: ms.terr ? 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : null }, `${ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? '♛ ' : ''}${t.name}`),
             here.map((c, i) => sv('circle', {
@@ -1508,9 +1512,9 @@
       });
 
       const INFRA = [
-        { type: 'treasury', name: 'Treasury', col: 'gold_level', base: 500, note: 'gold' },
-        { type: 'recruitment', name: 'Recruitment', col: 'industry_level', base: 1000, note: 'troops' },
-        { type: 'prestige', name: 'Prestige', col: 'prestige_level', base: 4000, note: 'prestige' },
+        { type: 'treasury', name: 'Treasury', col: 'treasury_level', base: 1250, note: 'gold' },
+        { type: 'recruitment', name: 'Recruitment', col: 'industry_level', base: 2500, note: 'troops' },
+        { type: 'prestige', name: 'Prestige', col: 'prestige_level', base: 10000, note: 'prestige' },
       ];
 
       const buildSection = (t) => {
@@ -1520,7 +1524,7 @@
         const out = [h('b', {}, 'Build')];
         INFRA.forEach((i) => {
           const lvl = t[i.col];
-          const cost = Math.max(1, Math.floor(i.base * (lvl + 1) / t.effective_influence * mult));
+          const cost = Math.max(1, Math.floor(i.base * (lvl + 1) / t.resources * mult));
           out.push(h('button', {
             class: 'cmdrow',
             disabled: gold < cost,
@@ -1530,7 +1534,7 @@
         if (t.has_road) {
           out.push(h('button', { class: 'cmdrow', onclick: order('demolish_road', { p_territory_id: t.id }, 'Road demolished') }, 'Demolish road', h('span', { style: 'color:var(--dim);margin-left:auto' }, 'free')));
         } else {
-          const cost = Math.max(1, Math.floor(10000 / t.base_influence * mult));
+          const cost = Math.max(1, Math.floor(30 * t.resources * mult));
           out.push(h('button', { class: 'cmdrow', disabled: gold < cost, onclick: order('build_road', { p_territory_id: t.id }, 'Road built') }, 'Build road', h('span', { style: 'color:var(--dim);margin-left:auto' }, `${cost} gold`)));
         }
         if (ms.game.mercenaries_enabled) {
@@ -2310,11 +2314,12 @@
           const t = ms.t.get(sel.id);
           const seen = ms.vis.has(t.id);
           const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
-          parts.push(h('h3', {}, t.name), h('div', { style: 'color:var(--dim)' }, `Tier ${t.tier}${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + (TERRAIN_NAMES[t.terrain] || t.terrain) : ''}${t.terrain === 'mountain' ? ' (defenders strike harder)' : ''}`));
+          parts.push(h('h3', {}, t.name), h('div', { style: 'color:var(--dim)' }, `Tier ${t.tier} · ${t.natural_resources} natural resources${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + (TERRAIN_NAMES[t.terrain] || t.terrain) : ''}${t.terrain === 'mountain' ? ' (defenders strike harder)' : ''}`));
           parts.push(h('div', { class: 'sec' },
             line('Owner', owner ? pname(owner) + (seen ? '' : ' (last seen)') : 'Unclaimed'),
             line('Troops', seen ? t.troops : 'Unknown'),
-            seen ? line('Gold / Industry / Prestige', `${t.gold_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
+            seen && t.resources !== undefined && t.resources !== null && t.resources !== t.natural_resources ? line('Resources (with terraforming)', t.resources) : null,
+            seen ? line('Treasury / Industry / Prestige', `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
             seen ? line('Road', t.has_road ? 'Yes' : 'No') : null,
             t.garrison_commander_id && seen ? line('Garrison leader', (ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || '') : null));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
@@ -2373,7 +2378,10 @@
       };
 
       const toMap = (e) => new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
-      const applyView = () => svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
+      const applyView = () => {
+        svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
+        svg.classList.toggle('zoomed', !!ms.full && ms.view.w < ms.full.w * 0.5);
+      };
 
       svg.addEventListener('wheel', (e) => {
         e.preventDefault();

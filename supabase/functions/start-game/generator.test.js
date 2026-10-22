@@ -56,7 +56,7 @@ test('different seeds give different maps', () => {
   assert.notDeepEqual(a.territories.map((t) => [t.x, t.y]), b.territories.map((t) => [t.x, t.y]));
 });
 
-test('territory counts, tiers and ownership are equal for every seat', () => {
+test('every seat starts identical, neutral resources follow tiers at 3:2:1', () => {
   for (const c of cases()) {
     const layout = generateWorld(c);
     const perPlayer = SIZES[c.mapSize];
@@ -65,16 +65,20 @@ test('territory counts, tiers and ownership are equal for every seat', () => {
     const profile = (seat) => {
       const owned = layout.territories.filter((t) => t.owner_seat === seat);
       assert.equal(owned.length, c.startingTerritories, label(c));
-      return owned.map((t) => t.tier).sort().join();
+      return owned.map((t) => `${t.tier}:${t.natural_resources}`).sort().join();
     };
     const first = profile(0);
-    assert.equal(first, '1,1,1,3', label(c));
+    assert.equal(first, '1:12,1:12,2:30,3:50', label(c));
     for (let s = 1; s < c.players; s++) assert.equal(profile(s), first, label(c));
     const neutral = layout.territories.filter((t) => t.owner_seat === null);
     assert.equal(neutral.length, c.players * (perPlayer - c.startingTerritories), label(c));
-    const tiers = (list) => list.map((t) => t.tier).sort().join();
-    const perWedge = (k) => layout.territories.slice(k * perPlayer, (k + 1) * perPlayer).filter((t) => t.owner_seat === null);
-    for (let k = 1; k < c.players; k++) assert.equal(tiers(perWedge(k)), tiers(perWedge(0)), label(c));
+    const counts = [1, 2, 3].map((tier) => neutral.filter((t) => t.tier === tier).length);
+    const total = neutral.length;
+    [3, 2, 1].forEach((v, i) => assert.ok(Math.abs(counts[i] - (total * v) / 6) < 1, `${label(c)} tiers ${counts}`));
+    for (const t of layout.territories) {
+      assert.ok(t.natural_resources >= 1 && t.natural_resources <= 60, label(c));
+      assert.equal(t.tier, t.natural_resources <= 20 ? 1 : t.natural_resources <= 40 ? 2 : 3, label(c));
+    }
   }
 });
 
@@ -93,44 +97,26 @@ test('capitals are symmetric: same radius, same pairwise distances', () => {
   }
 });
 
-test('every seat has a congruent start cluster and neighborhood', () => {
+test('every seat has a congruent start cluster', () => {
   for (const c of cases()) {
     const layout = generateWorld(c);
-    const perPlayer = SIZES[c.mapSize];
-    const degree = layout.territories.map(() => 0);
-    for (const e of layout.edges) {
-      degree[e.a] += 1;
-      degree[e.b] += 1;
-    }
+    const n = c.startingTerritories;
     const signature = (k) => {
-      const cap = layout.territories[k * perPlayer];
-      const dists = layout.territories
-        .slice(k * perPlayer, (k + 1) * perPlayer)
-        .map((t) => Math.round(Math.hypot(t.x - cap.x, t.y - cap.y)));
-      return { dists: dists.join(), degrees: degree.slice(k * perPlayer, (k + 1) * perPlayer).join() };
+      const cap = layout.territories[k * n];
+      return layout.territories.slice(k * n, (k + 1) * n).map((t) => Math.hypot(t.x - cap.x, t.y - cap.y));
     };
     const ref = signature(0);
-    for (let k = 1; k < c.players; k++) {
-      assert.deepEqual(signature(k).dists.split(',').map(Number).map((n, i) => near(n, ref.dists.split(',').map(Number)[i], 1)), new Array(perPlayer).fill(true), label(c));
-      assert.equal(signature(k).degrees, ref.degrees, label(c));
-    }
+    for (let k = 1; k < c.players; k++) signature(k).forEach((d, i) => assert.ok(near(d, ref[i], 1), label(c)));
   }
 });
 
-test('edge set is invariant under seat rotation', () => {
-  for (const c of cases()) {
-    const layout = generateWorld(c);
-    const perPlayer = SIZES[c.mapSize];
-    const keys = new Set(layout.edges.map((e) => `${e.a},${e.b}`));
-    const rotateIndex = (g, s) => (((Math.floor(g / perPlayer) + s) % c.players) * perPlayer) + (g % perPlayer);
-    for (const e of layout.edges) {
-      for (let s = 1; s < c.players; s++) {
-        const a = rotateIndex(e.a, s);
-        const b = rotateIndex(e.b, s);
-        assert.ok(keys.has(a < b ? `${a},${b}` : `${b},${a}`), `${label(c)} edge ${e.a}-${e.b} missing rotation ${s}`);
-      }
-    }
-  }
+test('neutral castles are scattered, not rotationally symmetric', () => {
+  const layout = generateWorld({ style: 'scatter', mapSize: 'standard', players: 4, seed: 42, startingTerritories: 4, startingGarrison: 10, terrain: false });
+  const mid = layout.map_w / 2;
+  const neutrals = layout.territories.filter((t) => t.owner_seat === null);
+  const wedgeSig = (k) => neutrals.filter((t) => Math.floor((((Math.atan2(t.y - mid, t.x - mid) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI)) * 4) === k).length;
+  const counts = [0, 1, 2, 3].map(wedgeSig);
+  assert.ok(new Set(counts).size > 1 || neutrals.length % 4 !== 0, `quadrant counts ${counts}`);
 });
 
 test('graph is connected with valid, unique edges', () => {
@@ -172,7 +158,7 @@ test('territories are spread out, in bounds, and uniquely named', () => {
         closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y));
       }
     }
-    assert.ok(closest >= SPACING * 0.4, `${label(c)} closest pair ${closest}`);
+    assert.ok(closest >= SPACING * 0.35, `${label(c)} closest pair ${closest}`);
   }
 });
 
@@ -180,11 +166,11 @@ test('neutral territories carry garrisons and start unowned', () => {
   const layout = generateWorld({ style: 'scatter', mapSize: 'standard', players: 4, seed: 7, startingTerritories: 4, startingGarrison: 10, terrain: false });
   for (const t of layout.territories.filter((x) => x.owner_seat === null)) {
     assert.equal(t.troops, 10 * t.tier);
-    assert.equal(t.effective_influence, t.base_influence);
+    assert.equal(t.resources, t.natural_resources);
   }
   for (const t of layout.territories.filter((x) => x.owner_seat !== null)) {
     assert.equal(t.troops, null);
-    assert.equal(t.effective_influence, t.base_influence + 5);
+    assert.equal(t.resources, t.natural_resources + 5);
   }
 });
 
@@ -193,6 +179,7 @@ test('invalid settings are rejected', () => {
   assert.throws(() => generateWorld({ ...ok, players: 1 }));
   assert.throws(() => generateWorld({ ...ok, players: 9 }));
   assert.throws(() => generateWorld({ ...ok, mapSize: 'compact', startingTerritories: 5 }));
+  assert.throws(() => generateWorld({ ...ok, startingTerritories: 0 }));
   assert.throws(() => generateWorld({ ...ok, style: 'swamp' }));
 });
 

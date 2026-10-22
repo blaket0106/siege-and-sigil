@@ -1,17 +1,20 @@
 import { bestTerrain } from './terrain.js';
 
-export const GENERATOR_VERSION = 2;
+export const GENERATOR_VERSION = 3;
 export const SPACING = 150;
 
 const MARGIN = 60;
 const TERRITORIES_PER_PLAYER = { compact: 6, standard: 9, large: 14 };
-const BASE_INFLUENCE = { 1: 2, 2: 4, 3: 6 };
-const INFLUENCE_PER_GUILDHALL_LEVEL = 5;
-const START_GUILDHALL_LEVEL = 1;
-const TIER_TWO_SHARE = 0.4;
+
+export const tierOf = (resources) => (resources <= 20 ? 1 : resources <= 40 ? 2 : 3);
+const START_RESOURCES = [50, 30, 12, 12];
+const TIER_RANGE = { 1: [4, 20], 2: [21, 40], 3: [41, 60] };
+const NEUTRAL_RATIO = [3, 2, 1];
+const RESOURCES_PER_TERRAFORM_LEVEL = 5;
+const START_TERRAFORM_LEVEL = 1;
 const STYLES = {
-  scatter: { minDist: 0.7, prune: 2.0, clustered: false },
-  continents: { minDist: 0.55, prune: 1.4, clustered: true },
+  scatter: { minDist: 0.6, prune: 2.4, clump: 0.55 },
+  continents: { minDist: 0.5, prune: 2.0, clump: 0.12 },
 };
 
 const PREFIXES = [
@@ -56,16 +59,11 @@ function rotate(p, angle) {
   return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
 
-function gaussian(rng) {
-  const u = Math.max(rng(), 1e-12);
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
-}
-
 function round4(value) {
   return Math.round(value * 1e4) / 1e4;
 }
 
-function placeWedge({ rng, players, perPlayer, start, radius, wedge, minDist, clustered, spacing }) {
+function placeWedge({ rng, players, start, radius, wedge, minDist }) {
   const placed = [];
   const locals = [];
   const innerMin = minDist / (2 * Math.sin(Math.PI / players));
@@ -100,43 +98,6 @@ function placeWedge({ rng, players, perPlayer, start, radius, wedge, minDist, cl
       const a = rng() * 2 * Math.PI;
       const d = minDist * (1 + rng() * 0.8);
       const c = { x: capital.x + d * Math.cos(a), y: capital.y + d * Math.sin(a) };
-      if (fits(c)) p = c;
-    }
-    if (!p) return null;
-    commit(p);
-  }
-
-  const centers = [capital];
-  if (clustered) {
-    for (let c = 0; c < 2; c++) {
-      for (let t = 0; t < 120; t++) {
-        const r = radius * (0.3 + rng() * 0.55);
-        const a = wedge * rng();
-        const cand = { x: r * Math.cos(a), y: r * Math.sin(a) };
-        const apart = centers.every((o) => Math.hypot(cand.x - o.x, cand.y - o.y) >= spacing * 2.2);
-        if (apart) {
-          centers.push(cand);
-          break;
-        }
-      }
-    }
-  }
-
-  const sample = () => {
-    if (!clustered) {
-      const r = radius * 0.97 * Math.sqrt(rng());
-      const a = wedge * rng();
-      return { x: r * Math.cos(a), y: r * Math.sin(a) };
-    }
-    const home = rng() < 0.4 || centers.length === 1;
-    const center = home ? centers[0] : centers[1 + Math.floor(rng() * (centers.length - 1))];
-    return { x: center.x + gaussian(rng) * spacing * 0.55, y: center.y + gaussian(rng) * spacing * 0.55 };
-  };
-
-  for (let j = start; j < perPlayer; j++) {
-    let p = null;
-    for (let t = 0; t < 400 && !p; t++) {
-      const c = sample();
       if (fits(c)) p = c;
     }
     if (!p) return null;
@@ -239,18 +200,69 @@ export function assignSeats(seed, playerIds) {
   return seats;
 }
 
+function placeNeutrals({ rng, count, radius, center, minDist, clump, taken }) {
+  const blobs = Array.from({ length: 3 + Math.floor(count / 10) }, () => {
+    const r = radius * 0.9 * Math.sqrt(rng());
+    const a = 2 * Math.PI * rng();
+    return { x: r * Math.cos(a), y: r * Math.sin(a) };
+  });
+  const sigma = radius * 0.22;
+  const density = (p) => {
+    let w = clump;
+    for (const b of blobs) w += Math.exp(-((p.x - b.x) ** 2 + (p.y - b.y) ** 2) / (2 * sigma * sigma));
+    return Math.min(1, w / 1.1);
+  };
+  const out = [];
+  const all = taken.map((p) => ({ x: p.x - center, y: p.y - center }));
+  for (let i = 0; i < count; i++) {
+    let p = null;
+    for (let t = 0; t < 800 && !p; t++) {
+      const r = radius * 0.97 * Math.sqrt(rng());
+      const a = 2 * Math.PI * rng();
+      const c = { x: r * Math.cos(a), y: r * Math.sin(a) };
+      if (rng() > density(c)) continue;
+      const md = minDist * (t > 400 ? 0.8 : 1);
+      if (all.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md * md)) p = c;
+    }
+    if (!p) return null;
+    out.push(p);
+    all.push(p);
+  }
+  return out;
+}
+
+function neutralResources(rng, count) {
+  const total = NEUTRAL_RATIO.reduce((s, v) => s + v, 0);
+  const exact = NEUTRAL_RATIO.map((v) => (count * v) / total);
+  const counts = exact.map(Math.floor);
+  const order = exact.map((e, i) => i).sort((a, b) => exact[b] - Math.floor(exact[b]) - (exact[a] - Math.floor(exact[a])) || a - b);
+  for (let i = 0, rest = count - counts.reduce((x, y) => x + y, 0); rest > 0; i++, rest--) counts[order[i]] += 1;
+  const values = [];
+  counts.forEach((c, i) => {
+    const [lo, hi] = TIER_RANGE[i + 1];
+    for (let k = 0; k < c; k++) values.push(lo + Math.floor(rng() * (hi - lo + 1)));
+  });
+  for (let i = values.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [values[i], values[j]] = [values[j], values[i]];
+  }
+  return values;
+}
+
 export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
   if (!perPlayer) throw new Error(`unknown map size: ${mapSize}`);
   if (!styleConfig) throw new Error(`unknown map style: ${style}`);
   if (!Number.isInteger(players) || players < 2 || players > 8) throw new Error(`players must be 2 to 8, got ${players}`);
-  if (!Number.isInteger(startingTerritories) || startingTerritories < 1 || perPlayer - startingTerritories < 2) {
-    throw new Error(`starting_territories must leave at least 2 neutral territories per player on a ${mapSize} map`);
+  if (!Number.isInteger(startingTerritories) || startingTerritories < 1 || startingTerritories > START_RESOURCES.length || perPlayer - startingTerritories < 2) {
+    throw new Error(`starting_territories must be 1 to ${START_RESOURCES.length} and leave at least 2 neutral territories per player on a ${mapSize} map`);
   }
 
   const spacing = SPACING * scale;
   const total = players * perPlayer;
+  const startTotal = players * startingTerritories;
+  const neutralTotal = total - startTotal;
   const radius = spacing * Math.sqrt(total / Math.PI);
   const center = radius + MARGIN * scale;
   const wedge = (2 * Math.PI) / players;
@@ -258,117 +270,70 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   const phase = rng() * 2 * Math.PI;
 
   let locals = null;
-  for (let attempt = 0; attempt < 40 && !locals; attempt++) {
-    locals = placeWedge({
-      rng,
-      players,
-      perPlayer,
-      start: startingTerritories,
-      radius,
-      wedge,
-      minDist: spacing * styleConfig.minDist * 0.96 ** attempt,
-      clustered: styleConfig.clustered,
-      spacing,
-    });
-  }
-  if (!locals) throw new Error('could not place territories for these settings');
-
-  const neutralLocals = locals
-    .map((p, j) => ({ j, r: Math.hypot(p.x, p.y) }))
-    .filter((e) => e.j >= startingTerritories)
-    .sort((a, b) => a.r - b.r || a.j - b.j);
-  const tierTwoCount = Math.max(1, Math.round(TIER_TWO_SHARE * neutralLocals.length));
-  const tierTwo = new Set(neutralLocals.slice(0, tierTwoCount).map((e) => e.j));
-
-  const tierOf = (j) => {
-    if (j === 0) return 3;
-    if (j < startingTerritories) return 1;
-    return tierTwo.has(j) ? 2 : 1;
-  };
-
-  const points = [];
-  for (let k = 0; k < players; k++) {
-    for (let j = 0; j < perPlayer; j++) {
-      const q = rotate(locals[j], phase + k * wedge);
-      points.push({ x: center + q.x, y: center + q.y });
+  let neutrals = null;
+  for (let attempt = 0; attempt < 40 && !neutrals; attempt++) {
+    const minDist = spacing * styleConfig.minDist * 0.96 ** attempt;
+    locals = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: Math.max(minDist, spacing * 0.7) });
+    if (!locals) continue;
+    const homes = [];
+    for (let k = 0; k < players; k++) {
+      for (const l of locals) {
+        const q = rotate(l, phase + k * wedge);
+        homes.push({ x: center + q.x, y: center + q.y });
+      }
     }
+    neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center, minDist, clump: styleConfig.clump, taken: homes });
+    if (neutrals) neutrals = neutrals.map((p) => ({ x: center + p.x, y: center + p.y }));
+    if (neutrals) locals = homes;
   }
+  if (!neutrals) throw new Error('could not place territories for these settings');
+
+  const points = [...locals, ...neutrals];
+  const resourcesAt = [
+    ...Array.from({ length: players }, () => START_RESOURCES.slice(0, startingTerritories)).flat(),
+    ...neutralResources(makeRng(seed, 4), neutralTotal),
+  ];
 
   const names = makeNames(total, makeRng(seed, 2));
   const territories = points.map((p, g) => {
-    const k = Math.floor(g / perPlayer);
-    const j = g % perPlayer;
-    const tier = tierOf(j);
-    const owned = j < startingTerritories;
-    const base = BASE_INFLUENCE[tier];
+    const owned = g < startTotal;
+    const natural = resourcesAt[g];
+    const tier = tierOf(natural);
     return {
       idx: g,
       name: names[g],
       slug: names[g].toLowerCase(),
       tier,
-      base_influence: base,
+      natural_resources: natural,
       x: round4(p.x),
       y: round4(p.y),
-      owner_seat: owned ? k : null,
+      owner_seat: owned ? Math.floor(g / startingTerritories) : null,
       troops: owned ? null : startingGarrison * tier,
-      gold_level: owned ? null : tier - 1,
+      treasury_level: owned ? null : tier - 1,
       industry_level: owned ? null : 1,
       prestige_level: owned ? null : 0,
-      effective_influence: base + (owned ? INFLUENCE_PER_GUILDHALL_LEVEL * START_GUILDHALL_LEVEL : 0),
+      resources: natural + (owned ? RESOURCES_PER_TERRAFORM_LEVEL * START_TERRAFORM_LEVEL : 0),
     };
   });
 
-  const rotateIndex = (g, s) => (((Math.floor(g / perPlayer) + s) % players) * perPlayer) + (g % perPlayer);
   const keyOf = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
   const lengthOf = (a, b) => Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);
 
-  const symmetrize = (edgeList) => {
-    const present = new Set(edgeList.map(([a, b]) => keyOf(a, b)));
-    const done = new Set();
-    const out = [];
-    for (const [a, b] of edgeList) {
-      const images = new Map();
-      for (let s = 0; s < players; s++) {
-        const ra = rotateIndex(a, s);
-        const rb = rotateIndex(b, s);
-        images.set(keyOf(ra, rb), [Math.min(ra, rb), Math.max(ra, rb)]);
-      }
-      const canonical = [...images.entries()].sort(([, x], [, y]) => x[0] - y[0] || x[1] - y[1])[0][0];
-      if (done.has(canonical)) continue;
-      done.add(canonical);
-      let count = 0;
-      for (const key of images.keys()) if (present.has(key)) count += 1;
-      if (count * 2 > images.size || (count * 2 === images.size && present.has(canonical))) {
-        out.push(...images.values());
-      }
-    }
-    return out;
-  };
-
   const kept = new Map();
   const removed = [];
-  for (const [a, b] of symmetrize(delaunayEdges(points))) {
-    if (a % perPlayer === b % perPlayer && players >= 4) {
-      const diff = (Math.floor(b / perPlayer) - Math.floor(a / perPlayer) + players) % players;
-      if (diff !== 1 && diff !== players - 1) continue;
-    }
+  for (const [a, b] of delaunayEdges(points)) {
     const length = lengthOf(a, b);
     if (length > styleConfig.prune * spacing) removed.push({ a, b, length });
-    else kept.set(keyOf(a, b), [a, b]);
+    else kept.set(keyOf(a, b), [Math.min(a, b), Math.max(a, b)]);
   }
 
   const parent = Array.from({ length: total }, (_, i) => i);
   for (const [a, b] of kept.values()) parent[findRoot(parent, a)] = findRoot(parent, b);
-
   removed.sort((x, y) => x.length - y.length || x.a - y.a || x.b - y.b);
   for (const { a, b } of removed) {
     if (findRoot(parent, a) === findRoot(parent, b)) continue;
-    for (let s = 0; s < players; s++) {
-      const ra = rotateIndex(a, s);
-      const rb = rotateIndex(b, s);
-      kept.set(keyOf(ra, rb), [Math.min(ra, rb), Math.max(ra, rb)]);
-      parent[findRoot(parent, ra)] = findRoot(parent, rb);
-    }
+    kept.set(keyOf(a, b), [Math.min(a, b), Math.max(a, b)]);
+    parent[findRoot(parent, a)] = findRoot(parent, b);
   }
 
   const edges = [...kept.values()]
@@ -384,8 +349,8 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
 
   const seats = Array.from({ length: players }, (_, k) => ({
     seat: k,
-    capital_idx: k * perPlayer,
-    territory_idxs: Array.from({ length: startingTerritories }, (_, j) => k * perPlayer + j),
+    capital_idx: k * startingTerritories,
+    territory_idxs: Array.from({ length: startingTerritories }, (_, j) => k * startingTerritories + j),
   }));
 
   const layout = {
@@ -407,7 +372,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       spacing,
       tiers: territories.map((t) => t.tier),
       owned: territories.map((t) => t.owner_seat !== null),
-      seatOf: territories.map((t, g) => Math.floor(g / perPlayer)),
+      seatOf: territories.map((t) => (t.owner_seat === null ? -1 : t.owner_seat)),
       players,
     });
     territories.forEach((t, g) => {
