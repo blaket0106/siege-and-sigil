@@ -123,6 +123,7 @@
     .composer input { flex: 1; }
     .loading { text-align: center; color: var(--dim); margin-top: 30vh; letter-spacing: 0.2em; }
     @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+    @media (pointer: coarse) { button:not(.link), select, input:not([type="checkbox"]) { min-height: 44px; } .hud { gap: 8px 12px; } }
   </style>
 </head>
 <body>
