@@ -825,6 +825,8 @@
       const memKey = `ss-fog-${gameId}-${uid}`;
       const ms = { turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
+      const mutedKey = `ss-muted-${gameId}-${uid}`;
+      try { ms.muted = new Set(JSON.parse(localStorage.getItem(mutedKey)) || []); } catch { ms.muted = new Set(); }
 
       const chatSeenKey = `ss-chatseen-${gameId}-${uid}`;
       try { ms.chatSeen = Number(localStorage.getItem(chatSeenKey)) || 0; } catch { ms.chatSeen = 0; }
@@ -1425,7 +1427,7 @@
       };
 
       const threadUnread = (t) => t.msgs.some((m) => m.player_id !== ms.me.id && (!t.read || Date.parse(m.created_at) > Date.parse(t.read)));
-      const chatUnread = () => ms.chat.filter((m) => m.player_id !== ms.me.id && m.id > ms.chatSeen).length;
+      const chatUnread = () => ms.chat.filter((m) => m.player_id !== ms.me.id && !ms.muted.has(m.player_id) && m.id > ms.chatSeen).length;
 
       const markChatSeen = () => {
         const top = ms.chat.length ? ms.chat[ms.chat.length - 1].id : 0;
@@ -1449,8 +1451,20 @@
         return lum < 0.3 ? color2(pid) : c;
       };
 
-      const chatLine = (pid, text, at) => h('div', { class: 'chatline' },
-        h('b', { style: `color:${readable(pid)};font-weight:bold` }, `${pname(pid)}: `), text, h('small', {}, fmtTime(at)));
+      const setMuted = (pid, on) => {
+        if (on) ms.muted.add(pid); else ms.muted.delete(pid);
+        try { localStorage.setItem(mutedKey, JSON.stringify([...ms.muted])); } catch {}
+        drawSide();
+      };
+
+      const chatLine = (pid, text, at) => (ms.muted.has(pid) ? null : h('div', { class: 'chatline' },
+        h('b', { style: `color:${readable(pid)};font-weight:bold` }, `${pname(pid)}: `), text, h('small', {}, fmtTime(at)),
+        ...(pid !== ms.me.id && !(ms.players.get(pid) || {}).is_ai ? [h('button', { class: 'link', style: 'margin-left:6px', onclick: () => setMuted(pid, true) }, 'mute')] : [])));
+
+      const mutedBar = () => (ms.muted.size
+        ? h('div', { class: 'meta', style: 'color:var(--dim);margin-top:8px' }, 'Muted: ',
+          ...[...ms.muted].map((pid) => h('button', { class: 'link', style: 'margin-right:8px', onclick: () => setMuted(pid, false) }, `${pname(pid)} (unmute)`)))
+        : null);
 
       const threadTitle = (t) => t.parts.filter((id) => id !== ms.me.id).map(pname).join(', ') || 'Just you';
 
@@ -1495,9 +1509,8 @@
 
         if (ms.chatTab === 'general') {
           markChatSeen();
-          return [bar, h('div', { class: 'chatlist', id: 'chatscroll' }, ms.chat.length
-            ? ms.chat.map((m) => chatLine(m.player_id, m.message, m.created_at))
-            : h('div', { class: 'empty' }, 'No messages yet.')), composer(ms.chatInput, sendGeneral)];
+          const lines = ms.chat.map((m) => chatLine(m.player_id, m.message, m.created_at)).filter(Boolean);
+          return [bar, h('div', { class: 'chatlist', id: 'chatscroll' }, lines.length ? lines : h('div', { class: 'empty' }, 'No messages yet.')), composer(ms.chatInput, sendGeneral), mutedBar()].filter(Boolean);
         }
 
         if (ms.compose) {
@@ -1525,8 +1538,8 @@
         if (open) {
           markThreadRead(open);
           return [bar, h('div', { class: 'row', style: 'margin-bottom:8px' }, h('button', { onclick: () => { ms.thread = null; drawSide(); } }, 'All messages'), h('b', { style: 'color:var(--gold2);font-weight:normal' }, threadTitle(open))),
-            h('div', { class: 'chatlist', id: 'chatscroll' }, open.msgs.map((m) => chatLine(m.player_id, m.body, m.created_at))),
-            composer(ms.threadInput, () => sendInThread(open))];
+            h('div', { class: 'chatlist', id: 'chatscroll' }, open.msgs.map((m) => chatLine(m.player_id, m.body, m.created_at)).filter(Boolean)),
+            composer(ms.threadInput, () => sendInThread(open)), mutedBar()].filter(Boolean);
         }
 
         const list = [...ms.threads.values()].sort((a, b) => (b.msgs.length ? b.msgs[b.msgs.length - 1].id : 0) - (a.msgs.length ? a.msgs[a.msgs.length - 1].id : 0));
