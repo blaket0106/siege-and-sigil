@@ -149,7 +149,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -360,6 +360,7 @@
       ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list. A defeated commander may be captured instead of killed: the captor can ransom, release or execute them, and captives sometimes escape. A commander who wins five battles earns a name and a bonus; losing a king or a named commander costs prestige and lowers production for a while.'],
       ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see.'],
       ['Diplomacy', 'From the Standings list you can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war. Peace is a truce that blocks attacks for a set number of ticks; at war you can also send peace terms (gold, tribute or a castle). Allies can lock a marriage alliance that cannot be broken until it ends. A third player can offer mediation between two players at war. Breaking a pact or alliance, or attacking during a grace period, costs honor.'],
+      ['Seasons, events and mercenaries', 'If the host turned them on: winter slows troop production (most in the north) and marches, autumn boosts gold. Random events can strike a castle; pay to respond or ignore them. Mercenary companies cost gold, arrive at once and disband after 48 ticks.'],
       ['Chat and messages', 'Use the Chat tab for the game channel and the Inbox for messages and reports. The News tab lists recent events.'],
     ];
 
@@ -514,6 +515,10 @@
       const limit = h('input', { type: 'number', min: '1', placeholder: 'none' });
       const starting = h('input', { type: 'number', min: '1', max: '12', value: '4' });
       const fog = h('input', { type: 'checkbox', checked: true });
+      const seasons = h('input', { type: 'checkbox' });
+      const seasonLen = h('input', { type: 'number', min: '12', max: '240', value: '48' });
+      const events = h('input', { type: 'checkbox' });
+      const mercs = h('input', { type: 'checkbox', checked: true });
       const fill = h('input', { type: 'checkbox' });
       const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
       difficulty.value = '3';
@@ -539,6 +544,10 @@
           h('div', {}, h('label', {}, 'Turn timeout, minutes (turn-based)'), turnMins)),
         hint,
         h('label', { class: 'check' }, fog, 'Fog of war'),
+        h('label', { class: 'check' }, seasons, 'Seasons (winter slows troops and marches)'),
+        h('div', {}, h('label', {}, 'Season length (ticks, 12 to 240)'), seasonLen),
+        h('label', { class: 'check' }, events, 'Random events (plague, unrest, harvest, comets)'),
+        h('label', { class: 'check' }, mercs, 'Mercenary companies for hire'),
         h('label', { class: 'check' }, fill, 'Fill empty seats with AI players'),
         h('div', {}, h('label', {}, 'AI difficulty (1 to 5)'), difficulty),
         h('label', {}, 'Your faction'), picker);
@@ -557,6 +566,10 @@
               starting_territories: Number(starting.value),
               victory_pct: Number(victory.value) / 100,
               fog_of_war: fog.checked,
+              seasons_enabled: seasons.checked,
+              season_length_ticks: Number(seasonLen.value),
+              events_enabled: events.checked,
+              mercenaries_enabled: mercs.checked,
               truce_ticks: Number(truce.value),
               grace_period_ticks: Number(grace.value),
               fill_with_ai: fill.checked,
@@ -619,6 +632,9 @@
             kv('Seats', `${players.length}/${game.max_players}`),
             kv('Victory', `${Math.round(game.victory_pct * 100)}% of territories`),
             kv('Fog of war', game.fog_of_war ? 'On' : 'Off'),
+            kv('Seasons', game.seasons_enabled ? `On (${game.season_length_ticks} ticks each)` : 'Off'),
+            kv('Random events', game.events_enabled ? 'On' : 'Off'),
+            kv('Mercenaries', game.mercenaries_enabled ? 'On' : 'Off'),
             kv('Starting castles', game.starting_territories),
             kv('AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'),
             kv('Truce', `${game.truce_ticks} ticks`),
@@ -824,7 +840,7 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      const ms = { worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
       const mutedKey = `ss-muted-${gameId}-${uid}`;
       try { ms.muted = new Set(JSON.parse(localStorage.getItem(mutedKey)) || []); } catch { ms.muted = new Set(); }
@@ -1105,6 +1121,13 @@
         return h('button', { class: 'primary', onclick: order('submit_turn', {}, 'Turn submitted') }, 'Submit turn');
       };
 
+      const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
+      const seasonLabel = (g) => {
+        const len = g.season_length_ticks;
+        const idx = Math.floor(g.current_tick / len) % 4;
+        return `${SEASONS[idx]} (to tick ${(Math.floor(g.current_tick / len) + 1) * len})`;
+      };
+
       const drawHud = () => {
         const g = ms.game;
         const winAt = Math.ceil(ms.t.size * g.victory_pct);
@@ -1116,6 +1139,7 @@
           h('b', {}, g.name),
           h('span', {}, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`),
           nextEl,
+          g.seasons_enabled && g.status === 'active' ? h('span', { style: 'color:var(--gold2)' }, seasonLabel(g)) : null,
           g.time_limit_ticks && g.status === 'active' ? h('span', { style: 'color:var(--dim)' }, `Ends at tick ${g.time_limit_ticks}`) : null,
           ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { style: 'color:#e08b82' }, 'You are eliminated') : null,
           turnControl(),
@@ -1158,6 +1182,14 @@
         } else {
           const cost = Math.max(1, Math.floor(10000 / t.base_influence * mult));
           out.push(h('button', { class: 'cmdrow', disabled: gold < cost, onclick: order('build_road', { p_territory_id: t.id }, 'Road built') }, 'Build road', h('span', { style: 'color:var(--dim);margin-left:auto' }, `${cost} gold`)));
+        }
+        if (ms.game.mercenaries_enabled) {
+          const size = h('input', { type: 'number', min: '10', max: '60', value: '20', style: 'width:80px' });
+          out.push(h('b', { style: 'margin-top:12px' }, 'Hire mercenaries (5 gold per troop, 48 tick contract)'),
+            h('div', { class: 'row wrap2' }, size, h('button', {
+              disabled: gold < 50,
+              onclick: (e) => order('hire_mercenaries', { p_territory_id: t.id, p_troops: Number(size.value) }, (d) => `${d.name} hired for ${d.cost} gold`)(e),
+            }, 'Hire company')));
         }
         const hire = ms.game.commander_cost;
         out.push(h('b', { style: 'margin-top:12px' }, `Hire a commander (${hire} gold)`),
@@ -1393,6 +1425,7 @@
           case 'nap_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} signed a non-aggression pact`;
           case 'nap_broken': return `${pname(p.by_player_id)} broke the non-aggression pact with ${pname(p.against_player_id)}`;
           case 'marriage_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} sealed a marriage alliance until tick ${p.until_tick}`;
+          case 'world_event': return p.kind === 'plague' ? `Plague breaks out at ${p.territory}` : p.kind === 'rebellion' ? `Unrest at ${p.territory}` : p.kind === 'harvest' ? `A bumper harvest at ${p.territory} (+${p.gold} gold)` : 'A comet crosses the sky; every realm gains prestige';
           case 'commander_captured': return `${p.name} (${pname(p.owner_player_id)}) was captured by ${pname(p.captor_player_id)}`;
           case 'captive_executed': return `${pname(p.by_player_id)} executed the captive ${p.name}`;
           case 'trade_agreed': return `${pname(p.player_a)} and ${pname(p.player_b)} agreed a trade deal`;
@@ -1774,6 +1807,14 @@
         return `peace on these terms: ${pname(payer)} pays ${bits.join(', ')}`;
       };
 
+      const eventsSection = () => {
+        if (!ms.worldEvents.length) return null;
+        return h('div', { class: 'sec' }, h('b', {}, 'Events'),
+          ms.worldEvents.map((e) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+            h('div', {}, e.kind === 'plague' ? `Plague at ${e.territory}: lose 30% of its troops at tick ${e.expires_tick} unless you act` : `Unrest at ${e.territory}: lose half its troops and a level at tick ${e.expires_tick} unless you act`),
+            h('button', { class: 'primary', style: 'margin-top:4px', disabled: ms.me.gold < e.cost, onclick: offerCall('respond_event', { p_game_id: gameId, p_event_id: e.id }, e.kind === 'plague' ? 'Quarantine ordered' : 'Order restored') }, e.kind === 'plague' ? `Quarantine (${e.cost} gold)` : `Quell unrest (${e.cost} gold)`))));
+      };
+
       const prisonersSection = () => {
         if (!ms.captives.length) return null;
         const held = ms.captives.filter((c) => c.captured_by_player_id === ms.me.id);
@@ -1936,6 +1977,7 @@
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
           parts.push(h('h3', {}, 'Realm'), ...realmSection());
           parts.push(offersSection());
+          parts.push(eventsSection());
           parts.push(prisonersSection());
           parts.push(h('div', { class: 'sec' }, h('b', {}, 'Standings'), pl.map(({ p, n }) => {
             const st = p.id === ms.me.id ? 'you' : dipStatus(p.id);
@@ -2027,10 +2069,11 @@
           sb.from('thread_participants').select('*').eq('game_id', gameId),
           ms.edges ? Promise.resolve({ data: ms.edges }) : sb.from('territory_edges').select('*').eq('game_id', gameId),
           sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
+          sb.rpc('my_world_events', { p_game_id: gameId }),
         ]);
         if (state.view !== 'map' || state.roomId !== gameId) return;
 
-        const [vw, mo, ib, br, ch, th, pt, ed, of] = res;
+        const [vw, mo, ib, br, ch, th, pt, ed, of, we] = res;
         if (vw.error && vw.error.message.includes('not in this game')) { toast('That game is no longer available.'); return showHome(); }
         const failed = res.find((r) => r.error);
         if (failed) { toast(failed.error.message); return; }
@@ -2060,6 +2103,7 @@
         ms.wl = (view.areas.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
         ms.dip = view.diplomacy;
         ms.offers = of.data.offers;
+        ms.worldEvents = we.data;
         ms.deals = of.data.deals;
         ms.locks = of.data.locks;
         ms.moments = mo.data;
