@@ -1047,7 +1047,7 @@ Runs in `run_tick` after movement (`resolve_tick_events` = movement, then `resol
 - **Capture:** the territory changes owner with **0 garrison troops** (the surviving attackers stand there as idle commanders and keep their troops), its Treasury level is destroyed and pays `10 × level × (1 + 0.25 × best Plunder level among the attackers)` gold (ledger `salvage`). Industry, Prestige and roads are kept. `effective_influence` is refreshed for both owners. A public `castle_captured` moment is written. The attackers then continue their routes.
 - **Reports:** a `battle` server event; a `combat` inbox message for the attacker and the previous owner (neutral owners get none).
 - `process_ticks` now reports `combats` and a `combat_events` list (territory, winner, captured, survivors, salvage).
-- **Not done yet:** mutual alliance teams fighting as one (allies fight sequentially, deliberately, see 20ab). Sieges and open-field fights are in 20q.
+- **Not done yet:** nothing known. Allied attackers fight as one side (20ab, team assaults); sieges and open-field fights are in 20q.
 
 ### 20q. Sieges and open-field fights (implemented)
 
@@ -1063,7 +1063,7 @@ Runs in `run_tick` after movement (`resolve_tick_events` = movement, then `resol
 - **Intercepts:** each tick, every pair of marching enemy commanders (different, non-allied players, both carrying troops, not at a contact) is checked by sweeping their movement over the last tick; if they came within 20.2 units they fight an open-field battle. Ties go to the earlier departure. The loser dies, the winner keeps marching with his survivors. Troopless commanders are never intercepted.
 - **Stale sieges:** sieging commanders whose territory has become friendly turn idle.
 - `process_ticks` `combats` / `combat_events` now include intercepts and reliefs.
-- **Not done yet:** team fights of allied armies (20ab). Win and elimination are in 20r.
+- **Not done yet:** allied siege breaks fight individually (20ab, team assaults). Win and elimination are in 20r.
 
 ### 20r. Win and elimination (implemented)
 
@@ -1218,7 +1218,8 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 - **Auto-concede:** `game_players.last_active_at` (hidden from clients) is refreshed by `touch_activity(game)`, which the map calls on open and every 5 minutes while the tab is visible. An hourly cron (`auto-concede-inactive`) runs `auto_concede_inactive()`, which eliminates any human in an active game idle for 72 hours (reason `inactive`) and re-evaluates the game end. The smoke suite covers it (`passed=8`).
 - **Mute:** each chat line from another human has a `mute` link; muted players' lines are hidden in General chat and message threads, and their messages stop counting as unread. A "Muted" row under the composer unmutes. This is client-side only (stored in localStorage per game and user), so it hides messages for the muter but does not stop the sender or other players seeing them.
 - **AI sieges:** at difficulty 3 and above, when an AI commander finds a reachable frontier castle it cannot beat in a direct assault and has no winnable assault target, it sends a `siege` march at the best-scoring one (same score as assaults). `ai_sieges`, run each AI turn before `ai_commanders`, checks each AI siege and calls `fight_castle` once the same closed-form estimate (with the difficulty margin) says the assault wins, after starvation has thinned the garrison. Difficulty 1 and 2 never start sieges and hesitate half the time when ready. A rolled-back 150-tick game with 3 AIs (difficulty 4) produced 11 sieges, 6 battle reports and no AI errors.
-- **Deliberate V1 decisions (not gaps):** allied commanders fight sequentially, not as one army (who owns a captured castle would be ambiguous); victory is individual, with no shared allied win.
+- **Team assaults:** `resolve_assault` now gathers every assault-marching commander in contact with the same castle that belongs to the first-arriving player or to an ally of that player, and `fight_castle` fights them as one attacking side: troops add, damage uses the best Armory among the attackers' owners plus the best Valor, survivors are split by troop weight. The captured castle goes to the first-arriving (initiating) player; allied survivors end idle there. Every attacking and defending player involved gets the battle inbox message. Rolled-back test: a 12-troop commander plus an allied 12-troop commander with Armory 4 took a 20-troop castle, the castle went to the initiator, both survived with 8 troops each, and the damage used the ally's Armory. Limits: only allies of the initiator join (two attackers who are each allied to the initiator but not to each other do not fight together as one side beyond that rule); breaking a siege and open-field intercepts and reliefs remain individual. Victory stays individual (no shared allied win), by decision.
+- **Deliberate V1 decisions (not gaps):** victory is individual, with no shared allied win.
 
 ---
 
