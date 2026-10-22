@@ -1119,7 +1119,7 @@ A turn, in order:
 
 - **Refactor:** `hire_commander`, `transfer_troops` and `upgrade_infrastructure` now call internal `*_core(game, player, ...)` versions that the AI shares, so cost rules live in one place.
 - **Observed (3 players, 1 passive human, compact map, 100 ticks):** no errors; difficulty 5 AIs took neutral castles faster (6 castles each vs 5), made 16 upgrades vs 9, and fought 4 battles vs 2; neither attacked the human's heavily garrisoned castles.
-- **Not done yet:** AI laying sieges, relief marches, roads, Prestige upgrades, hiring beyond the cap, holding back gold. AI diplomacy is in 20y, garrison leaders in 20aa and sallies in 20ab.
+- **Not done yet:** AI relief marches, roads, Prestige upgrades, hiring beyond the cap, holding back gold. AI diplomacy is in 20y, garrison leaders in 20aa and sallies in 20ab.
 
 ### 20u. Diplomacy (implemented)
 
@@ -1217,7 +1217,8 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 - **Abuse limits:** insert triggers cap a user at 5 games created per hour, 5 unfinished (lobby or active) games created at once, and 10 unfinished games joined (AI seats exempt). Chat and thread messages were already limited to 8 per 10 seconds. Limits are constants in `enforce_game_create_limits` and `enforce_game_join_limits`.
 - **Auto-concede:** `game_players.last_active_at` (hidden from clients) is refreshed by `touch_activity(game)`, which the map calls on open and every 5 minutes while the tab is visible. An hourly cron (`auto-concede-inactive`) runs `auto_concede_inactive()`, which eliminates any human in an active game idle for 72 hours (reason `inactive`) and re-evaluates the game end. The smoke suite covers it (`passed=8`).
 - **Mute:** each chat line from another human has a `mute` link; muted players' lines are hidden in General chat and message threads, and their messages stop counting as unread. A "Muted" row under the composer unmutes. This is client-side only (stored in localStorage per game and user), so it hides messages for the muter but does not stop the sender or other players seeing them.
-- **Deliberate V1 decisions (not gaps):** allied commanders fight sequentially, not as one army (who owns a captured castle would be ambiguous); victory is individual, with no shared allied win; the AI never lays sieges.
+- **AI sieges:** at difficulty 3 and above, when an AI commander finds a reachable frontier castle it cannot beat in a direct assault and has no winnable assault target, it sends a `siege` march at the best-scoring one (same score as assaults). `ai_sieges`, run each AI turn before `ai_commanders`, checks each AI siege and calls `fight_castle` once the same closed-form estimate (with the difficulty margin) says the assault wins, after starvation has thinned the garrison. Difficulty 1 and 2 never start sieges and hesitate half the time when ready. A rolled-back 150-tick game with 3 AIs (difficulty 4) produced 11 sieges, 6 battle reports and no AI errors.
+- **Deliberate V1 decisions (not gaps):** allied commanders fight sequentially, not as one army (who owns a captured castle would be ambiguous); victory is individual, with no shared allied win.
 
 ---
 
