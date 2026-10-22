@@ -359,7 +359,7 @@
       ['Marching', 'Select a commander and choose March, then click a destination. Armies travel through friendly castles and can be given multi-stop routes. Range is limited; Stables extends it.'],
       ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list.'],
       ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see.'],
-      ['Diplomacy', 'Propose alliances or peace from a rival castle or player. Peace is a truce that blocks attacks for a set number of ticks. Breaking an alliance or attacking during a grace period costs honor.'],
+      ['Diplomacy', 'From the Standings list you can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war. Peace is a truce that blocks attacks for a set number of ticks; at war you can also send peace terms (gold, tribute or a castle). Allies can lock a marriage alliance that cannot be broken until it ends. A third player can offer mediation between two players at war. Breaking a pact or alliance, or attacking during a grace period, costs honor.'],
       ['Chat and messages', 'Use the Chat tab for the game channel and the Inbox for messages and reports. The News tab lists recent events.'],
     ];
 
@@ -824,7 +824,7 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      const ms = { offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
       const mutedKey = `ss-muted-${gameId}-${uid}`;
       try { ms.muted = new Set(JSON.parse(localStorage.getItem(mutedKey)) || []); } catch { ms.muted = new Set(); }
@@ -1092,7 +1092,7 @@
 
       const canAct = () => ms.game.status === 'active' && ms.me.eliminated_at_tick == null;
 
-      const pendingProposals = () => ms.dip.filter((d) => (d.status === 'proposed' || d.status === 'peace_proposed') && d.proposed_by_player_id !== ms.me.id).length;
+      const pendingProposals = () => ms.dip.filter((d) => (d.status === 'proposed' || d.status === 'peace_proposed') && d.proposed_by_player_id !== ms.me.id).length + ms.offers.filter((o) => o.to_player_id === ms.me.id).length;
 
       const castlesOf = (pid) => ms.standings[pid] || 0;
 
@@ -1389,7 +1389,12 @@
         const p = m.payload;
         switch (m.type) {
           case 'game_started': return 'The realms are drawn. The game begins.';
-          case 'war_declared': return `${pname(p.by_player_id)} and ${pname(p.against_player_id)} are at war${p.how === 'alliance_broken' ? ' after a broken alliance' : ' after the first attack'}`;
+          case 'war_declared': return `${pname(p.by_player_id)} ${p.how === 'declared' ? 'declared war on' : 'and'} ${pname(p.against_player_id)}${p.how === 'declared' ? '' : ' are at war'}${p.how === 'alliance_broken' ? ' after a broken alliance' : p.how === 'declared' ? '' : ' after the first attack'}`;
+          case 'nap_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} signed a non-aggression pact`;
+          case 'nap_broken': return `${pname(p.by_player_id)} broke the non-aggression pact with ${pname(p.against_player_id)}`;
+          case 'marriage_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} sealed a marriage alliance until tick ${p.until_tick}`;
+          case 'trade_agreed': return `${pname(p.player_a)} and ${pname(p.player_b)} agreed a trade deal`;
+          case 'mediation_succeeded': return `${pname(p.mediator)} brokered a truce between ${pname(p.player_a)} and ${pname(p.player_b)}`;
           case 'alliance_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} formed an alliance`;
           case 'truce_formed': return `${pname(p.player_a)} and ${pname(p.player_b)} agreed a truce until tick ${p.ends_tick}`;
           case 'truce_ended': return `The truce between ${pname(p.player_a)} and ${pname(p.player_b)} has ended`;
@@ -1671,10 +1676,117 @@
         ]);
       };
 
+      const trustWord = (pr) => {
+        const score = pr.honor - 2 * pr.infamy;
+        return score >= 50 ? 'Trusted' : score <= -20 ? 'Notorious' : 'Unproven';
+      };
+
       const profileLine = (p) => {
         const pr = p.user_id ? ms.profiles.get(p.user_id) : null;
         if (!pr) return null;
-        return h('div', { style: 'color:var(--dim);font-size:.78rem;padding:2px 0 0 4px' }, `Honor ${pr.honor} · Infamy ${pr.infamy} · ${pr.total_wins} wins in ${pr.total_games} games`);
+        return h('div', { style: 'color:var(--dim);font-size:.78rem;padding:2px 0 0 4px' }, `${trustWord(pr)} · Honor ${pr.honor} · Infamy ${pr.infamy} · ${pr.total_wins} wins in ${pr.total_games} games`);
+      };
+
+      const offerCall = (fn, args, message) => (e) => act(e.currentTarget, async () => {
+        const { error } = await sb.rpc(fn, args);
+        if (error) throw error;
+        if (message) toast(message, true);
+      });
+
+      const numInput = (value, min, max) => h('input', { type: 'number', min: String(min), max: String(max), value: String(value) });
+
+      const marriageDialog = (p) => {
+        const lock = numInput(48, 12, 240);
+        modal(`Marriage alliance with ${p.display_name}`, h('div', {},
+          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'Neither of you can break the alliance until the lock ends. They must accept.'),
+          h('label', {}, 'Lock length (ticks, 12 to 240)'), lock), (close) => [
+          h('button', { onclick: close }, 'Cancel'),
+          h('button', { class: 'primary', onclick: (e) => offerCall('propose_marriage', { p_game_id: gameId, p_target_player_id: p.id, p_lock_ticks: Number(lock.value) }, `Marriage proposed to ${p.display_name}`)(e).then(close) }, 'Propose'),
+        ]);
+      };
+
+      const tradeDialog = (p) => {
+        const give = numInput(10, 0, 1000);
+        const get = numInput(10, 0, 1000);
+        const cycles = numInput(5, 1, 20);
+        modal(`Trade agreement with ${p.display_name}`, h('div', {},
+          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'Gold moves every production cycle. A payment you cannot cover cancels the deal and costs infamy. War cancels trade.'),
+          h('label', {}, 'You pay per cycle'), give, h('label', {}, 'They pay you per cycle'), get, h('label', {}, 'Cycles (1 to 20)'), cycles), (close) => [
+          h('button', { onclick: close }, 'Cancel'),
+          h('button', { class: 'primary', onclick: (e) => offerCall('propose_trade', { p_game_id: gameId, p_target_player_id: p.id, p_give: Number(give.value), p_get: Number(get.value), p_cycles: Number(cycles.value) }, `Trade proposed to ${p.display_name}`)(e).then(close) }, 'Propose'),
+        ]);
+      };
+
+      const termsDialog = (p) => {
+        const payer = h('select', {}, h('option', { value: 'proposer' }, 'I pay'), h('option', { value: 'target' }, `${p.display_name} pays`));
+        const gold = numInput(0, 0, 100000);
+        const tribute = numInput(0, 0, 10000);
+        const cycles = numInput(0, 0, 20);
+        const mine = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id);
+        const theirs = [...ms.t.values()].filter((t) => t.owner_player_id === p.id);
+        const pick = (list) => h('select', {}, h('option', { value: '' }, 'None'), ...list.map((t) => h('option', { value: String(t.id) }, t.name)));
+        const give = pick(mine);
+        const ask = pick(theirs);
+        modal(`Peace terms for ${p.display_name}`, h('div', { style: 'max-height:60vh;overflow-y:auto' },
+          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'On acceptance the war becomes a truce. Capitals and castles holding commanders cannot be ceded.'),
+          h('label', {}, 'Who pays gold'), payer, h('label', {}, 'Lump sum now'), gold,
+          h('label', {}, 'Tribute per cycle'), tribute, h('label', {}, 'Tribute cycles (0 to 20)'), cycles,
+          h('label', {}, 'A castle you give up'), give, h('label', {}, 'A castle you ask for'), ask), (close) => [
+          h('button', { onclick: close }, 'Cancel'),
+          h('button', {
+            class: 'primary',
+            onclick: (e) => offerCall('propose_peace_terms', {
+              p_game_id: gameId,
+              p_target_player_id: p.id,
+              p_terms: { payer: payer.value, gold_now: Number(gold.value), tribute: Number(tribute.value), cycles: Number(cycles.value), give_territory: give.value ? Number(give.value) : null, ask_territory: ask.value ? Number(ask.value) : null },
+            }, `Peace terms sent to ${p.display_name}`)(e).then(close),
+          }, 'Propose'),
+        ]);
+      };
+
+      const mediationDialog = () => {
+        const others = [...ms.players.values()].filter((x) => x.id !== ms.me.id && x.eliminated_at_tick == null);
+        const sel = () => h('select', {}, ...others.map((x) => h('option', { value: String(x.id) }, x.display_name)));
+        const a = sel();
+        const b = sel();
+        if (others[1]) b.value = String(others[1].id);
+        modal('Offer mediation', h('div', {},
+          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'Pick two players at war. If both accept, they agree a truce.'), h('label', {}, 'First player'), a, h('label', {}, 'Second player'), b), (close) => [
+          h('button', { onclick: close }, 'Cancel'),
+          h('button', { class: 'primary', onclick: (e) => offerCall('offer_mediation', { p_game_id: gameId, p_player_a: Number(a.value), p_player_b: Number(b.value) }, 'Mediation offered')(e).then(close) }, 'Offer'),
+        ]);
+      };
+
+      const describeOffer = (o) => {
+        const t = o.terms || {};
+        if (o.kind === 'nap') return 'a non-aggression pact';
+        if (o.kind === 'marriage') return `a marriage alliance locked for ${t.lock_ticks} ticks`;
+        if (o.kind === 'trade') return `a trade deal: ${pname(o.from_player_id)} pays ${t.give}, ${pname(o.to_player_id)} pays ${t.get}, per cycle for ${t.cycles} cycles`;
+        if (o.kind === 'mediation') return `mediation between ${pname(t.a)} and ${pname(t.b)}`;
+        const payer = t.payer === 'proposer' ? o.from_player_id : o.to_player_id;
+        const bits = [];
+        if (t.gold_now) bits.push(`${t.gold_now} gold now`);
+        if (t.tribute) bits.push(`${t.tribute} gold per cycle for ${t.cycles} cycles`);
+        if (t.give_territory) bits.push(`${pname(o.from_player_id)} cedes ${ms.t.get(t.give_territory).name}`);
+        if (t.ask_territory) bits.push(`${pname(o.to_player_id)} cedes ${ms.t.get(t.ask_territory).name}`);
+        return `peace on these terms: ${pname(payer)} pays ${bits.join(', ')}`;
+      };
+
+      const offersSection = () => {
+        if (!ms.offers.length && !ms.deals.length && !ms.locks.length) return null;
+        const incoming = ms.offers.filter((o) => o.to_player_id === ms.me.id);
+        const outgoing = ms.offers.filter((o) => o.from_player_id === ms.me.id);
+        return h('div', { class: 'sec' }, h('b', {}, 'Offers and agreements'),
+          incoming.map((o) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+            h('div', {}, `${pname(o.from_player_id)} offers ${describeOffer(o)} (expires tick ${o.expires_tick})`),
+            h('div', { class: 'row', style: 'margin-top:4px' },
+              h('button', { class: 'primary', onclick: offerCall('respond_offer', { p_offer_id: o.id, p_accept: true }, 'Offer accepted') }, 'Accept'),
+              h('button', { onclick: offerCall('respond_offer', { p_offer_id: o.id, p_accept: false }, 'Offer declined') }, 'Decline')))),
+          outgoing.map((o) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b;color:var(--dim)' },
+            h('div', {}, `You offered ${pname(o.to_player_id)} ${describeOffer(o)}`),
+            h('button', { style: 'margin-top:4px', onclick: offerCall('withdraw_offer', { p_offer_id: o.id }, 'Offer withdrawn') }, 'Withdraw'))),
+          ms.deals.map((d) => h('div', { class: 'line' }, h('span', {}, `${d.kind === 'tribute' ? 'Tribute' : 'Trade'}: ${pname(d.payer_id)} pays ${pname(d.payee_id)} ${d.amount}`), h('span', {}, `${d.cycles_left} cycles left`))),
+          ms.locks.map((l) => h('div', { class: 'line' }, h('span', {}, `Marriage: ${pname(l.player_a)} and ${pname(l.player_b)}`), h('span', {}, `locked until tick ${l.until_tick}`))));
       };
 
       const diplomacyControls = (p) => {
@@ -1683,10 +1795,18 @@
         const st = r ? r.status : 'neutral';
         const target = { p_target_player_id: p.id };
         const peaceBtn = h('button', { onclick: order('propose_peace', target, `Peace proposed to ${p.display_name}`) }, 'Propose peace');
+        const tradeBtn = h('button', { onclick: () => tradeDialog(p) }, 'Trade');
         if (st === 'neutral') {
           return h('div', { class: 'row wrap2' },
             h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance'),
-            peaceBtn);
+            h('button', { onclick: offerCall('propose_nap', { p_game_id: gameId, p_target_player_id: p.id }, `Pact proposed to ${p.display_name}`) }, 'Non-aggression pact'),
+            peaceBtn, tradeBtn,
+            h('button', { class: 'danger', onclick: (e) => { if (confirm(`Declare war on ${p.display_name}? Everyone will see it.`)) order('declare_war', target, `You declared war on ${p.display_name}`)(e); } }, 'Declare war'));
+        }
+        if (st === 'nap') {
+          return h('div', { class: 'row wrap2' }, h('span', { style: 'color:var(--gold2)' }, 'Non-aggression pact'),
+            h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance'), tradeBtn,
+            h('button', { class: 'danger', onclick: (e) => { if (confirm(`Break your pact with ${p.display_name}? War follows after a grace period and costs infamy.`)) order('break_nap', target, 'Pact broken. War follows after the grace period')(e); } }, 'Break pact'));
         }
         if (st === 'proposed') {
           if (r.proposed_by_player_id === ms.me.id) return h('span', { style: 'color:var(--dim)' }, 'Alliance proposed, awaiting reply');
@@ -1700,12 +1820,17 @@
             h('button', { class: 'primary', onclick: order('accept_peace', target, `Truce agreed with ${p.display_name}`) }, 'Accept peace'),
             h('button', { onclick: order('decline_peace', target, 'Peace declined') }, 'Decline'));
         }
-        if (st === 'truce') return h('span', { style: 'color:var(--gold2)' }, `Truce until tick ${r.truce_ends_tick}`);
+        if (st === 'truce') return h('div', { class: 'row wrap2' }, h('span', { style: 'color:var(--gold2)' }, `Truce until tick ${r.truce_ends_tick}`), tradeBtn);
         if (st === 'allied') {
-          return h('button', { class: 'danger', onclick: (e) => { if (confirm(`Break your alliance with ${p.display_name}? War follows after a grace period.`)) order('break_alliance', target, 'Alliance broken. War follows after the grace period')(e); } }, 'Break alliance');
+          const lock = (ms.locks || []).find((l) => (l.player_a === p.id || l.player_b === p.id) && l.until_tick > ms.game.current_tick);
+          return h('div', { class: 'row wrap2' },
+            lock
+              ? h('span', { style: 'color:var(--gold2)' }, `Marriage alliance until tick ${lock.until_tick}`)
+              : h('button', { class: 'danger', onclick: (e) => { if (confirm(`Break your alliance with ${p.display_name}? War follows after a grace period.`)) order('break_alliance', target, 'Alliance broken. War follows after the grace period')(e); } }, 'Break alliance'),
+            lock ? null : h('button', { onclick: () => marriageDialog(p) }, 'Marriage alliance'), tradeBtn);
         }
         if (st === 'grace_period') return h('span', { style: 'color:var(--gold2)' }, `Alliance broken. War at tick ${r.grace_ends_tick}`);
-        return h('div', { class: 'row wrap2' }, h('span', { style: 'color:#e08b82' }, 'At war'), peaceBtn);
+        return h('div', { class: 'row wrap2' }, h('span', { style: 'color:#e08b82' }, 'At war'), peaceBtn, h('button', { onclick: () => termsDialog(p) }, 'Peace terms'));
       };
 
       const drawSide = () => {
@@ -1788,6 +1913,7 @@
         } else {
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
           parts.push(h('h3', {}, 'Realm'), ...realmSection());
+          parts.push(offersSection());
           parts.push(h('div', { class: 'sec' }, h('b', {}, 'Standings'), pl.map(({ p, n }) => {
             const st = p.id === ms.me.id ? 'you' : dipStatus(p.id);
             const ctl = diplomacyControls(p);
@@ -1798,6 +1924,7 @@
               profileLine(p),
               p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id && !p.is_ai ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null, p.id !== ms.me.id && !p.is_ai && canAct() && !(p.eliminated_at_tick != null) ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null) : null);
           })));
+          if (canAct() && ms.players.size > 2) parts.push(h('div', { class: 'sec' }, h('button', { onclick: mediationDialog }, 'Offer mediation')));
           parts.push(h('div', { class: 'sec', style: 'color:var(--dim);font-size:.8rem' }, 'Click a castle or commander for details. Drag to pan, scroll to zoom. A gold ring marks a king.'));
         }
         sideEl.replaceChildren(sideTabs(), ...parts.filter(Boolean));
@@ -1876,10 +2003,11 @@
           sb.from('message_threads').select('*').eq('game_id', gameId),
           sb.from('thread_participants').select('*').eq('game_id', gameId),
           ms.edges ? Promise.resolve({ data: ms.edges }) : sb.from('territory_edges').select('*').eq('game_id', gameId),
+          sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
         ]);
         if (state.view !== 'map' || state.roomId !== gameId) return;
 
-        const [vw, mo, ib, br, ch, th, pt, ed] = res;
+        const [vw, mo, ib, br, ch, th, pt, ed, of] = res;
         if (vw.error && vw.error.message.includes('not in this game')) { toast('That game is no longer available.'); return showHome(); }
         const failed = res.find((r) => r.error);
         if (failed) { toast(failed.error.message); return; }
@@ -1907,6 +2035,9 @@
         ms.areas = view.areas;
         ms.wl = (view.areas.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
         ms.dip = view.diplomacy;
+        ms.offers = of.data.offers;
+        ms.deals = of.data.deals;
+        ms.locks = of.data.locks;
         ms.moments = mo.data;
         ms.inbox = ib.data;
         ms.battles = br.data;
