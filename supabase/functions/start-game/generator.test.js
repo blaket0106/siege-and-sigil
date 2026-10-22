@@ -12,7 +12,7 @@ function cases() {
     for (const mapSize of Object.keys(SIZES)) {
       for (const players of [2, 3, 4, 5, 6, 7, 8]) {
         for (const seed of SEEDS) {
-          out.push({ style, mapSize, players, seed, startingTerritories: 4, startingGarrison: 10 });
+          out.push({ style, mapSize, players, seed, startingTerritories: 4, startingGarrison: 10, terrain: false });
         }
       }
     }
@@ -50,7 +50,7 @@ test('generation is deterministic', () => {
 });
 
 test('different seeds give different maps', () => {
-  const base = { style: 'scatter', mapSize: 'standard', players: 4, startingTerritories: 4, startingGarrison: 10 };
+  const base = { style: 'scatter', mapSize: 'standard', players: 4, startingTerritories: 4, startingGarrison: 10, terrain: false };
   const a = generateWorld({ ...base, seed: 1 });
   const b = generateWorld({ ...base, seed: 2 });
   assert.notDeepEqual(a.territories.map((t) => [t.x, t.y]), b.territories.map((t) => [t.x, t.y]));
@@ -177,7 +177,7 @@ test('territories are spread out, in bounds, and uniquely named', () => {
 });
 
 test('neutral territories carry garrisons and start unowned', () => {
-  const layout = generateWorld({ style: 'scatter', mapSize: 'standard', players: 4, seed: 7, startingTerritories: 4, startingGarrison: 10 });
+  const layout = generateWorld({ style: 'scatter', mapSize: 'standard', players: 4, seed: 7, startingTerritories: 4, startingGarrison: 10, terrain: false });
   for (const t of layout.territories.filter((x) => x.owner_seat === null)) {
     assert.equal(t.troops, 10 * t.tier);
     assert.equal(t.effective_influence, t.base_influence);
@@ -200,4 +200,69 @@ test('seat assignment is a deterministic permutation', () => {
   const ids = [11, 12, 13, 14];
   assert.deepEqual(assignSeats(5, ids), assignSeats(5, ids));
   assert.deepEqual([...assignSeats(5, ids)].sort(), ids);
+});
+
+const TERRAIN_CASES = [
+  { style: 'scatter', mapSize: 'compact', players: 4, seed: 1 },
+  { style: 'scatter', mapSize: 'standard', players: 4, seed: 42 },
+  { style: 'continents', mapSize: 'standard', players: 6, seed: 7 },
+  { style: 'scatter', mapSize: 'large', players: 8, seed: 99 },
+  { style: 'continents', mapSize: 'compact', players: 2, seed: 5 },
+].map((c) => ({ ...c, startingTerritories: 4, startingGarrison: 10 }));
+
+function heightAt(art, layout, x, y) {
+  const cell = layout.map_w / art.grid;
+  const ix = Math.min(art.grid - 1, Math.max(0, Math.floor(x / cell)));
+  const iy = Math.min(art.grid - 1, Math.max(0, Math.floor(y / cell)));
+  return parseInt(art.h.substr((iy * art.grid + ix) * 2, 2), 36) / 1295;
+}
+
+test('terrain is deterministic and leaves positions and graph untouched', () => {
+  for (const c of TERRAIN_CASES) {
+    const withTerrain = generateWorld(c);
+    assert.deepEqual(withTerrain, generateWorld(c), label(c));
+    const bare = generateWorld({ ...c, terrain: false });
+    assert.deepEqual(withTerrain.territories.map((t) => [t.x, t.y, t.tier, t.owner_seat]), bare.territories.map((t) => [t.x, t.y, t.tier, t.owner_seat]), label(c));
+    assert.deepEqual(withTerrain.edges.map((e) => [e.a, e.b]), bare.edges.map((e) => [e.a, e.b]), label(c));
+    assert.ok(isConnected(withTerrain), label(c));
+  }
+});
+
+test('every castle stands on land, starting castles are never mountain fortresses', () => {
+  for (const c of TERRAIN_CASES) {
+    const layout = generateWorld(c);
+    for (const t of layout.territories) {
+      assert.ok(heightAt(layout.art, layout, t.x, t.y) >= layout.art.sea, `${label(c)} ${t.name} is at sea`);
+      assert.ok(['plains', 'forest', 'hills', 'mountain', 'coast'].includes(t.terrain), label(c));
+      if (t.owner_seat !== null) assert.notEqual(t.terrain, 'mountain', label(c));
+    }
+  }
+});
+
+test('edges carry terrain costs and each seat gets a comparable start', () => {
+  for (const c of TERRAIN_CASES) {
+    const layout = generateWorld(c);
+    const pen = new Array(c.players).fill(0);
+    for (const e of layout.edges) {
+      assert.ok(['land', 'pass', 'river'].includes(e.kind), label(c));
+      assert.ok(e.move_cost_mult >= 1 && e.move_cost_mult <= 1.8, label(c));
+      const w = e.kind === 'pass' ? 2 : e.kind === 'river' ? 1 : e.move_cost_mult > 1 ? 0.3 : 0;
+      for (const t of [e.a, e.b]) if (layout.territories[t].owner_seat !== null) pen[layout.territories[t].owner_seat] += w;
+    }
+    assert.ok(Math.max(...pen) - Math.min(...pen) <= 5, `${label(c)} spread ${pen.join()}`);
+  }
+});
+
+test('terrain art is well formed and compact', () => {
+  for (const c of TERRAIN_CASES) {
+    const { art, map_w: mapW } = generateWorld(c);
+    assert.equal(art.h.length, art.grid * art.grid * 2, label(c));
+    assert.equal(art.m.length, art.grid * art.grid, label(c));
+    assert.ok(/^[0-9a-z]+$/.test(art.h) && /^[0-9]+$/.test(art.m), label(c));
+    for (const r of art.rivers) {
+      assert.ok(r.p.length >= 2 && r.w > 0, label(c));
+      for (const [x, y] of r.p) assert.ok(x >= 0 && x <= mapW && y >= 0 && y <= mapW, label(c));
+    }
+    assert.ok(JSON.stringify(art).length < 120000, label(c));
+  }
 });

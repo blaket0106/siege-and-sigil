@@ -834,6 +834,264 @@
       return cells;
     }
 
+    const TERRAIN_NAMES = { plains: 'Plains', forest: 'Forest', hills: 'Hills', mountain: 'Mountain fortress', coast: 'Coast' };
+    const EDGE_NAMES = { land: 'road', pass: 'mountain pass', river: 'river crossing', sea: 'sea lane' };
+
+    function decodeArt(art) {
+      const G = art.grid;
+      const h = new Float32Array(G * G);
+      const m = new Float32Array(G * G);
+      for (let i = 0; i < G * G; i++) {
+        h[i] = parseInt(art.h.substr(i * 2, 2), 36) / 1295;
+        m[i] = Number(art.m[i]) / 9;
+      }
+      return { G, h, m, sea: art.sea, seed: art.seed, rivers: art.rivers };
+    }
+
+    function bilerp(grid, G, fx, fy) {
+      fx = Math.min(G - 1.001, Math.max(0, fx));
+      fy = Math.min(G - 1.001, Math.max(0, fy));
+      const ix = Math.floor(fx);
+      const iy = Math.floor(fy);
+      const tx = fx - ix;
+      const ty = fy - iy;
+      const a = grid[iy * G + ix];
+      const b = grid[iy * G + ix + 1];
+      const c = grid[(iy + 1) * G + ix];
+      const d = grid[(iy + 1) * G + ix + 1];
+      return a * (1 - tx) * (1 - ty) + b * tx * (1 - ty) + c * (1 - tx) * ty + d * tx * ty;
+    }
+
+    function hexToRgb(hex) {
+      const n = parseInt(hex.replace('#', ''), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    function paintTerrain(art, mapW, sites) {
+      const d = decodeArt(art);
+      const G = d.G;
+      const cell = mapW / G;
+      const W = 768;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = W;
+      const ctx = canvas.getContext('2d');
+      const img = ctx.createImageData(W, W);
+      const H = (x, y) => bilerp(d.h, G, x / cell - 0.5, y / cell - 0.5);
+      const M = (x, y) => bilerp(d.m, G, x / cell - 0.5, y / cell - 0.5);
+      const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+      const deep = [14, 47, 79];
+      const shallow = [52, 128, 168];
+      const foam = [150, 205, 210];
+      const sand = [214, 196, 140];
+      const dry = [150, 160, 88];
+      const wet = [84, 138, 70];
+      const forestC = [44, 98, 58];
+      const hillC = [148, 138, 86];
+      const rockC = [128, 120, 112];
+      const snow = [240, 243, 247];
+      const e = cell * 0.8;
+
+      for (let py = 0; py < W; py++) {
+        for (let px = 0; px < W; px++) {
+          const x = ((px + 0.5) / W) * mapW;
+          const y = ((py + 0.5) / W) * mapW;
+          const h = H(x, y);
+          let c;
+          if (h < d.sea) {
+            const t = h / d.sea;
+            c = mix(deep, shallow, ss(0.25, 1, t));
+            if (t > 0.9) c = mix(c, foam, 0.55 * ss(0.9, 1, t));
+          } else {
+            const el = (h - d.sea) / (1 - d.sea);
+            const m = M(x, y);
+            c = mix(dry, wet, m);
+            c = mix(c, forestC, ss(0.55, 0.72, m) * (1 - ss(0.35, 0.55, el)));
+            c = mix(c, hillC, ss(0.22, 0.4, el) * 0.8);
+            c = mix(c, rockC, ss(0.38, 0.55, el));
+            c = mix(c, snow, ss(0.62, 0.78, el));
+            c = mix(sand, c, ss(0, 0.07, el));
+            const shade = (-(H(x + e, y) - H(x - e, y)) - (H(x, y + e) - H(x, y - e))) * 4.6;
+            const f = Math.min(1.5, Math.max(0.62, 1 + shade));
+            c = [c[0] * f, c[1] * f, c[2] * f];
+          }
+          const o = (py * W + px) * 4;
+          img.data[o] = Math.min(255, c[0]);
+          img.data[o + 1] = Math.min(255, c[1]);
+          img.data[o + 2] = Math.min(255, c[2]);
+          img.data[o + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+
+      let seed = d.seed >>> 0;
+      const rnd = () => {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const scale = W / mapW;
+      const clear = (x, y) => sites.every((s) => Math.hypot(s.x - x, s.y - y) > 26);
+      const peaks = [];
+      const trees = [];
+      for (let py = 6; py < W - 6; py += 8) {
+        for (let px = 6; px < W - 6; px += 8) {
+          const x = ((px + rnd() * 8) / W) * mapW;
+          const y = ((py + rnd() * 8) / W) * mapW;
+          const h = H(x, y);
+          if (h < d.sea + 0.02) continue;
+          const el = (h - d.sea) / (1 - d.sea);
+          const m = M(x, y);
+          if (el > 0.4 && rnd() < 0.38 && clear(x, y)) peaks.push({ px: x * scale, py: y * scale, size: 13 + el * 20 + rnd() * 7, snow: el > 0.58 });
+          else if (m > 0.6 && el < 0.45 && rnd() < 0.55 && clear(x, y)) trees.push({ px: x * scale, py: y * scale, r: 2.6 + rnd() * 1.6 });
+        }
+      }
+      trees.sort((a, b) => a.py - b.py);
+      for (const t of trees) {
+        ctx.fillStyle = 'rgba(14,44,26,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(t.px + 1.2, t.py + t.r * 0.9, t.r * 1.1, t.r * 0.5, 0, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = '#2b6a3b';
+        ctx.beginPath();
+        ctx.arc(t.px, t.py, t.r, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(150,200,110,0.55)';
+        ctx.beginPath();
+        ctx.arc(t.px - t.r * 0.3, t.py - t.r * 0.3, t.r * 0.5, 0, 7);
+        ctx.fill();
+      }
+      peaks.sort((a, b) => a.py - b.py);
+      for (const p of peaks) {
+        const w = p.size;
+        const ht = p.size * 0.9;
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.beginPath();
+        ctx.ellipse(p.px + w * 0.15, p.py + 1, w * 0.62, w * 0.18, 0, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = '#b3aba0';
+        ctx.beginPath();
+        ctx.moveTo(p.px - w / 2, p.py);
+        ctx.lineTo(p.px, p.py - ht);
+        ctx.lineTo(p.px + w * 0.05, p.py);
+        ctx.fill();
+        ctx.fillStyle = '#6f675e';
+        ctx.beginPath();
+        ctx.moveTo(p.px + w * 0.05, p.py);
+        ctx.lineTo(p.px, p.py - ht);
+        ctx.lineTo(p.px + w / 2, p.py);
+        ctx.fill();
+        if (p.snow) {
+          ctx.fillStyle = '#f4f6f8';
+          ctx.beginPath();
+          ctx.moveTo(p.px - w * 0.14, p.py - ht * 0.68);
+          ctx.lineTo(p.px, p.py - ht);
+          ctx.lineTo(p.px + w * 0.14, p.py - ht * 0.68);
+          ctx.lineTo(p.px + w * 0.04, p.py - ht * 0.6);
+          ctx.fill();
+        }
+      }
+
+      const T = 384;
+      const near = new Int16Array(T * T);
+      const land = new Uint8Array(T * T);
+      for (let ty = 0; ty < T; ty++) {
+        for (let tx = 0; tx < T; tx++) {
+          const x = ((tx + 0.5) / T) * mapW;
+          const y = ((ty + 0.5) / T) * mapW;
+          const i = ty * T + tx;
+          land[i] = H(x, y) >= d.sea ? 1 : 0;
+          let best = 0;
+          let bd = Infinity;
+          for (let k = 0; k < sites.length; k++) {
+            const dx = sites[k].x - x;
+            const dy = sites[k].y - y;
+            const dd = dx * dx + dy * dy;
+            if (dd < bd) { bd = dd; best = k; }
+          }
+          near[i] = best;
+        }
+      }
+
+      return {
+        url: canvas.toDataURL(),
+        T,
+        near,
+        land,
+        mapW,
+        rivers: d.rivers,
+        landAt: (x, y) => H(x, y) >= d.sea,
+      };
+    }
+
+    function paintTint(terr, state) {
+      const { T, near, land } = terr;
+      const canvas = terr.tintCanvas || (terr.tintCanvas = Object.assign(document.createElement('canvas'), { width: T, height: T }));
+      const ctx = canvas.getContext('2d');
+      const img = ctx.createImageData(T, T);
+      for (let y = 0; y < T; y++) {
+        for (let x = 0; x < T; x++) {
+          const i = y * T + x;
+          if (!land[i]) continue;
+          const k = near[i];
+          const st = state[k];
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          let a = 0;
+          if (!st.seen) { r = 8; g = 10; b = 16; a = 135; }
+          else if (st.rgb) { [r, g, b] = st.rgb; a = 74; }
+          if (st.selected) { r = (r * a + 255 * 40) / (a + 40); g = (g * a + 255 * 40) / (a + 40); b = (b * a + 255 * 40) / (a + 40); a += 40; }
+          const rightK = x + 1 < T && land[i + 1] ? near[i + 1] : k;
+          const downK = y + 1 < T && land[i + T] ? near[i + T] : k;
+          if (rightK !== k || downK !== k) {
+            const sel = st.selected || state[rightK].selected || state[downK].selected;
+            r = sel ? 240 : 20; g = sel ? 207 : 16; b = sel ? 125 : 10; a = sel ? 230 : 150;
+          }
+          const o = i * 4;
+          img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = a;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return canvas.toDataURL();
+    }
+
+    function castleSprite(tier, terrain, ownerColor) {
+      const w = tier >= 3 ? 44 : tier === 2 ? 34 : 26;
+      const stone = '#d6cdb8';
+      const shade = '#9a9180';
+      const line = '#2a2418';
+      const parts = [];
+      parts.push(sv('ellipse', { cx: 3, cy: 9, rx: w * 0.66, ry: 5, fill: 'rgba(0,0,0,0.3)' }));
+      if (terrain === 'mountain') {
+        parts.push(sv('path', { d: `M${-w * 0.75},10 L${-w * 0.35},-3 L${-w * 0.05},3 L${w * 0.3},-6 L${w * 0.75},10 Z`, fill: '#857d72', stroke: line, 'stroke-width': 1 }));
+      }
+      const wallTop = -4;
+      parts.push(sv('rect', { x: -w / 2, y: wallTop, width: w, height: 13, fill: stone, stroke: line, 'stroke-width': 1.1 }));
+      parts.push(sv('rect', { x: -w / 2, y: wallTop, width: w * 0.28, height: 13, fill: shade, opacity: 0.55 }));
+      const teeth = Math.round(w / 6);
+      for (let i = 0; i < teeth; i++) {
+        parts.push(sv('rect', { x: -w / 2 + (i * w) / teeth + 0.5, y: wallTop - 2.6, width: w / teeth - 1.3, height: 2.8, fill: stone, stroke: line, 'stroke-width': 0.7 }));
+      }
+      const keepH = tier >= 3 ? 20 : 15;
+      parts.push(sv('rect', { x: -w * 0.17, y: wallTop - keepH + 4, width: w * 0.34, height: keepH, fill: stone, stroke: line, 'stroke-width': 1.1 }));
+      parts.push(sv('rect', { x: -w * 0.17, y: wallTop - keepH + 4, width: w * 0.1, height: keepH, fill: shade, opacity: 0.55 }));
+      if (tier >= 2) {
+        for (const sx of [-1, 1]) {
+          const tx = sx * w * 0.5;
+          parts.push(sv('rect', { x: tx - 3.4, y: wallTop - 7, width: 6.8, height: 20, fill: stone, stroke: line, 'stroke-width': 1 }));
+          parts.push(sv('path', { d: `M${tx - 4.6},${wallTop - 7} L${tx},${wallTop - 14} L${tx + 4.6},${wallTop - 7} Z`, fill: ownerColor, stroke: line, 'stroke-width': 0.9 }));
+        }
+      }
+      parts.push(sv('path', { d: `M-3.2,9 L-3.2,4 A3.2,3.2 0 0 1 3.2,4 L3.2,9 Z`, fill: '#2a2418' }));
+      const poleTop = wallTop - keepH + 4 - 9;
+      parts.push(sv('line', { x1: 0, y1: wallTop - keepH + 4, x2: 0, y2: poleTop, stroke: line, 'stroke-width': 1.2 }));
+      parts.push(sv('path', { d: `M0,${poleTop} L11,${poleTop + 3.2} L0,${poleTop + 6.4} Z`, fill: ownerColor, stroke: line, 'stroke-width': 0.9 }));
+      return sv('g', {}, ...parts);
+    }
+
     async function showMap(gameId) {
       clearCleanup();
       state.view = 'map';
@@ -855,7 +1113,7 @@
       const hud = h('div', { class: 'hud' });
       const sideEl = h('div', { class: 'side' });
       const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
-      const L = { cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      const L = { terrain: sv('g'), tint: sv('g'), rivers: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
       svg.append(...Object.values(L));
       mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' }, h('div', { class: 'mapwrap' }, svg), sideEl)));
 
@@ -967,6 +1225,22 @@
         return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
       };
 
+      const initTerrain = () => {
+        const sites = [...ms.t.values()];
+        ms.terrIds = sites.map((t) => t.id);
+        ms.terr = paintTerrain(ms.art, ms.game.map_w, sites);
+        const W = ms.game.map_w;
+        L.terrain.replaceChildren(sv('image', { x: 0, y: 0, width: W, height: W, href: ms.terr.url, preserveAspectRatio: 'none', style: 'pointer-events:none' }));
+        ms.tintEl = sv('image', { x: 0, y: 0, width: W, height: W, preserveAspectRatio: 'none', style: 'pointer-events:none' });
+        L.tint.replaceChildren(ms.tintEl);
+        const d = (r) => 'M' + r.p.map((q) => `${q[0]} ${q[1]}`).join(' L');
+        L.rivers.replaceChildren(...ms.terr.rivers.flatMap((r) => [
+          sv('path', { d: d(r), fill: 'none', stroke: '#2f6aa3', 'stroke-width': 4 + r.w * 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9, style: 'pointer-events:none' }),
+          sv('path', { d: d(r), fill: 'none', stroke: '#7fb9ea', 'stroke-width': 2 + r.w * 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.95, style: 'pointer-events:none' }),
+        ]));
+        svg.parentElement.style.background = '#0e2f4f';
+      };
+
       const render = () => {
         computeVis();
         const tf = tickF();
@@ -975,34 +1249,61 @@
         });
         try { localStorage.setItem(memKey, JSON.stringify(ms.mem)); } catch {}
 
+        if (ms.terr) {
+          const state = ms.terrIds.map((id) => {
+            const t = ms.t.get(id);
+            const seen = ms.vis.has(id);
+            const owner = seen ? t.owner_player_id : null;
+            return { seen, rgb: owner ? hexToRgb(color(owner)) : null, selected: !!(ms.sel && ms.sel.type === 't' && ms.sel.id === id) };
+          });
+          const sig = state.map((x) => `${x.seen ? 1 : 0}${x.selected ? 1 : 0}${x.rgb ? x.rgb.join('.') : ''}`).join('|');
+          if (sig !== ms.tintSig) {
+            ms.tintSig = sig;
+            ms.tintEl.setAttribute('href', paintTint(ms.terr, state));
+          }
+        }
+
         const cells = [];
         const castles = [];
         ms.t.forEach((t) => {
           const seen = ms.vis.has(t.id);
           const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
           const selected = ms.sel && ms.sel.type === 't' && ms.sel.id === t.id;
-          cells[selected ? 'push' : 'unshift'](sv('polygon', {
-            points: ms.cells.get(t.id),
-            fill: owner ? color(owner) : '#2a2a38',
-            'fill-opacity': seen ? (owner ? 0.4 : 0.55) : 0.14,
-            stroke: selected ? '#f0cf7d' : '#0a0a0f',
-            'stroke-width': selected ? 3 : 1.5,
-            onclick: () => select('t', t.id),
-          }));
+          const pick = (e) => {
+            if (ms.terr) {
+              const q = toMap(e);
+              if (!ms.terr.landAt(q.x, q.y)) return;
+            }
+            select('t', t.id);
+          };
+          cells[selected ? 'push' : 'unshift'](ms.terr
+            ? sv('polygon', { points: ms.cells.get(t.id), fill: 'transparent', stroke: 'none', onclick: pick })
+            : sv('polygon', {
+              points: ms.cells.get(t.id),
+              fill: owner ? color(owner) : '#2a2a38',
+              'fill-opacity': seen ? (owner ? 0.4 : 0.55) : 0.14,
+              stroke: selected ? '#f0cf7d' : '#0a0a0f',
+              'stroke-width': selected ? 3 : 1.5,
+              onclick: pick,
+            }));
 
-          const r = 8 + 3 * (t.tier || 1);
+          const tier = t.tier || 1;
+          const r = ms.terr ? (tier >= 3 ? 30 : tier === 2 ? 24 : 20) : 8 + 3 * tier;
+          const rBot = ms.terr ? 12 : r;
           const showTroops = seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war || ms.vis.has(t.id));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
           const sieged = ms.cmd.some((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tf));
           const g = sv('g', { opacity: seen ? 1 : 0.5 },
             sieged ? sv('circle', { cx: t.x, cy: t.y, r: r + 7, fill: 'none', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '4 4', style: 'pointer-events:none' }) : null,
-            sv('circle', { cx: t.x, cy: t.y, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: () => select('t', t.id) }),
-            ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: t.x, y: t.y + 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
-            sv('text', { x: t.x, y: t.y - r - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'),
-            sv('text', { x: t.x, y: t.y + r + 16, 'text-anchor': 'middle', 'font-size': 14 }, t.name),
+            ms.terr
+              ? sv('g', { transform: `translate(${t.x},${t.y})`, style: 'cursor:pointer', onclick: pick }, castleSprite(tier, t.terrain, owner ? color(owner) : '#8a8a96'))
+              : sv('circle', { cx: t.x, cy: t.y, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }),
+            !ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: t.x, y: t.y + 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
+            sv('text', { x: t.x, y: t.y - r - 5, 'text-anchor': 'middle', 'font-size': 17, style: `fill:#fff;font-weight:bold${ms.terr ? ';paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : ''}` }, showTroops ? t.troops : '?'),
+            sv('text', { x: t.x, y: t.y + rBot + 16, 'text-anchor': 'middle', 'font-size': 14, style: ms.terr ? 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : null }, `${ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? '♛ ' : ''}${t.name}`),
             here.map((c, i) => sv('circle', {
               cx: t.x + (i - (here.length - 1) / 2) * 17,
-              cy: t.y + r + 32,
+              cy: t.y + rBot + 32,
               r: c.role === 'king' ? 8 : 6.5,
               fill: color(c.owner_player_id),
               stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : (c.role === 'king' ? '#f0cf7d' : '#000'),
@@ -1020,6 +1321,13 @@
           const B = ms.t.get(e.to_territory_id);
           const road = A.has_road && B.has_road;
           const seen = ms.vis.has(A.id) || ms.vis.has(B.id);
+          if (ms.terr) {
+            const style = road ? { stroke: '#e0b64a', w: 2.8, dash: null }
+              : e.kind === 'pass' ? { stroke: '#e8c9a0', w: 2.2, dash: '2 5' }
+                : e.kind === 'river' ? { stroke: '#cfe8ff', w: 2.2, dash: '7 4' }
+                  : { stroke: '#efe4bf', w: 1.6, dash: '5 5' };
+            return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: style.stroke, 'stroke-width': style.w, 'stroke-dasharray': style.dash, 'stroke-opacity': seen ? 0.7 : 0.2, 'stroke-linecap': 'round', style: 'pointer-events:none' });
+          }
           return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: road ? '#b8923a' : '#4a4860', 'stroke-width': road ? 2.6 : 1.2, 'stroke-opacity': seen ? 0.85 : 0.25, style: 'pointer-events:none' });
         }));
 
@@ -1961,7 +2269,7 @@
           const t = ms.t.get(sel.id);
           const seen = ms.vis.has(t.id);
           const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
-          parts.push(h('h3', {}, t.name), h('div', { style: 'color:var(--dim)' }, `Tier ${t.tier}${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + t.terrain : ''}`));
+          parts.push(h('h3', {}, t.name), h('div', { style: 'color:var(--dim)' }, `Tier ${t.tier}${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + (TERRAIN_NAMES[t.terrain] || t.terrain) : ''}${t.terrain === 'mountain' ? ' (defenders strike harder)' : ''}`));
           parts.push(h('div', { class: 'sec' },
             line('Owner', owner ? pname(owner) + (seen ? '' : ' (last seen)') : 'Unclaimed'),
             line('Troops', seen ? t.troops : 'Unknown'),
@@ -1974,9 +2282,9 @@
           if (fought.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Battles here'), fought.map(battleRow)));
           parts.push(siegeSection(t), buildSection(t));
           const links = ms.edges.filter((e) => e.from_territory_id === t.id || e.to_territory_id === t.id)
-            .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length }))
+            .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length, kind: e.kind }))
             .sort((a, b) => a.len - b.len);
-          parts.push(h('div', { class: 'sec' }, h('b', {}, 'Roads to'), links.map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, Math.round(l.len))))));
+          parts.push(h('div', { class: 'sec' }, h('b', {}, 'Roads to'), links.map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${Math.round(l.len)}`)))));
         } else if (sel && sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === sel.id);
           if (!c || !commanderSeen(c, tf)) {
@@ -2164,6 +2472,9 @@
         if (!ms.edges) {
           ms.edges = ed.data;
           ms.cells = voronoiCells([...ms.t.values()], view.game.map_w, view.game.map_h);
+          const artRow = await sb.from('games').select('map_art').eq('id', gameId).maybeSingle();
+          ms.art = artRow.data && artRow.data.map_art ? artRow.data.map_art : null;
+          if (ms.art) initTerrain();
         }
         if (firstLoad) {
           firstLoad = false;

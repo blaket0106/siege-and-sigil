@@ -1,4 +1,6 @@
-export const GENERATOR_VERSION = 1;
+import { bestTerrain } from './terrain.js';
+
+export const GENERATOR_VERSION = 2;
 export const SPACING = 150;
 
 const MARGIN = 60;
@@ -237,7 +239,7 @@ export function assignSeats(seed, playerIds) {
   return seats;
 }
 
-export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison }) {
+export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
   if (!perPlayer) throw new Error(`unknown map size: ${mapSize}`);
@@ -384,7 +386,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     territory_idxs: Array.from({ length: startingTerritories }, (_, j) => k * perPlayer + j),
   }));
 
-  return {
+  const layout = {
     generator_version: GENERATOR_VERSION,
     map_w: round4(2 * center),
     map_h: round4(2 * center),
@@ -392,4 +394,29 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     territories,
     edges,
   };
+
+  if (terrain) {
+    const world = bestTerrain({
+      makeRng,
+      seed,
+      points,
+      edges: edges.map((e) => [e.a, e.b]),
+      mapW: layout.map_w,
+      spacing: SPACING,
+      tiers: territories.map((t) => t.tier),
+      owned: territories.map((t) => t.owner_seat !== null),
+      seatOf: territories.map((t, g) => Math.floor(g / perPlayer)),
+      players,
+    });
+    territories.forEach((t, g) => {
+      t.terrain = world.terrain[g];
+    });
+    edges.forEach((e, k) => {
+      e.kind = world.edgeInfo[k].kind;
+      e.move_cost_mult = world.edgeInfo[k].mult;
+    });
+    layout.art = world.art;
+  }
+
+  return layout;
 }
