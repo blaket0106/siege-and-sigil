@@ -1138,7 +1138,7 @@ Pair status lives in `diplomacy` (neutral, proposed, allied, grace_period, war).
 - **`leave_game(game)`:** lobby only. A member's player row is removed. If the creator leaves, host passes to the earliest-joined remaining human; if none remain the game is deleted. Once a game has started, leaving is `concede_defeat`.
 - **`cancel_game(game)`:** creator only, lobby only. Deletes the game.
 - **`delete_game(game)`:** creator only, finished games only. Deletes the game and all its data (all child tables cascade).
-- **Not done yet:** abandoned active games (see 20ab). Kicking and lobby cleanup are in 20ab.
+- **Not done yet:** nothing known. Kicking and lobby cleanup are in 20ab; inactive players are auto-conceded (20ab, auto-concede).
 
 ### 20w. Map view (implemented, read-only)
 
@@ -1215,7 +1215,8 @@ Replaces the client-only fog of 20w for the data itself; the client still draws 
 - **Help, standings and leaderboard:** a "How to play" dialog (top bar and map HUD; opens once on a player's first map via localStorage `ss-help-seen`). `game_summary(game)` (players of a finished game only) returns final standings: castles, troops, battles, elimination tick, winner and end reason; shown by the "Final standings" HUD button on finished games. `get_leaderboard(limit)` returns profiles with at least one game ranked by honor, then wins; shown on the home screen. Both are security-definer RPCs granted to `authenticated`.
 - **Automated tests:** `supabase/functions/start-game/generator.test.js` (run `node --test generator.test.js`, 11 tests) covers map generation. `supabase/tests/game_smoke.sql` is a database suite: paste it into the SQL runner (or `psql -f`); it builds a 4-seat AI game, runs 10 ticks, checks fog privileges, summary gating and leaderboard access, then deliberately raises `SUITE passed=N failed=M ...` so nothing persists. Expect `passed=7 failed=0`.
 - **Abuse limits:** insert triggers cap a user at 5 games created per hour, 5 unfinished (lobby or active) games created at once, and 10 unfinished games joined (AI seats exempt). Chat and thread messages were already limited to 8 per 10 seconds. Limits are constants in `enforce_game_create_limits` and `enforce_game_join_limits`.
-- **Deliberate V1 decisions (not gaps):** allied commanders fight sequentially, not as one army (who owns a captured castle would be ambiguous); victory is individual, with no shared allied win; a player who simply stops playing is not auto-conceded (their empire can be conquered); the AI never lays sieges.
+- **Auto-concede:** `game_players.last_active_at` (hidden from clients) is refreshed by `touch_activity(game)`, which the map calls on open and every 5 minutes while the tab is visible. An hourly cron (`auto-concede-inactive`) runs `auto_concede_inactive()`, which eliminates any human in an active game idle for 72 hours (reason `inactive`) and re-evaluates the game end. The smoke suite covers it (`passed=8`).
+- **Deliberate V1 decisions (not gaps):** allied commanders fight sequentially, not as one army (who owns a captured castle would be ambiguous); victory is individual, with no shared allied win; the AI never lays sieges.
 
 ---
 

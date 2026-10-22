@@ -38,6 +38,11 @@ begin
   select current_tick into n from public.games where id = g;
   if n = 10 then ok := ok + 1; else bad := bad + 1; res := res || 'tick counter is 10 (got ' || n || '); '; end if;
 
+  update public.game_players set last_active_at = now() - interval '73 hours' where id = p1;
+  n := public.auto_concede_inactive();
+  select count(*) into n from public.game_players where id = p1 and eliminated_at_tick is not null;
+  if n = 1 then ok := ok + 1; else bad := bad + 1; res := res || 'inactive human auto-conceded; '; end if;
+
   update public.games set status = 'finished', winner_player_id = p1 where id = g;
   set local role authenticated;
   s := public.game_summary(g);

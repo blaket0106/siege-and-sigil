@@ -846,6 +846,11 @@
         }
       } catch {}
 
+      const touch = () => { if (!document.hidden) sb.rpc('touch_activity', { p_game_id: gameId }); };
+      touch();
+      const touchTimer = setInterval(touch, 5 * 60 * 1000);
+      state.cleanup.push(() => clearInterval(touchTimer));
+
       const color = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color : '#6b6b78');
       const color2 = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color2 : '#2a2a35');
       const pname = (pid) => (pid && ms.players.get(pid) ? ms.players.get(pid).display_name : 'Unclaimed');
