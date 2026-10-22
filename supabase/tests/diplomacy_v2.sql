@@ -93,6 +93,12 @@ begin
   select count(*) into n from public.gold_deals where game_id = g and kind = 'trade' and status = 'active';
   if n = 2 then ok := ok + 1; else bad := bad + 1; res := res || 'trade creates two deals (got ' || n || '); '; end if;
 
+  update public.gold_deals set status = 'cancelled' where kind = 'tribute';
+  select gold into n from public.game_players where id = p1;
+  update public.game_players set gold = 0 where id = p2;
+  perform public.process_gold_deals(g, tk + 2);
+  if (select count(*) from public.gold_deals where game_id = g and kind = 'trade' and status = 'active') = 0 and (select gold from public.game_players where id = p1) = n then ok := ok + 1; else bad := bad + 1; res := res || 'one-sided trade default cancels both legs; '; end if;
+
   set local role anon;
   begin perform public.propose_nap(g, p2); st := 'allowed'; exception when insufficient_privilege then st := 'denied'; end;
   reset role;
