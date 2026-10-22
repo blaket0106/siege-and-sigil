@@ -345,8 +345,37 @@
         h('div', { class: 'brand' }, h('h1', {}, 'Siege & Sigil')),
         h('div', { class: 'who' },
           nameEl,
+          h('button', { class: 'link', onclick: helpDialog }, 'how to play'),
           h('button', { class: 'link', onclick: renameDialog }, 'rename'),
           h('button', { onclick: () => sb.auth.signOut() }, DEV_GUEST ? 'New guest' : 'Sign out')));
+    }
+
+    const HELP = [
+      ['Goal', 'Hold the share of castles shown in the top bar ("Castles x / y to win"). The first player to reach it wins. Lose your last castle and you are eliminated.'],
+      ['Time', 'The game advances in ticks. Orders you give take effect as ticks pass; the countdown shows the next tick. Turn-based games advance when everyone ends their turn or the deadline passes.'],
+      ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for influence. Higher tiers earn more.'],
+      ['Commanders', 'Commanders lead troops. Hire more, spend gold on their abilities and move troops between a commander and a castle. A commander left in a castle garrisons it.'],
+      ['Marching', 'Select a commander and choose March, then click a destination. Armies travel through friendly castles and can be given multi-stop routes. Range is limited; Stables extends it.'],
+      ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list.'],
+      ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see.'],
+      ['Diplomacy', 'Propose alliances or peace from a rival castle or player. Peace is a truce that blocks attacks for a set number of ticks. Breaking an alliance or attacking during a grace period costs honor.'],
+      ['Chat and messages', 'Use the Chat tab for the game channel and the Inbox for messages and reports. The News tab lists recent events.'],
+    ];
+
+    function helpDialog() {
+      const body = h('div', { style: 'max-height:60vh;overflow-y:auto;padding-right:6px' },
+        ...HELP.map(([t, d]) => h('div', { style: 'margin-bottom:10px' }, h('b', { style: 'color:var(--gold2)' }, t), h('div', { style: 'color:var(--text)' }, d))));
+      modal('How to play', body, (close) => [h('button', { class: 'primary', onclick: close }, 'Got it')]);
+    }
+
+    async function summaryDialog(gameId) {
+      const { data, error } = await sb.rpc('game_summary', { p_game_id: gameId });
+      if (error) return toast(error.message);
+      const rows = data.players.map((p) => h('div', { class: 'game' },
+        h('div', {},
+          h('div', { class: 'name' }, dots(p.faction), p.name, p.player_id === data.winner_player_id ? h('span', { class: 'tag gold' }, 'winner') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
+          h('div', { class: 'meta' }, `${p.castles} castles · ${p.troops} troops · ${p.battles} battles${p.eliminated_at_tick != null ? ` · eliminated at tick ${p.eliminated_at_tick}` : ''}`))));
+      modal(`${data.name}: final standings`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);margin-bottom:8px' }, `Ended at tick ${data.ticks}${data.reason ? ` (${data.reason})` : ''}`), h('div', { class: 'list', style: 'max-height:50vh;overflow-y:auto' }, ...rows)), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
     }
 
     function renameDialog() {
@@ -381,6 +410,7 @@
 
       const openList = h('div', { class: 'list' });
       const mineList = h('div', { class: 'list' });
+      const boardList = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Loading'));
 
       const refresh = async () => {
         if (state.view !== 'home') return;
@@ -427,7 +457,17 @@
             h('button', { onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh'),
             h('button', { class: 'primary', onclick: createDialog }, 'Create game'))),
           openList),
-        h('div', { class: 'panel' }, h('h2', {}, 'Your games'), mineList)));
+        h('div', { class: 'panel' }, h('h2', {}, 'Your games'), mineList),
+        h('div', { class: 'panel' }, h('h2', {}, 'Leaderboard'), boardList)));
+
+      sb.rpc('get_leaderboard', { p_limit: 15 }).then(({ data, error }) => {
+        if (error) return toast(error.message);
+        boardList.replaceChildren(...(data.length
+          ? data.map((r, i) => h('div', { class: 'game' },
+            h('div', {}, h('div', { class: 'name' }, `${i + 1}. ${r.display_name}`), h('div', { class: 'meta' }, `${r.total_wins} wins in ${r.total_games} games`)),
+            h('span', { class: 'tag gold' }, `${r.honor} honor${r.infamy ? ` · ${r.infamy} infamy` : ''}`)))
+          : [h('div', { class: 'empty' }, 'No finished games yet.')]));
+      });
 
       await refresh();
 
@@ -799,6 +839,13 @@
       svg.append(...Object.values(L));
       mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' }, h('div', { class: 'mapwrap' }, svg), sideEl)));
 
+      try {
+        if (!localStorage.getItem('ss-help-seen')) {
+          localStorage.setItem('ss-help-seen', '1');
+          helpDialog();
+        }
+      } catch {}
+
       const color = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color : '#6b6b78');
       const color2 = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color2 : '#2a2a35');
       const pname = (pid) => (pid && ms.players.get(pid) ? ms.players.get(pid).display_name : 'Unclaimed');
@@ -1056,6 +1103,8 @@
         const winner = ms.players.get(g.winner_player_id);
         hud.replaceChildren(...[
           h('button', { onclick: showHome }, 'Back to games'),
+          h('button', { onclick: helpDialog }, 'Help'),
+          g.status === 'finished' ? h('button', { class: 'primary', onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
           h('b', {}, g.name),
           h('span', {}, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`),
           nextEl,
