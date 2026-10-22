@@ -245,8 +245,8 @@ test('edges carry terrain costs and each seat gets a comparable start', () => {
     const pen = new Array(c.players).fill(0);
     for (const e of layout.edges) {
       assert.ok(['land', 'pass', 'river'].includes(e.kind), label(c));
-      assert.ok(e.move_cost_mult >= 1 && e.move_cost_mult <= 1.8, label(c));
-      const w = e.kind === 'pass' ? 2 : e.kind === 'river' ? 1 : e.move_cost_mult > 1 ? 0.3 : 0;
+      assert.ok(e.move_cost_mult >= 1 && e.move_cost_mult <= 2.6, label(c));
+      const w = e.kind === 'pass' ? 2 : e.kind === 'river' ? 1 : (e.move_cost_mult - 1) * 1.5;
       for (const t of [e.a, e.b]) if (layout.territories[t].owner_seat !== null) pen[layout.territories[t].owner_seat] += w;
     }
     const mean = pen.reduce((x, y) => x + y, 0) / pen.length;
@@ -280,11 +280,10 @@ test('free travel: scaled world, links cover every road, ocean and unforded rive
     for (const e of road.edges) assert.ok(keys.has(`${e.a},${e.b}`), `${label3} road ${e.a}-${e.b} missing from links`);
     assert.ok(isConnected(free), label3);
     assert.ok(free.edges.length > road.edges.length, label3);
-    assert.ok(free.edges.length < 4000, label3);
+    assert.ok(free.edges.length < 9000, label3);
     for (const e of free.edges) {
       const a = free.territories[e.a];
       const b = free.territories[e.b];
-      assert.ok(e.length <= 3.5 * 150 * 3 + 1, label3);
       assert.ok(near(e.length, Math.hypot(a.x - b.x, a.y - b.y)), label3);
       assert.ok(['land', 'pass', 'river'].includes(e.kind), label3);
       assert.ok(heightAt(free.art, free, (a.x + b.x) / 2, (a.y + b.y) / 2) >= free.art.sea - 0.05, `${label3} midpoint at sea`);

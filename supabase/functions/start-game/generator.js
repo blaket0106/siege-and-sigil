@@ -419,7 +419,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     });
     layout.art = world.art;
     if (freeTravel) {
-      layout.edges = world.links(3.5 * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
+      layout.edges = world.links().map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
     }
   }
   layout.world_scale = scale;

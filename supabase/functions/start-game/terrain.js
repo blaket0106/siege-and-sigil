@@ -375,7 +375,7 @@ export function buildTerrain(o) {
   const scanLine = (A, B) => {
     const len = Math.hypot(B.x - A.x, B.y - A.y);
     const steps = Math.max(4, Math.ceil(len / (cell * 0.7)));
-    let forest = 0;
+    let cost = 0;
     let ocean = false;
     const runs = [];
     let run = null;
@@ -385,7 +385,12 @@ export function buildTerrain(o) {
       const y = A.y + (B.y - A.y) * t;
       const h = sample(height, x, y);
       if (h < SEA) ocean = true;
-      if (sample(moist, x, y) > 0.58 && h < 0.5) forest += 1;
+      let c = 1;
+      if (h > MOUNT_T) c = 2;
+      else if (h > 0.42) c = 1.4;
+      else if (sample(moist, x, y) > 0.58) c = 1.4;
+      else if (h > SEA + 0.17) c = 1.15;
+      cost += c;
       if (t * len > spacing * 0.3 && (1 - t) * len > spacing * 0.3 && h > MOUNT_T) {
         if (!run) run = { sx: x, sy: y };
         run.ex = x;
@@ -401,7 +406,7 @@ export function buildTerrain(o) {
       const q = segIntersect(A, B, seg.a, seg.b);
       if (q && !crossings.some((c) => Math.hypot(c.x - q.x, c.y - q.y) < spacing * 0.08)) crossings.push(q);
     }
-    return { len, ocean, forest: forest / (steps + 1), runs: runs.map((r) => ({ x: (r.sx + r.ex) / 2, y: (r.sy + r.ey) / 2 })), crossings };
+    return { len, ocean, cost: cost / (steps + 1), runs: runs.map((r) => ({ x: (r.sx + r.ex) / 2, y: (r.sy + r.ey) / 2 })), crossings };
   };
 
   const fords = [];
@@ -433,15 +438,15 @@ export function buildTerrain(o) {
     if (sc.ocean) return null;
     for (const q of sc.crossings) if (!fords.some((f) => Math.hypot(f.x - q.x, f.y - q.y) <= spacing * 0.2)) return null;
     for (const r of sc.runs) if (!passes.some((f) => Math.hypot(f.x - r.x, f.y - r.y) <= spacing * 0.35)) return null;
-    if (sc.runs.length) return { kind: 'pass', mult: 1.8 };
-    if (sc.crossings.length) return { kind: 'river', mult: 1.5 };
-    if (sc.forest > 0.55) return { kind: 'land', mult: 1.25 };
-    return { kind: 'land', mult: 1 };
+    const mult = Math.round(Math.min(2.6, sc.cost + 0.25 * sc.crossings.length) * 100) / 100;
+    if (sc.runs.length) return { kind: 'pass', mult };
+    if (sc.crossings.length) return { kind: 'river', mult };
+    return { kind: 'land', mult };
   };
 
   const edgeInfo = edges.map(([a, b]) => classify(a, b) || { kind: 'land', mult: 1 });
 
-  const links = (cap) => {
+  const links = (cap = Infinity) => {
     const out = [];
     for (let a = 0; a < points.length; a++) {
       for (let b = a + 1; b < points.length; b++) {
@@ -467,7 +472,7 @@ export function buildTerrain(o) {
   const seats = o.players;
   const pen = new Array(seats).fill(0);
   edges.forEach(([a, b], k) => {
-    const w = edgeInfo[k].kind === 'pass' ? 2 : edgeInfo[k].kind === 'river' ? 1 : edgeInfo[k].mult > 1 ? 0.3 : 0;
+    const w = edgeInfo[k].kind === 'pass' ? 2 : edgeInfo[k].kind === 'river' ? 1 : (edgeInfo[k].mult - 1) * 1.5;
     if (!w) return;
     for (const t of [a, b]) if (o.owned[t]) pen[seatOf[t]] += w;
   });
