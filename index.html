@@ -149,7 +149,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, starting_gold, starting_garrison, starting_gold_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -356,7 +356,7 @@
       ['Time', 'The game advances in ticks. Orders you give take effect as ticks pass; the countdown shows the next tick. Turn-based games advance when everyone ends their turn or the deadline passes.'],
       ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for influence. Higher tiers earn more.'],
       ['Commanders', 'Commanders lead troops. Hire more, spend gold on their abilities and move troops between a commander and a castle. A commander left in a castle garrisons it.'],
-      ['Marching', 'Select a commander and choose March, then click a destination. Armies travel through friendly castles and can be given multi-stop routes. Range is limited; Stables extends it.'],
+      ['Marching', 'Select a commander and choose March, then click a destination. In free-travel games you can march straight to any castle within your range (Stables extends it); the sea, rivers and mountain ranges block a direct march, so cross at a ford (bridge icon) or a mountain pass and chain stops with a multi-stop route. Otherwise armies follow roads through friendly castles.'],
       ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list. A defeated commander may be captured instead of killed: the captor can ransom, release or execute them, and captives sometimes escape. A commander who wins five battles earns a name and a bonus; losing a king or a named commander costs prestige and lowers production for a while.'],
       ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see.'],
       ['Diplomacy', 'From the Standings list you can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war. Peace is a truce that blocks attacks for a set number of ticks; at war you can also send peace terms (gold, tribute or a castle). Allies can lock a marriage alliance that cannot be broken until it ends. A third player can offer mediation between two players at war. Breaking a pact or alliance, or attacking during a grace period, costs honor.'],
@@ -519,6 +519,9 @@
       const seasons = h('input', { type: 'checkbox' });
       const seasonLen = h('input', { type: 'number', min: '12', max: '240', value: '48' });
       const events = h('input', { type: 'checkbox' });
+      const scaleSel = h('select', {}, h('option', { value: '1' }, 'Classic (1x)'), h('option', { value: '2' }, 'Wide (2x)'), h('option', { value: '3' }, 'Vast (3x)'), h('option', { value: '4' }, 'Immense (4x)'));
+      scaleSel.value = '3';
+      const freeTravel = h('input', { type: 'checkbox', checked: true });
       const mercs = h('input', { type: 'checkbox', checked: true });
       const fill = h('input', { type: 'checkbox' });
       const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
@@ -545,6 +548,8 @@
           h('div', {}, h('label', {}, 'Turn timeout, minutes (turn-based)'), turnMins)),
         hint,
         h('label', { class: 'check' }, fog, 'Fog of war'),
+        h('div', {}, h('label', {}, 'Map scale (distance between castles)'), scaleSel),
+        h('label', { class: 'check' }, freeTravel, 'Free travel: march to any castle in range (rivers, mountains and sea block; cross at fords and passes)'),
         h('label', { class: 'check' }, seasons, 'Seasons (winter slows troops and marches)'),
         h('div', {}, h('label', {}, 'Season length (ticks, 12 to 240)'), seasonLen),
         h('label', { class: 'check' }, events, 'Random events (plague, unrest, harvest, comets)'),
@@ -567,6 +572,8 @@
               starting_territories: Number(starting.value),
               victory_pct: Number(victory.value) / 100,
               fog_of_war: fog.checked,
+              world_scale: Number(scaleSel.value),
+              free_travel: freeTravel.checked,
               seasons_enabled: seasons.checked,
               season_length_ticks: Number(seasonLen.value),
               events_enabled: events.checked,
@@ -633,6 +640,7 @@
             kv('Seats', `${players.length}/${game.max_players}`),
             kv('Victory', `${Math.round(game.victory_pct * 100)}% of territories`),
             kv('Fog of war', game.fog_of_war ? 'On' : 'Off'),
+            kv('Map scale', `${game.world_scale || 1}x${game.free_travel ? ', free travel' : ', roads'}`),
             kv('Seasons', game.seasons_enabled ? `On (${game.season_length_ticks} ticks each)` : 'Off'),
             kv('Random events', game.events_enabled ? 'On' : 'Off'),
             kv('Mercenaries', game.mercenaries_enabled ? 'On' : 'Off'),
@@ -835,7 +843,7 @@
     }
 
     const TERRAIN_NAMES = { plains: 'Plains', forest: 'Forest', hills: 'Hills', mountain: 'Mountain fortress', coast: 'Coast' };
-    const EDGE_NAMES = { land: 'road', pass: 'mountain pass', river: 'river crossing', sea: 'sea lane' };
+    const EDGE_NAMES = { land: 'open ground', pass: 'mountain pass', river: 'ford', sea: 'sea lane' };
 
     function decodeArt(art) {
       const G = art.grid;
@@ -871,7 +879,7 @@
       const d = decodeArt(art);
       const G = d.G;
       const cell = mapW / G;
-      const W = 768;
+      const W = 1024;
       const canvas = document.createElement('canvas');
       canvas.width = W;
       canvas.height = W;
@@ -994,7 +1002,7 @@
         }
       }
 
-      const T = 384;
+      const T = 512;
       const near = new Int16Array(T * T);
       const land = new Uint8Array(T * T);
       for (let ty = 0; ty < T; ty++) {
@@ -1113,7 +1121,7 @@
       const hud = h('div', { class: 'hud' });
       const sideEl = h('div', { class: 'side' });
       const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
-      const L = { terrain: sv('g'), tint: sv('g'), rivers: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      const L = { terrain: sv('g'), tint: sv('g'), rivers: sv('g'), crossings: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
       svg.append(...Object.values(L));
       mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' }, h('div', { class: 'mapwrap' }, svg), sideEl)));
 
@@ -1138,6 +1146,21 @@
       };
       const isFriend = (pid) => pid === ms.me.id || dipStatus(pid) === 'allied';
       const rankOf = (c) => Object.values(ms.abil.get(c.id) || {}).reduce((a, b) => a + b, 0);
+
+      const S = () => (ms.game && ms.game.world_scale) || 1;
+      const M = () => Math.pow(S(), 0.5);
+      const rangeOf = (stables) => (ms.game.free_travel ? (210 + 60 * stables) * S() : 90 + 60 * stables);
+      const myStables = () => (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
+      const reachableFrom = (tid) => {
+        const range = rangeOf(myStables());
+        const out = new Map();
+        ms.edges.forEach((e) => {
+          if (e.length > range) return;
+          if (e.from_territory_id === tid) out.set(e.to_territory_id, e);
+          else if (e.to_territory_id === tid) out.set(e.from_territory_id, e);
+        });
+        return out;
+      };
 
       const tickF = () => {
         const g = ms.game;
@@ -1235,9 +1258,17 @@
         L.tint.replaceChildren(ms.tintEl);
         const d = (r) => 'M' + r.p.map((q) => `${q[0]} ${q[1]}`).join(' L');
         L.rivers.replaceChildren(...ms.terr.rivers.flatMap((r) => [
-          sv('path', { d: d(r), fill: 'none', stroke: '#2f6aa3', 'stroke-width': 4 + r.w * 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9, style: 'pointer-events:none' }),
-          sv('path', { d: d(r), fill: 'none', stroke: '#7fb9ea', 'stroke-width': 2 + r.w * 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.95, style: 'pointer-events:none' }),
+          sv('path', { d: d(r), fill: 'none', stroke: '#2f6aa3', 'stroke-width': (4 + r.w * 1.6) * M(), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9, style: 'pointer-events:none' }),
+          sv('path', { d: d(r), fill: 'none', stroke: '#7fb9ea', 'stroke-width': (2 + r.w * 1.1) * M(), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.95, style: 'pointer-events:none' }),
         ]));
+        const bridge = (x, y) => sv('g', { transform: `translate(${x},${y}) scale(${M()})` },
+          sv('rect', { x: -9, y: -4, width: 18, height: 8, rx: 1, fill: '#c9a46a', stroke: '#2a2418', 'stroke-width': 1.2 }),
+          sv('line', { x1: -9, y1: -1, x2: 9, y2: -1, stroke: '#2a2418', 'stroke-width': 0.8 }),
+          sv('line', { x1: -9, y1: 2, x2: 9, y2: 2, stroke: '#2a2418', 'stroke-width': 0.8 }));
+        const gap = (x, y) => sv('g', { transform: `translate(${x},${y}) scale(${M()})` },
+          sv('path', { d: 'M-9,5 L-4,-6 L0,1 L4,-6 L9,5 Z', fill: '#e8dcc2', stroke: '#2a2418', 'stroke-width': 1.2 }),
+          sv('line', { x1: 0, y1: 1, x2: 0, y2: 5, stroke: '#2a2418', 'stroke-width': 1 }));
+        L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])));
         svg.parentElement.style.background = '#0e2f4f';
       };
 
@@ -1261,6 +1292,12 @@
             ms.tintSig = sig;
             ms.tintEl.setAttribute('href', paintTint(ms.terr, state));
           }
+        }
+
+        ms.reachable = null;
+        if (ms.game.free_travel && ms.marching && ms.sel && ms.sel.type === 'c') {
+          const c = ms.cmd.find((x) => x.id === ms.sel.id);
+          if (c && c.current_territory_id) ms.reachable = new Set(reachableFrom(c.current_territory_id).keys());
         }
 
         const cells = [];
@@ -1293,17 +1330,19 @@
           const showTroops = seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war || ms.vis.has(t.id));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
           const sieged = ms.cmd.some((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tf));
-          const g = sv('g', { opacity: seen ? 1 : 0.5 },
-            sieged ? sv('circle', { cx: t.x, cy: t.y, r: r + 7, fill: 'none', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '4 4', style: 'pointer-events:none' }) : null,
+          const k = ms.terr ? M() : 1;
+          const reach = ms.reachable ? ms.reachable.has(t.id) || (ms.sel && ms.sel.type === 'c' && (ms.cmd.find((x) => x.id === ms.sel.id) || {}).current_territory_id === t.id) : true;
+          const g = sv('g', { transform: `translate(${t.x},${t.y}) scale(${k})`, opacity: (seen ? 1 : 0.5) * (reach ? 1 : 0.4) },
+            sieged ? sv('circle', { cx: 0, cy: 0, r: r + 7, fill: 'none', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '4 4', style: 'pointer-events:none' }) : null,
             ms.terr
-              ? sv('g', { transform: `translate(${t.x},${t.y})`, style: 'cursor:pointer', onclick: pick }, castleSprite(tier, t.terrain, owner ? color(owner) : '#8a8a96'))
-              : sv('circle', { cx: t.x, cy: t.y, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }),
-            !ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: t.x, y: t.y + 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
-            sv('text', { x: t.x, y: t.y - r - 5, 'text-anchor': 'middle', 'font-size': 17, style: `fill:#fff;font-weight:bold${ms.terr ? ';paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : ''}` }, showTroops ? t.troops : '?'),
-            sv('text', { x: t.x, y: t.y + rBot + 16, 'text-anchor': 'middle', 'font-size': 14, style: ms.terr ? 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : null }, `${ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? '♛ ' : ''}${t.name}`),
+              ? sv('g', { style: 'cursor:pointer', onclick: pick }, castleSprite(tier, t.terrain, owner ? color(owner) : '#8a8a96'))
+              : sv('circle', { cx: 0, cy: 0, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }),
+            !ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: 0, y: 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
+            sv('text', { x: 0, y: -r - 5, 'text-anchor': 'middle', 'font-size': 17, style: `fill:#fff;font-weight:bold${ms.terr ? ';paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : ''}` }, showTroops ? t.troops : '?'),
+            sv('text', { x: 0, y: rBot + 16, 'text-anchor': 'middle', 'font-size': 14, style: ms.terr ? 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round' : null }, `${ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? '♛ ' : ''}${t.name}`),
             here.map((c, i) => sv('circle', {
-              cx: t.x + (i - (here.length - 1) / 2) * 17,
-              cy: t.y + rBot + 32,
+              cx: (i - (here.length - 1) / 2) * 17,
+              cy: rBot + 32,
               r: c.role === 'king' ? 8 : 6.5,
               fill: color(c.owner_player_id),
               stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : (c.role === 'king' ? '#f0cf7d' : '#000'),
@@ -1316,20 +1355,22 @@
         L.cells.replaceChildren(...cells);
         L.castles.replaceChildren(...castles);
 
-        L.edges.replaceChildren(...ms.edges.map((e) => {
+        const nearLimit = 150 * 1.7 * S();
+        L.edges.replaceChildren(...ms.edges.filter((e) => !ms.game.free_travel || e.length <= nearLimit).map((e) => {
           const A = ms.t.get(e.from_territory_id);
           const B = ms.t.get(e.to_territory_id);
           const road = A.has_road && B.has_road;
+          if (ms.game.free_travel && !road) return null;
           const seen = ms.vis.has(A.id) || ms.vis.has(B.id);
           if (ms.terr) {
             const style = road ? { stroke: '#e0b64a', w: 2.8, dash: null }
               : e.kind === 'pass' ? { stroke: '#e8c9a0', w: 2.2, dash: '2 5' }
                 : e.kind === 'river' ? { stroke: '#cfe8ff', w: 2.2, dash: '7 4' }
                   : { stroke: '#efe4bf', w: 1.6, dash: '5 5' };
-            return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: style.stroke, 'stroke-width': style.w, 'stroke-dasharray': style.dash, 'stroke-opacity': seen ? 0.7 : 0.2, 'stroke-linecap': 'round', style: 'pointer-events:none' });
+            return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: style.stroke, 'stroke-width': style.w * M(), 'stroke-dasharray': style.dash ? style.dash.split(' ').map((v) => v * M()).join(' ') : null, 'stroke-opacity': seen ? 0.7 : 0.2, 'stroke-linecap': 'round', style: 'pointer-events:none' });
           }
           return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: road ? '#b8923a' : '#4a4860', 'stroke-width': road ? 2.6 : 1.2, 'stroke-opacity': seen ? 0.85 : 0.25, style: 'pointer-events:none' });
-        }));
+        }).filter(Boolean));
 
         L.rings.replaceChildren(...(ms.rings && ms.game.fog_of_war
           ? ms.sources.map((s) => sv('circle', { cx: s.x, cy: s.y, r: s.r, fill: 'none', stroke: 'rgba(212,169,74,0.28)', 'stroke-dasharray': '5 5', style: 'pointer-events:none' }))
@@ -1340,18 +1381,18 @@
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
           const pos = c && cmdPos(c, tf);
           const stables = (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
-          if (pos) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: 90 + 60 * stables, fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2, 'stroke-dasharray': '2 6', style: 'pointer-events:none' }));
+          if (pos) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: rangeOf(stables), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${2 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
         }
         if (ms.marching && ms.stops.length && ms.sel && ms.sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
           const pos = c && cmdPos(c, tf);
           if (pos) {
             const pts = [pos, ...ms.stops.map((st) => ms.t.get(st.id))];
-            pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3, 'stroke-dasharray': '8 6', style: 'pointer-events:none' }));
+            pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3 * M(), 'stroke-dasharray': `${8 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
             ms.stops.forEach((st, i) => {
               const q = ms.t.get(st.id);
-              pv.push(sv('circle', { cx: q.x, cy: q.y, r: 17, fill: '#3a2f12', stroke: '#f0cf7d', 'stroke-width': 2.5, style: 'pointer-events:none' }));
-              pv.push(sv('text', { x: q.x, y: q.y + 5, 'text-anchor': 'middle', 'font-size': 15, style: 'fill:#f0cf7d;font-weight:bold' }, String(i + 1)));
+              pv.push(sv('circle', { cx: q.x, cy: q.y, r: 17 * M(), fill: '#3a2f12', stroke: '#f0cf7d', 'stroke-width': 2.5 * M(), style: 'pointer-events:none' }));
+              pv.push(sv('text', { x: q.x, y: q.y + 5 * M(), 'text-anchor': 'middle', 'font-size': 15 * M(), style: 'fill:#f0cf7d;font-weight:bold' }, String(i + 1)));
             });
           }
         }
@@ -1360,9 +1401,9 @@
           const ok = !ms.preview.plan || ms.preview.plan.in_range;
           const tone = ms.preview.error ? '#e0685c' : (ok ? '#7fd08a' : '#e0685c');
           if (ms.preview.plan) {
-            pv.push(sv('polyline', { points: ms.preview.plan.path.map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4, 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
+            pv.push(sv('polyline', { points: ms.preview.plan.path.map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4 * M(), 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
           }
-          pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 26, fill: 'none', stroke: tone, 'stroke-width': 3, style: 'pointer-events:none' }));
+          pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 26 * M(), fill: 'none', stroke: tone, 'stroke-width': 3 * M(), style: 'pointer-events:none' }));
         }
         L.preview.replaceChildren(...pv);
 
@@ -1381,17 +1422,17 @@
           const friend = isFriend(c.owner_player_id);
           if (friend) {
             const pts = [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
-            out.push(sv('polyline', { points: pts.join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2, 'stroke-dasharray': '3 5', style: 'pointer-events:none' }));
+            out.push(sv('polyline', { points: pts.join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${3 * M()} ${5 * M()}`, style: 'pointer-events:none' }));
           }
           out.push(sv('circle', {
-            cx: pos.x, cy: pos.y, r: c.role === 'king' ? 9 : 7.5,
+            cx: pos.x, cy: pos.y, r: (c.role === 'king' ? 9 : 7.5) * M(),
             fill: color(c.owner_player_id),
             stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : '#f0cf7d',
-            'stroke-width': 2,
+            'stroke-width': 2 * M(),
             style: 'cursor:pointer',
             onclick: (e) => { e.stopPropagation(); select('c', c.id); },
           }));
-          out.push(sv('text', { x: pos.x, y: pos.y - 13, 'text-anchor': 'middle', 'font-size': 14, style: 'fill:#f0cf7d' }, friend ? c.troops : ''));
+          out.push(sv('text', { x: pos.x, y: pos.y - 13 * M(), 'text-anchor': 'middle', 'font-size': 14 * M(), style: 'fill:#f0cf7d;paint-order:stroke;stroke:#000;stroke-width:' + 3 * M() + 'px' }, friend ? c.troops : ''));
         });
         L.dyn.replaceChildren(...out);
       };
@@ -2281,10 +2322,11 @@
           const fought = ms.battles.filter((b) => b.territory_id === t.id);
           if (fought.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Battles here'), fought.map(battleRow)));
           parts.push(siegeSection(t), buildSection(t));
-          const links = ms.edges.filter((e) => e.from_territory_id === t.id || e.to_territory_id === t.id)
+          const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
+          const links = ms.edges.filter((e) => (e.from_territory_id === t.id || e.to_territory_id === t.id) && e.length <= reachRange)
             .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length, kind: e.kind }))
             .sort((a, b) => a.len - b.len);
-          parts.push(h('div', { class: 'sec' }, h('b', {}, 'Roads to'), links.map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${Math.round(l.len)}`)))));
+          parts.push(h('div', { class: 'sec' }, h('b', {}, ms.game.free_travel ? 'Within your range' : 'Roads to'), links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${Math.round(l.len)}`)))));
         } else if (sel && sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === sel.id);
           if (!c || !commanderSeen(c, tf)) {
@@ -2478,9 +2520,12 @@
         }
         if (firstLoad) {
           firstLoad = false;
-          const pad = 40;
+          const pad = 40 * ((view.game && view.game.world_scale) || 1);
           ms.full = { x: -pad, y: -pad, w: view.game.map_w + 2 * pad, h: view.game.map_h + 2 * pad };
           ms.view = { ...ms.full };
+          const cap = ms.me && ms.t.get(ms.me.capital_territory_id);
+          const viewW = 150 * 6 * ((view.game && view.game.world_scale) || 1);
+          if (cap && ms.full.w > viewW * 1.1) ms.view = { x: cap.x - viewW / 2, y: cap.y - viewW / 2, w: viewW, h: viewW };
           applyView();
         }
         render();

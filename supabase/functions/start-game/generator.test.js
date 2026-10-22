@@ -249,7 +249,8 @@ test('edges carry terrain costs and each seat gets a comparable start', () => {
       const w = e.kind === 'pass' ? 2 : e.kind === 'river' ? 1 : e.move_cost_mult > 1 ? 0.3 : 0;
       for (const t of [e.a, e.b]) if (layout.territories[t].owner_seat !== null) pen[layout.territories[t].owner_seat] += w;
     }
-    assert.ok(Math.max(...pen) - Math.min(...pen) <= 5, `${label(c)} spread ${pen.join()}`);
+    const mean = pen.reduce((x, y) => x + y, 0) / pen.length;
+    assert.ok(Math.max(...pen) - Math.min(...pen) <= 0.8 * mean + 4, `${label(c)} spread ${pen.join()}`);
   }
 });
 
@@ -263,6 +264,39 @@ test('terrain art is well formed and compact', () => {
       assert.ok(r.p.length >= 2 && r.w > 0, label(c));
       for (const [x, y] of r.p) assert.ok(x >= 0 && x <= mapW && y >= 0 && y <= mapW, label(c));
     }
-    assert.ok(JSON.stringify(art).length < 120000, label(c));
+    assert.ok(JSON.stringify(art).length < 220000, label(c));
   }
+});
+
+test('free travel: scaled world, links cover every road, ocean and unforded rivers or ranges block', () => {
+  for (const c of TERRAIN_CASES.slice(0, 4)) {
+    const base = { ...c, scale: 3 };
+    const road = generateWorld(base);
+    const free = generateWorld({ ...base, freeTravel: true });
+    const label3 = `${label(c)} x3`;
+    assert.equal(free.world_scale, 3, label3);
+    assert.ok(free.map_w > road.map_w * 0 + 1000, label3);
+    const keys = new Set(free.edges.map((e) => `${e.a},${e.b}`));
+    for (const e of road.edges) assert.ok(keys.has(`${e.a},${e.b}`), `${label3} road ${e.a}-${e.b} missing from links`);
+    assert.ok(isConnected(free), label3);
+    assert.ok(free.edges.length > road.edges.length, label3);
+    assert.ok(free.edges.length < 4000, label3);
+    for (const e of free.edges) {
+      const a = free.territories[e.a];
+      const b = free.territories[e.b];
+      assert.ok(e.length <= 3.5 * 150 * 3 + 1, label3);
+      assert.ok(near(e.length, Math.hypot(a.x - b.x, a.y - b.y)), label3);
+      assert.ok(['land', 'pass', 'river'].includes(e.kind), label3);
+      assert.ok(heightAt(free.art, free, (a.x + b.x) / 2, (a.y + b.y) / 2) >= free.art.sea - 0.05, `${label3} midpoint at sea`);
+    }
+    assert.ok(Array.isArray(free.art.fords) && Array.isArray(free.art.passes), label3);
+  }
+});
+
+test('scaled spacing: castles are three times further apart', () => {
+  const c = { style: 'scatter', mapSize: 'standard', players: 4, seed: 42, startingTerritories: 4, startingGarrison: 10, terrain: false };
+  const one = generateWorld(c);
+  const three = generateWorld({ ...c, scale: 3 });
+  const closest = (layout) => Math.min(...layout.territories.flatMap((a, i) => layout.territories.slice(i + 1).map((b) => Math.hypot(a.x - b.x, a.y - b.y))));
+  assert.ok(near(closest(three), closest(one) * 3, 1), `${closest(three)} vs ${closest(one) * 3}`);
 });

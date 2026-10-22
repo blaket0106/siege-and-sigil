@@ -67,6 +67,8 @@ Deno.serve(async (req: Request) => {
       startingTerritories: game.starting_territories,
       style: game.map_style,
       startingGarrison: game.starting_garrison,
+      scale: Number(game.world_scale) || 1,
+      freeTravel: !!game.free_travel,
     });
   } catch (error) {
     return respond({ error: (error as Error).message }, 422);

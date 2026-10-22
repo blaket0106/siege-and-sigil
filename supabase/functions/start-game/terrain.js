@@ -1,8 +1,8 @@
-export const GRID = 128;
+export const GRID = 192;
 export const SEA = 0.2;
 const LAND_T = 0.36;
 const MOUNT_T = 0.53;
-const CANDIDATES = 12;
+const CANDIDATES = 20;
 
 function smoothstep(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -364,38 +364,95 @@ export function buildTerrain(o) {
     }
   }
 
-  const edgeInfo = edges.map(([a, b]) => {
-    const A = points[a];
-    const B = points[b];
+  const nearestOnSegment = (p, seg) => {
+    const dx = seg.b.x - seg.a.x;
+    const dy = seg.b.y - seg.a.y;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = Math.min(1, Math.max(0, ((p.x - seg.a.x) * dx + (p.y - seg.a.y) * dy) / len2));
+    return { x: seg.a.x + t * dx, y: seg.a.y + t * dy };
+  };
+
+  const scanLine = (A, B) => {
     const len = Math.hypot(B.x - A.x, B.y - A.y);
     const steps = Math.max(4, Math.ceil(len / (cell * 0.7)));
-    let peak = 0;
     let forest = 0;
-    let counted = 0;
+    let ocean = false;
+    const runs = [];
+    let run = null;
     for (let s = 0; s <= steps; s++) {
       const t = s / steps;
       const x = A.x + (B.x - A.x) * t;
       const y = A.y + (B.y - A.y) * t;
-      counted += 1;
-      if (sample(moist, x, y) > 0.58 && sample(height, x, y) < 0.5) forest += 1;
-      if (t > 0.18 && t < 0.82) peak = Math.max(peak, sample(height, x, y));
+      const h = sample(height, x, y);
+      if (h < SEA) ocean = true;
+      if (sample(moist, x, y) > 0.58 && h < 0.5) forest += 1;
+      if (t * len > spacing * 0.3 && (1 - t) * len > spacing * 0.3 && h > MOUNT_T) {
+        if (!run) run = { sx: x, sy: y };
+        run.ex = x;
+        run.ey = y;
+      } else if (run) {
+        runs.push(run);
+        run = null;
+      }
     }
-    if (peak > MOUNT_T) return { kind: 'pass', mult: 1.8 };
+    if (run) runs.push(run);
+    const crossings = [];
     for (const seg of riverSegs) {
       const q = segIntersect(A, B, seg.a, seg.b);
-      if (!q) continue;
-      let bridged = false;
-      for (const p of points) {
-        if (Math.hypot(p.x - q.x, p.y - q.y) < spacing * 0.22) {
-          bridged = true;
-          break;
-        }
-      }
-      if (!bridged) return { kind: 'river', mult: 1.5 };
+      if (q && !crossings.some((c) => Math.hypot(c.x - q.x, c.y - q.y) < spacing * 0.08)) crossings.push(q);
     }
-    if (forest / counted > 0.55) return { kind: 'land', mult: 1.25 };
+    return { len, ocean, forest: forest / (steps + 1), runs: runs.map((r) => ({ x: (r.sx + r.ex) / 2, y: (r.sy + r.ey) / 2 })), crossings };
+  };
+
+  const fords = [];
+  const passes = [];
+  const addUnique = (list, p, rad) => {
+    if (!list.some((f) => Math.hypot(f.x - p.x, f.y - p.y) < rad)) list.push(p);
+  };
+  for (const [a, b] of edges) {
+    const sc = scanLine(points[a], points[b]);
+    sc.crossings.forEach((q) => addUnique(fords, q, spacing * 0.08));
+    sc.runs.forEach((r) => addUnique(passes, r, spacing * 0.15));
+  }
+  for (const p of points) {
+    let best = null;
+    let bd = spacing * 0.22;
+    for (const seg of riverSegs) {
+      const q = nearestOnSegment(p, seg);
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bd) {
+        bd = d;
+        best = q;
+      }
+    }
+    if (best) addUnique(fords, best, spacing * 0.08);
+  }
+
+  const classify = (a, b) => {
+    const sc = scanLine(points[a], points[b]);
+    if (sc.ocean) return null;
+    for (const q of sc.crossings) if (!fords.some((f) => Math.hypot(f.x - q.x, f.y - q.y) <= spacing * 0.2)) return null;
+    for (const r of sc.runs) if (!passes.some((f) => Math.hypot(f.x - r.x, f.y - r.y) <= spacing * 0.35)) return null;
+    if (sc.runs.length) return { kind: 'pass', mult: 1.8 };
+    if (sc.crossings.length) return { kind: 'river', mult: 1.5 };
+    if (sc.forest > 0.55) return { kind: 'land', mult: 1.25 };
     return { kind: 'land', mult: 1 };
-  });
+  };
+
+  const edgeInfo = edges.map(([a, b]) => classify(a, b) || { kind: 'land', mult: 1 });
+
+  const links = (cap) => {
+    const out = [];
+    for (let a = 0; a < points.length; a++) {
+      for (let b = a + 1; b < points.length; b++) {
+        const length = Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);
+        if (length > cap) continue;
+        const c = classify(a, b);
+        if (c) out.push({ a, b, kind: c.kind, mult: c.mult, length });
+      }
+    }
+    return out;
+  };
 
   const terrain = points.map((p, t) => {
     if (fortress.has(t)) return 'mountain';
@@ -430,6 +487,7 @@ export function buildTerrain(o) {
     fairness,
     terrain,
     edgeInfo,
+    links,
     art: {
       v: 1,
       grid: G,
@@ -438,6 +496,8 @@ export function buildTerrain(o) {
       h: hStr.join(''),
       m: mStr.join(''),
       rivers: riverPolys,
+      fords: fords.map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
+      passes: passes.map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
     },
     stats: {
       landShare: isLand.reduce((s, v) => s + v, 0) / (G * G),

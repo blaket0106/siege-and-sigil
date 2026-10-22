@@ -65,7 +65,7 @@ function round4(value) {
   return Math.round(value * 1e4) / 1e4;
 }
 
-function placeWedge({ rng, players, perPlayer, start, radius, wedge, minDist, clustered }) {
+function placeWedge({ rng, players, perPlayer, start, radius, wedge, minDist, clustered, spacing }) {
   const placed = [];
   const locals = [];
   const innerMin = minDist / (2 * Math.sin(Math.PI / players));
@@ -113,7 +113,7 @@ function placeWedge({ rng, players, perPlayer, start, radius, wedge, minDist, cl
         const r = radius * (0.3 + rng() * 0.55);
         const a = wedge * rng();
         const cand = { x: r * Math.cos(a), y: r * Math.sin(a) };
-        const apart = centers.every((o) => Math.hypot(cand.x - o.x, cand.y - o.y) >= SPACING * 2.2);
+        const apart = centers.every((o) => Math.hypot(cand.x - o.x, cand.y - o.y) >= spacing * 2.2);
         if (apart) {
           centers.push(cand);
           break;
@@ -130,7 +130,7 @@ function placeWedge({ rng, players, perPlayer, start, radius, wedge, minDist, cl
     }
     const home = rng() < 0.4 || centers.length === 1;
     const center = home ? centers[0] : centers[1 + Math.floor(rng() * (centers.length - 1))];
-    return { x: center.x + gaussian(rng) * SPACING * 0.55, y: center.y + gaussian(rng) * SPACING * 0.55 };
+    return { x: center.x + gaussian(rng) * spacing * 0.55, y: center.y + gaussian(rng) * spacing * 0.55 };
   };
 
   for (let j = start; j < perPlayer; j++) {
@@ -239,7 +239,7 @@ export function assignSeats(seed, playerIds) {
   return seats;
 }
 
-export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true }) {
+export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
   if (!perPlayer) throw new Error(`unknown map size: ${mapSize}`);
@@ -249,9 +249,10 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     throw new Error(`starting_territories must leave at least 2 neutral territories per player on a ${mapSize} map`);
   }
 
+  const spacing = SPACING * scale;
   const total = players * perPlayer;
-  const radius = SPACING * Math.sqrt(total / Math.PI);
-  const center = radius + MARGIN;
+  const radius = spacing * Math.sqrt(total / Math.PI);
+  const center = radius + MARGIN * scale;
   const wedge = (2 * Math.PI) / players;
   const rng = makeRng(seed, 1);
   const phase = rng() * 2 * Math.PI;
@@ -265,8 +266,9 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       start: startingTerritories,
       radius,
       wedge,
-      minDist: SPACING * styleConfig.minDist * 0.96 ** attempt,
+      minDist: spacing * styleConfig.minDist * 0.96 ** attempt,
       clustered: styleConfig.clustered,
+      spacing,
     });
   }
   if (!locals) throw new Error('could not place territories for these settings');
@@ -351,7 +353,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       if (diff !== 1 && diff !== players - 1) continue;
     }
     const length = lengthOf(a, b);
-    if (length > styleConfig.prune * SPACING) removed.push({ a, b, length });
+    if (length > styleConfig.prune * spacing) removed.push({ a, b, length });
     else kept.set(keyOf(a, b), [a, b]);
   }
 
@@ -402,7 +404,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       points,
       edges: edges.map((e) => [e.a, e.b]),
       mapW: layout.map_w,
-      spacing: SPACING,
+      spacing,
       tiers: territories.map((t) => t.tier),
       owned: territories.map((t) => t.owner_seat !== null),
       seatOf: territories.map((t, g) => Math.floor(g / perPlayer)),
@@ -416,7 +418,11 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       e.move_cost_mult = world.edgeInfo[k].mult;
     });
     layout.art = world.art;
+    if (freeTravel) {
+      layout.edges = world.links(3.5 * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
+    }
   }
+  layout.world_scale = scale;
 
   return layout;
 }
