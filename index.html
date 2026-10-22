@@ -872,10 +872,6 @@
       return a * (1 - tx) * (1 - ty) + b * tx * (1 - ty) + c * (1 - tx) * ty + d * tx * ty;
     }
 
-    function hexToRgb(hex) {
-      const n = parseInt(hex.replace('#', ''), 16);
-      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-    }
 
     function paintTerrain(art, mapW, sites) {
       const d = decodeArt(art);
@@ -1004,68 +1000,11 @@
         }
       }
 
-      const T = 512;
-      const near = new Int16Array(T * T);
-      const land = new Uint8Array(T * T);
-      for (let ty = 0; ty < T; ty++) {
-        for (let tx = 0; tx < T; tx++) {
-          const x = ((tx + 0.5) / T) * mapW;
-          const y = ((ty + 0.5) / T) * mapW;
-          const i = ty * T + tx;
-          land[i] = H(x, y) >= d.sea ? 1 : 0;
-          let best = 0;
-          let bd = Infinity;
-          for (let k = 0; k < sites.length; k++) {
-            const dx = sites[k].x - x;
-            const dy = sites[k].y - y;
-            const dd = dx * dx + dy * dy;
-            if (dd < bd) { bd = dd; best = k; }
-          }
-          near[i] = best;
-        }
-      }
-
       return {
         url: canvas.toDataURL(),
-        T,
-        near,
-        land,
         mapW,
         rivers: d.rivers,
-        landAt: (x, y) => H(x, y) >= d.sea,
       };
-    }
-
-    function paintTint(terr, state) {
-      const { T, near, land } = terr;
-      const canvas = terr.tintCanvas || (terr.tintCanvas = Object.assign(document.createElement('canvas'), { width: T, height: T }));
-      const ctx = canvas.getContext('2d');
-      const img = ctx.createImageData(T, T);
-      for (let y = 0; y < T; y++) {
-        for (let x = 0; x < T; x++) {
-          const i = y * T + x;
-          if (!land[i]) continue;
-          const k = near[i];
-          const st = state[k];
-          let r = 0;
-          let g = 0;
-          let b = 0;
-          let a = 0;
-          if (!st.seen) { r = 8; g = 10; b = 16; a = 135; }
-          else if (st.rgb) { [r, g, b] = st.rgb; a = 74; }
-          if (st.selected) { r = (r * a + 255 * 40) / (a + 40); g = (g * a + 255 * 40) / (a + 40); b = (b * a + 255 * 40) / (a + 40); a += 40; }
-          const rightK = x + 1 < T && land[i + 1] ? near[i + 1] : k;
-          const downK = y + 1 < T && land[i + T] ? near[i + T] : k;
-          if (rightK !== k || downK !== k) {
-            const sel = st.selected || state[rightK].selected || state[downK].selected;
-            r = sel ? 240 : 20; g = sel ? 207 : 16; b = sel ? 125 : 10; a = sel ? 230 : 150;
-          }
-          const o = i * 4;
-          img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = a;
-        }
-      }
-      ctx.putImageData(img, 0, 0);
-      return canvas.toDataURL();
     }
 
     function castleSprite(tier, terrain, ownerColor) {
@@ -1123,7 +1062,7 @@
       const hud = h('div', { class: 'hud' });
       const sideEl = h('div', { class: 'side' });
       const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
-      const L = { terrain: sv('g'), tint: sv('g'), rivers: sv('g'), crossings: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      const L = { terrain: sv('g'), rivers: sv('g'), crossings: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
       svg.append(...Object.values(L));
       mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' }, h('div', { class: 'mapwrap' }, svg), sideEl)));
 
@@ -1252,12 +1191,9 @@
 
       const initTerrain = () => {
         const sites = [...ms.t.values()];
-        ms.terrIds = sites.map((t) => t.id);
         ms.terr = paintTerrain(ms.art, ms.game.map_w, sites);
         const W = ms.game.map_w;
         L.terrain.replaceChildren(sv('image', { x: 0, y: 0, width: W, height: W, href: ms.terr.url, preserveAspectRatio: 'none', style: 'pointer-events:none' }));
-        ms.tintEl = sv('image', { x: 0, y: 0, width: W, height: W, preserveAspectRatio: 'none', style: 'pointer-events:none' });
-        L.tint.replaceChildren(ms.tintEl);
         const d = (r) => 'M' + r.p.map((q) => `${q[0]} ${q[1]}`).join(' L');
         L.rivers.replaceChildren(...ms.terr.rivers.flatMap((r) => [
           sv('path', { d: d(r), fill: 'none', stroke: '#2f6aa3', 'stroke-width': (4 + r.w * 1.6) * M(), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9, style: 'pointer-events:none' }),
@@ -1282,20 +1218,6 @@
         });
         try { localStorage.setItem(memKey, JSON.stringify(ms.mem)); } catch {}
 
-        if (ms.terr) {
-          const state = ms.terrIds.map((id) => {
-            const t = ms.t.get(id);
-            const seen = ms.vis.has(id);
-            const owner = seen ? t.owner_player_id : null;
-            return { seen, rgb: owner ? hexToRgb(color(owner)) : null, selected: !!(ms.sel && ms.sel.type === 't' && ms.sel.id === id) };
-          });
-          const sig = state.map((x) => `${x.seen ? 1 : 0}${x.selected ? 1 : 0}${x.rgb ? x.rgb.join('.') : ''}`).join('|');
-          if (sig !== ms.tintSig) {
-            ms.tintSig = sig;
-            ms.tintEl.setAttribute('href', paintTint(ms.terr, state));
-          }
-        }
-
         ms.reachable = null;
         if (ms.game.free_travel && ms.marching && ms.sel && ms.sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
@@ -1309,15 +1231,9 @@
           const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
           const selected = ms.sel && ms.sel.type === 't' && ms.sel.id === t.id;
           const pick = (e) => {
-            if (ms.terr) {
-              const q = toMap(e);
-              if (!ms.terr.landAt(q.x, q.y)) return;
-            }
             select('t', t.id);
           };
-          cells[selected ? 'push' : 'unshift'](ms.terr
-            ? sv('polygon', { points: ms.cells.get(t.id), fill: 'transparent', stroke: 'none', onclick: pick })
-            : sv('polygon', {
+          if (!ms.terr) cells[selected ? 'push' : 'unshift'](sv('polygon', {
               points: ms.cells.get(t.id),
               fill: owner ? color(owner) : '#2a2a38',
               'fill-opacity': seen ? (owner ? 0.4 : 0.55) : 0.14,
@@ -1336,6 +1252,7 @@
           const reach = ms.reachable ? ms.reachable.has(t.id) || (ms.sel && ms.sel.type === 'c' && (ms.cmd.find((x) => x.id === ms.sel.id) || {}).current_territory_id === t.id) : true;
           const g = sv('g', { transform: `translate(${t.x},${t.y}) scale(${k})`, opacity: (seen ? 1 : 0.5) * (reach ? 1 : 0.4) },
             sieged ? sv('circle', { cx: 0, cy: 0, r: r + 7, fill: 'none', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '4 4', style: 'pointer-events:none' }) : null,
+            ms.terr ? sv('circle', { cx: 0, cy: 0, r: r + 14, fill: 'transparent', stroke: selected ? '#f0cf7d' : (owner ? color(owner) : 'none'), 'stroke-width': selected ? 4 : 3, 'stroke-opacity': seen ? 0.9 : 0.4, style: 'cursor:pointer', onclick: pick }) : null,
             ms.terr && t.natural_resources ? sv('circle', { cx: 0, cy: 0, r: 16 + 0.55 * t.natural_resources, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.35, 'stroke-width': 1.5, style: 'pointer-events:none' }) : null,
             ms.terr
               ? sv('g', { style: 'cursor:pointer', onclick: pick }, castleSprite(tier, t.terrain, owner ? color(owner) : '#8a8a96'))
@@ -2521,10 +2438,10 @@
         view.routes.sort((a, b) => a.id - b.id).forEach((r) => ms.routes.set(r.commander_id, r));
         if (!ms.edges) {
           ms.edges = ed.data;
-          ms.cells = voronoiCells([...ms.t.values()], view.game.map_w, view.game.map_h);
           const artRow = await sb.from('games').select('map_art').eq('id', gameId).maybeSingle();
           ms.art = artRow.data && artRow.data.map_art ? artRow.data.map_art : null;
           if (ms.art) initTerrain();
+          else ms.cells = voronoiCells([...ms.t.values()], view.game.map_w, view.game.map_h);
         }
         if (firstLoad) {
           firstLoad = false;

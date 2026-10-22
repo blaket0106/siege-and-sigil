@@ -4,7 +4,8 @@ export const GENERATOR_VERSION = 3;
 export const SPACING = 150;
 
 const MARGIN = 60;
-const TERRITORIES_PER_PLAYER = { compact: 6, standard: 9, large: 14 };
+const LINK_CAP = 5;
+const TERRITORIES_PER_PLAYER = { compact: 12, standard: 24, large: 36 };
 
 export const tierOf = (resources) => (resources <= 20 ? 1 : resources <= 40 ? 2 : 3);
 const START_RESOURCES = [50, 30, 12, 12];
@@ -384,7 +385,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     });
     layout.art = world.art;
     if (freeTravel) {
-      layout.edges = world.links().map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
+      layout.edges = world.links(LINK_CAP * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
     }
   }
   layout.world_scale = scale;

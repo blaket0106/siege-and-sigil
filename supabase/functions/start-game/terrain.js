@@ -146,8 +146,9 @@ export function buildTerrain(o) {
   const noiseB = makeNoise(o.makeRng(o.seed, 101 + o.salt * 10));
   const noiseC = makeNoise(o.makeRng(o.seed, 102 + o.salt * 10));
   const noiseD = makeNoise(o.makeRng(o.seed, 103 + o.salt * 10));
-  const R = spacing * 0.9;
-  const CORR = spacing * 0.34;
+  const noiseE = makeNoise(o.makeRng(o.seed, 104 + o.salt * 10));
+  const R = spacing * 0.5;
+  const CORR = spacing * 0.22;
   const cx = (gx) => (gx + 0.5) * cell;
 
   const near = new Float32Array(G * G);
@@ -201,7 +202,10 @@ export function buildTerrain(o) {
       const i = gy * G + gx;
       const x = cx(gx);
       const y = cx(gy);
-      const p = Math.max(near[i], 0.92 * corr[i]);
+      const cont = fbm(noiseE, x / (spacing * 3.4), y / (spacing * 3.4), 5);
+      const rad = Math.hypot(x - mapW / 2, y - mapW / 2) / (mapW / 2);
+      const cm = cont + 0.55 * Math.min(0, 0.85 - rad);
+      const p = Math.max(near[i], 0.92 * corr[i], Math.min(1, Math.max(0, (cm - 0.43) * 2.2 + 0.4)));
       const fade = smoothstep(0, fadeLen, Math.min(x, y, mapW - x, mapW - y));
       const n1 = fbm(noiseA, x / (spacing * 1.6), y / (spacing * 1.6), 4);
       score[i] = (p + 0.42 * (n1 - 0.5)) * (0.3 + 0.7 * fade);
@@ -209,7 +213,7 @@ export function buildTerrain(o) {
 
       const nr = fbm(noiseB, x / (spacing * 1.9), y / (spacing * 1.9), 5);
       const ridge = 1 - Math.abs(2 * nr - 1);
-      const mount = smoothstep(0.7, 0.94, ridge);
+      const mount = smoothstep(0.82, 0.98, ridge);
       const flat = Math.max(near[i], 0.55 * corr[i]);
       const land = smoothstep(LAND_T, LAND_T + 0.12, score[i]);
       const roll = fbm(noiseC, x / (spacing * 0.9), y / (spacing * 0.9), 3);
@@ -360,7 +364,9 @@ export function buildTerrain(o) {
   const riverSegs = [];
   for (const r of riverPolys) {
     for (let k = 0; k < r.p.length - 1; k++) {
-      riverSegs.push({ a: { x: r.p[k][0], y: r.p[k][1] }, b: { x: r.p[k + 1][0], y: r.p[k + 1][1] } });
+      const sa = { x: r.p[k][0], y: r.p[k][1] };
+      const sb = { x: r.p[k + 1][0], y: r.p[k + 1][1] };
+      riverSegs.push({ a: sa, b: sb, x0: Math.min(sa.x, sb.x), x1: Math.max(sa.x, sb.x), y0: Math.min(sa.y, sb.y), y1: Math.max(sa.y, sb.y) });
     }
   }
 
@@ -402,7 +408,12 @@ export function buildTerrain(o) {
     }
     if (run) runs.push(run);
     const crossings = [];
+    const lx0 = Math.min(A.x, B.x);
+    const lx1 = Math.max(A.x, B.x);
+    const ly0 = Math.min(A.y, B.y);
+    const ly1 = Math.max(A.y, B.y);
     for (const seg of riverSegs) {
+      if (seg.x1 < lx0 || seg.x0 > lx1 || seg.y1 < ly0 || seg.y0 > ly1) continue;
       const q = segIntersect(A, B, seg.a, seg.b);
       if (q && !crossings.some((c) => Math.hypot(c.x - q.x, c.y - q.y) < spacing * 0.08)) crossings.push(q);
     }
@@ -515,7 +526,8 @@ export function buildTerrain(o) {
 
 export function bestTerrain(o) {
   let best = null;
-  for (let salt = 0; salt < CANDIDATES; salt++) {
+  const count = o.points.length > 150 ? CANDIDATES / 2 : CANDIDATES;
+  for (let salt = 0; salt < count; salt++) {
     const result = buildTerrain({ ...o, salt });
     if (!best || result.fairness < best.fairness) best = result;
   }

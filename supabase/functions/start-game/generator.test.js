@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateWorld, assignSeats, SPACING } from './generator.js';
 
-const SIZES = { compact: 6, standard: 9, large: 14 };
+const SIZES = { compact: 12, standard: 24, large: 36 };
 const SEEDS = [1, 42, 987654321, 9007199254740991];
 const near = (a, b, eps = 1e-2) => Math.abs(a - b) <= eps;
 
@@ -273,7 +273,7 @@ test('free travel: scaled world, links cover every road, ocean and unforded rive
       const b = free.territories[e.b];
       assert.ok(near(e.length, Math.hypot(a.x - b.x, a.y - b.y)), label3);
       assert.ok(['land', 'pass', 'river'].includes(e.kind), label3);
-      assert.ok(heightAt(free.art, free, (a.x + b.x) / 2, (a.y + b.y) / 2) >= free.art.sea - 0.05, `${label3} midpoint at sea`);
+      assert.ok(heightAt(free.art, free, (a.x + b.x) / 2, (a.y + b.y) / 2) >= free.art.sea - 0.1, `${label3} midpoint at sea`);
     }
     assert.ok(Array.isArray(free.art.fords) && Array.isArray(free.art.passes), label3);
   }

@@ -1284,3 +1284,11 @@ Supersedes the tier and influence rules in sections 5 and 10 where they conflict
 - **Roads (warp gate logic):** a road is a per-castle build costing `30 x resources x infra_cost_mult` gold (richer castles cost more). A march between two castles that both have a road moves at `sqrt(Stables level + 3)` times the normal speed (about 2x at Stables 1, 3x at Stables 6). Range still applies: you cannot march to a castle outside march range, the bonus only changes the time. If either road is demolished while a commander is travelling the link, the remaining distance reverts to base speed immediately (arrival tick recomputed). Capturing a castle destroys its road. This applies to free-travel games.
 - **Readout:** zoomed in, the map shows `Treasury / Industry / Prestige` above each castle's garrison.
 - **Tests:** `supabase/tests/roads_resources.sql` (9 checks), `generator.test.js` (17).
+
+### 20ad. Castle counts, continent map and no regions (implemented)
+
+- **Castle counts:** map size is castles per player: compact 12, standard 24, large 36 (Neptune's Pride base is 24). Each player still starts with 4 owned, so a 4-player standard game has 96 castles (16 owned, 80 neutral). Supersedes the 6 / 9 / 14 presets in sections 16 and 17.
+- **No regions:** ownership regions (Voronoi cells and borders) were client-only drawing; no rule used them, and they are gone on terrain maps. Ownership shows as a colored ring around each castle, and the gold ring marks the selected castle. Fog of war still uses scan rings and dims castles you cannot see. Games without terrain art keep the old cell drawing.
+- **Continent land:** land is a noise-based continent filling the map (inland seas, lakes, ragged coast) rather than discs around castles. Small land patches around castles and narrow land bridges along the base road graph still guarantee every castle is on land and the map is connected. Mountain ridges cover about 12 to 20 percent of land.
+- **Link cap:** in free travel, `territory_edges` holds passable pairs within 5 spacings (1500 links for 96 castles, about 5600 for a 288 castle map). This replaces "no length cap" in 20ab.
+- **Generation cost:** large maps build 10 terrain candidates instead of 20 to stay inside the function CPU limit (about 1.1 s for 288 castles).
