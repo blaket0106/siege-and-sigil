@@ -360,6 +360,7 @@
       ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list. A defeated commander may be captured instead of killed: the captor can ransom, release or execute them, and captives sometimes escape. A commander who wins five battles earns a name and a bonus; losing a king or a named commander costs prestige and lowers production for a while.'],
       ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see.'],
       ['Diplomacy', 'From the Standings list you can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war. Peace is a truce that blocks attacks for a set number of ticks; at war you can also send peace terms (gold, tribute or a castle). Allies can lock a marriage alliance that cannot be broken until it ends. A third player can offer mediation between two players at war. Breaking a pact or alliance, or attacking during a grace period, costs honor.'],
+      ['Council', 'Your seven realm areas are seats held by named councillors. Deploy one as a commander and that seat drops to level 1 until you recall them at one of your castles. If a councillor falls, you lose prestige, production dips for a while and the seat stays empty until you pay for a replacement.'],
       ['Seasons, events and mercenaries', 'If the host turned them on: winter slows troop production (most in the north) and marches, autumn boosts gold. Random events can strike a castle; pay to respond or ignore them. Mercenary companies cost gold, arrive at once and disband after 48 ticks.'],
       ['Chat and messages', 'Use the Chat tab for the game channel and the Inbox for messages and reports. The News tab lists recent events.'],
     ];
@@ -840,7 +841,7 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      const ms = { council: [], worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
       const mutedKey = `ss-muted-${gameId}-${uid}`;
       try { ms.muted = new Set(JSON.parse(localStorage.getItem(mutedKey)) || []); } catch { ms.muted = new Set(); }
@@ -1807,6 +1808,31 @@
         return `peace on these terms: ${pname(payer)} pays ${bits.join(', ')}`;
       };
 
+      const councilSection = () => {
+        if (!ms.council.length) return null;
+        const mine = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id);
+        const live = canAct();
+        return h('div', { class: 'sec' }, h('b', {}, 'Council'),
+          h('div', { style: 'color:var(--dim);font-size:.8rem;margin:2px 0 6px' }, 'Each seat is held by a named councillor. A seat only gives its bonus while its councillor is at court. Deploy one as a commander and the seat drops to level 1 until you recall them. If they fall, the seat stays empty until you recruit a replacement.'),
+          ms.council.map((c) => {
+            const pick = h('select', {}, ...mine.map((t) => h('option', { value: String(t.id) }, t.name)));
+            const cmd = c.commander_id ? ms.cmd.find((x) => x.id === c.commander_id) : null;
+            let action = null;
+            if (live && c.status === 'seated') {
+              action = h('div', { class: 'row wrap2', style: 'margin-top:4px' }, pick,
+                h('button', { onclick: (e) => order('deploy_councillor', { p_area: c.area, p_territory_id: Number(pick.value) }, `${c.name} takes the field`)(e) }, 'Deploy'));
+            } else if (live && c.status === 'afield' && cmd && cmd.status === 'idle') {
+              action = h('button', { style: 'margin-top:4px', onclick: order('recall_councillor', { p_commander_id: c.commander_id }, `${c.name} returns to court`) }, 'Recall to court');
+            } else if (live && c.status === 'dead') {
+              action = h('button', { class: 'primary', style: 'margin-top:4px', disabled: ms.me.gold < 150, onclick: order('recruit_councillor', { p_area: c.area }, 'A new councillor takes the seat') }, 'Recruit a replacement (150 gold)');
+            }
+            const state = c.status === 'seated' ? `at court, level ${c.level}` : c.status === 'afield' ? `in the field (seat level ${c.level}, restores to ${c.banked_level})` : `seat vacant (level ${c.level}, restores to ${c.banked_level || c.level})`;
+            return h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+              h('div', {}, h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[c.area] || c.area}: ${c.status === 'dead' ? 'vacant' : c.name}`), h('span', { style: 'color:var(--dim);margin-left:8px' }, state)),
+              action);
+          }));
+      };
+
       const eventsSection = () => {
         if (!ms.worldEvents.length) return null;
         return h('div', { class: 'sec' }, h('b', {}, 'Events'),
@@ -1961,7 +1987,7 @@
           const ab = ms.abil.get(c.id) || {};
           const m = ms.mov.get(c.id);
           parts.push(h('h3', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`),
-            h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}`));
+            h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}${c.council_area ? ` · Councillor of the ${AREA_NAMES[c.council_area] || c.council_area}` : ''}${c.promoted ? ' · Veteran' : ''}`));
           parts.push(h('div', { class: 'sec' },
             line('Rank', rankOf(c)),
             line('Troops', c.troops),
@@ -1977,6 +2003,7 @@
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
           parts.push(h('h3', {}, 'Realm'), ...realmSection());
           parts.push(offersSection());
+          parts.push(councilSection());
           parts.push(eventsSection());
           parts.push(prisonersSection());
           parts.push(h('div', { class: 'sec' }, h('b', {}, 'Standings'), pl.map(({ p, n }) => {
@@ -2070,10 +2097,11 @@
           ms.edges ? Promise.resolve({ data: ms.edges }) : sb.from('territory_edges').select('*').eq('game_id', gameId),
           sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
           sb.rpc('my_world_events', { p_game_id: gameId }),
+          sb.rpc('my_council', { p_game_id: gameId }),
         ]);
         if (state.view !== 'map' || state.roomId !== gameId) return;
 
-        const [vw, mo, ib, br, ch, th, pt, ed, of, we] = res;
+        const [vw, mo, ib, br, ch, th, pt, ed, of, we, cn] = res;
         if (vw.error && vw.error.message.includes('not in this game')) { toast('That game is no longer available.'); return showHome(); }
         const failed = res.find((r) => r.error);
         if (failed) { toast(failed.error.message); return; }
@@ -2104,6 +2132,7 @@
         ms.dip = view.diplomacy;
         ms.offers = of.data.offers;
         ms.worldEvents = we.data;
+        ms.council = cn.data;
         ms.deals = of.data.deals;
         ms.locks = of.data.locks;
         ms.moments = mo.data;

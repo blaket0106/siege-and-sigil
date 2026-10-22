@@ -22,6 +22,9 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - Mercenary companies.
 - Random event deck (plague, unrest, harvest, comet) with optional responses.
 
+### Council
+- Named council seat characters: seven seats, seven named councillors per player, deployable to the field (seat bonus lost while away) or killable (seat vacant until a replacement is recruited).
+
 ### UI / Intelligence
 - News bulletin tab: the News tab already carries the public record (war declarations, eliminations, captures, sieges, world events); alliances and pacts stay private.
 
@@ -29,10 +32,9 @@ All items are generic — no IP dependencies. Built items are listed with where 
 
 ## Left
 
-- **Naval mechanics** — fleet building, naval transport, naval combat, an 8th council seat, coastal adjacency. Needs map generation to mark coastal territories and a new unit type across movement, combat and AI.
-- **Named council seat characters** — each of the 7 seats filled by a named character who can be deployed to the field (losing the seat bonus) or killed (seat vacant until replaced). Needs a council seat system to exist first.
+- **Naval mechanics** — fleet building, naval transport, naval combat, an 8th council seat (Admiral), coastal adjacency. Needs map generation to mark coastal territories and a new unit type across movement, combat and AI.
 - **AI council advisor** — per-seat AI voice answering live game state in character. Needs an Anthropic API key, a server-side call and a per-question cost budget.
-- **Character personalities in the intel system** — procedurally generated traits for named commanders and council members, used by the advisor and AI-written whispers. Depends on the two items above.
+- **Character personalities in the intel system** — procedurally generated traits for named commanders and council members, used by the advisor and AI-written whispers (councillors are ready to carry them). Councillors now exist, so this depends only on the advisor.
 
 ---
 
