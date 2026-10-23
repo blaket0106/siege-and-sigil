@@ -107,7 +107,11 @@ body::after { content: ''; position: fixed; inset: 0; z-index: -1; pointer-event
 
 #stage { position: fixed; inset: 0; z-index: -2; overflow: hidden; background: var(--ink-0); }
 #stage canvas { position: absolute; }
-#stage .land { inset: -6%; width: 112%; height: 112%; animation: drift 140s ease-in-out infinite alternate; opacity: 0.62; }
+#stage::before { content: ''; position: absolute; inset: -6%; background: url('assets/login-still-wide.jpg') center / cover no-repeat; animation: drift 140s ease-in-out infinite alternate; }
+#stage::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 8, 14, 0.62), rgba(5, 8, 14, 0.8)); }
+:root[data-theme='light'] #stage::after { background: linear-gradient(180deg, rgba(40, 28, 14, 0.34), rgba(40, 28, 14, 0.52)); }
+@media (max-width: 899px) { #stage::before { background-image: url('assets/login-still-tall.jpg'); background-position: center top; } }
+#stage .embers, #stage .mist { z-index: 1; }
 #stage .embers { inset: 0; width: 100%; height: 100%; mix-blend-mode: screen; }
 #stage .mist { position: absolute; inset: -20%; background: radial-gradient(40% 30% at 25% 60%, rgba(255, 240, 210, 0.07), transparent 70%), radial-gradient(35% 28% at 75% 35%, rgba(255, 240, 210, 0.06), transparent 70%); animation: mist 70s linear infinite alternate; }
 @keyframes drift { from { transform: scale(1) translate(-1.5%, -1%); } to { transform: scale(1.09) translate(1.5%, 1%); } }
@@ -472,7 +476,7 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 @media (max-width: 760px) { .legend { display: none; } .mapbody { flex-direction: column; } .side { width: auto; max-height: 42vh; border-left: none; border-top: 1px solid var(--gilt-lo); } .panel { padding: 22px 18px; } }
 @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } .wrap { padding: 0 14px 48px; } h1 { font-size: 2rem; } .lobby-strip { grid-template-columns: 1fr; } }
 @media (pointer: coarse) { button:not(.link), select, input:not([type='checkbox']) { min-height: 44px; } .hud { gap: 8px 12px; } }
-@media (prefers-reduced-motion: reduce) { .sigil.draw .outline { animation: none; stroke-dashoffset: 0; } button, .banner { transition: none; } #stage .land, #stage .mist, .house .crest::before, .modal, .overlay, .toast { animation: none; } button.primary::after { display: none; } .selring, .flag, .marchline { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sigil.draw .outline { animation: none; stroke-dashoffset: 0; } button, .banner { transition: none; } #stage::before, #stage .mist, .house .crest::before, .modal, .overlay, .toast { animation: none; } button.primary::after { display: none; } .selring, .flag, .marchline { animation: none; } }
 
 .mappreview { margin-bottom: 18px; padding: 10px; background: var(--surface-b, #1b130c); border: 1px solid var(--gilt-lo); border-radius: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
 @media (min-width: 1060px) {
@@ -639,4 +643,15 @@ body.on-login #stage, body.on-login::after { display: none; }
   .login-rail .auth-card { margin-top: 6px; }
   .login .lower { display: none; }
   .login-poster { background: url('assets/login-still-tall.jpg') center top / cover no-repeat, linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
+}
+@media (max-width: 860px) {
+  .house { padding: 18px 16px 16px; }
+  .house .crest { width: 96px; height: 108px; margin-bottom: 8px; }
+  .house .crest::before { width: 104px; height: 104px; }
+  .house .crest svg { width: 66px; height: auto; }
+  .house .actions { margin-top: 14px; }
+}
+@media (max-width: 600px) {
+  .topnav .hide-m, .topnav .who { display: none; }
+  .topbar { margin-bottom: 18px; }
 }
