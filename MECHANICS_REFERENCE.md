@@ -1456,3 +1456,9 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 
 **Wormholes removed** (migration `remove_wormholes`)
 - The `wormholes` setting, the wormhole edge kind and the Wormholes lobby selector are gone from the generator, edge function, `create_game`, lobby, map views and 3D view. `territory_edges.kind` allows land, river, pass and sea only, and `games.wormholes` is dropped. The Phase 5 notes above that describe wormholes no longer apply.
+
+**Anonymity hardened** (migrations `harden_anonymity`, `revoke_player_user_id`)
+- Signed-in users can no longer read `game_players.user_id`. The client gets what it needs from `room_players` (flags `is_me`, `is_host`), `my_games`, `get_game_view` (`is_me` per player) and `player_reputations` (keyed by player id).
+- In an anonymous game that has not finished, `player_reputations` returns only the trust word (Trusted, Unproven or Notorious), never honor, infamy or win counts, because those numbers could be matched against the public `profiles` table. `room_players` hides the host flag in the same case.
+- Eight row-level policies that looked up `game_players.user_id` directly now call the helpers `is_my_player` and `my_player_id`, which run with definer rights.
+- Still visible: `games.created_by` identifies the host (the host is public in the lobby anyway). Recognising someone by play style or chat cannot be prevented.

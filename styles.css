@@ -565,3 +565,6 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 .legalbody th, .legalbody td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
 .legalbody th { font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.1em; color: var(--gilt); }
 .modal:has(.legalbody) { max-width: 760px; }
+.xref, .xref:hover:not(:disabled), .xref:active:not(:disabled) { display: inline; background: none; border: none; border-radius: 0; box-shadow: none; filter: none; padding: 0; font: inherit; letter-spacing: 0; text-shadow: none; color: var(--gilt); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; transform: none; }
+.xref:hover:not(:disabled) { color: var(--gilt-hi); text-decoration-style: solid; }
+.mpane h3 { scroll-margin-top: 8px; }
