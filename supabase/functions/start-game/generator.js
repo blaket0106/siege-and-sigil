@@ -5,6 +5,7 @@ export const SPACING = 150;
 
 const MARGIN = 60;
 const LINK_CAP = 5;
+const AREA_PER_CASTLE = 2.4;
 const TERRITORIES_PER_PLAYER = { compact: 12, standard: 24, large: 36 };
 
 export const tierOf = (resources) => (resources <= 20 ? 1 : resources <= 40 ? 2 : 3);
@@ -14,8 +15,8 @@ const NEUTRAL_RATIO = [3, 2, 1];
 const RESOURCES_PER_TERRAFORM_LEVEL = 5;
 const START_TERRAFORM_LEVEL = 1;
 const STYLES = {
-  scatter: { minDist: 0.6, prune: 2.4, clump: 0.55 },
-  continents: { minDist: 0.5, prune: 2.0, clump: 0.12 },
+  scatter: { minDist: 0.6, prune: 3.4, clump: 0.03 },
+  continents: { minDist: 0.5, prune: 3.0, clump: 0.06 },
 };
 
 const PREFIXES = [
@@ -302,12 +303,12 @@ function placeClusters({ rng, players, start, shape, minDist, R }) {
 }
 
 function placeNeutrals({ rng, count, radius, center, minDist, clump, taken, inside }) {
-  const blobs = Array.from({ length: 3 + Math.floor(count / 10) }, () => {
+  const blobs = Array.from({ length: 3 + Math.floor(count / 32) }, () => {
     const r = radius * 0.9 * Math.sqrt(rng());
     const a = 2 * Math.PI * rng();
     return { x: r * Math.cos(a), y: r * Math.sin(a) };
   });
-  const sigma = radius * 0.22;
+  const sigma = radius * 0.16;
   const density = (p) => {
     let w = clump;
     for (const b of blobs) w += Math.exp(-((p.x - b.x) ** 2 + (p.y - b.y) ** 2) / (2 * sigma * sigma));
@@ -366,7 +367,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   const total = players * perPlayer;
   const startTotal = players * startingTerritories;
   const neutralTotal = total - startTotal;
-  const radius = spacing * Math.sqrt(total / (Math.PI * AREA_FRAC[shapeKind]));
+  const radius = spacing * Math.sqrt((total * AREA_PER_CASTLE) / (Math.PI * AREA_FRAC[shapeKind]));
   const center = radius + MARGIN * scale;
   const wedge = (2 * Math.PI) / players;
   const rng = makeRng(seed, 1);

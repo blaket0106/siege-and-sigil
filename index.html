@@ -1289,7 +1289,7 @@
 
           const tier = t.tier || 1;
           const plate = !!ms.terr;
-          const r = plate ? (tier >= 3 ? 40 : tier === 2 ? 33 : 27) : 8 + 3 * tier;
+          const r = plate ? (tier >= 3 ? 34 : tier === 2 ? 28 : 23) : 8 + 3 * tier;
           const cy0 = plate ? -6 : 0;
           const rBot = plate ? cy0 + r - 2 : r;
           const showTroops = seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war || ms.vis.has(t.id));
@@ -1304,7 +1304,7 @@
           const g = sv('g', { transform: `translate(${t.x},${t.y}) scale(${k})`, opacity: (seen ? 1 : 0.7) * (reach ? 1 : 0.4) },
             sieged ? sv('circle', { cx: 0, cy: cy0, r: r + 16, fill: 'none', stroke: '#e0685c', 'stroke-width': 4, 'stroke-dasharray': '6 5', style: 'pointer-events:none' }) : null,
             plate ? sv('circle', { cx: 0, cy: cy0, r: r + 24, fill: 'transparent', stroke: selected ? '#f0cf7d' : 'none', 'stroke-width': 4, style: 'cursor:pointer', onclick: pick }) : null,
-            plate && t.natural_resources ? sv('circle', { cx: 0, cy: cy0, r: r + 12 + 0.5 * t.natural_resources, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.28, 'stroke-width': 2, style: 'pointer-events:none' }) : null,
+            plate && t.natural_resources ? sv('circle', { cx: 0, cy: cy0, r: r + 8 + 0.35 * t.natural_resources, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.28, 'stroke-width': 2, style: 'pointer-events:none' }) : null,
             plate ? sv('circle', { cx: 0, cy: cy0, r: r + 4, fill: 'none', stroke: '#f4efe0', 'stroke-opacity': 0.9, 'stroke-width': 2, style: 'pointer-events:none' }) : null,
             plate && mine ? sv('circle', { cx: 0, cy: cy0, r: r + 11, fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3.5, style: 'pointer-events:none' }) : null,
             plate ? sv('circle', { cx: 0, cy: cy0, r, fill: seen ? 'rgba(12,14,24,0.88)' : 'rgba(12,14,24,0.7)', stroke: ringColor, 'stroke-width': 7, 'stroke-dasharray': owner || seen ? null : '11 8', style: 'cursor:pointer', onclick: pick }) : null,
