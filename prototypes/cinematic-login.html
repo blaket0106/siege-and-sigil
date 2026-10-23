@@ -200,13 +200,12 @@ async function build() {
   let path = null;
   const sun = { el: Number(Q.get('sun') ?? 7), az: Number(Q.get('az') ?? 248) };
   const FOV = Number(Q.get('fov') || 48);
-  const speed = Number(Q.get('speed') || 95);
+  const speed = Number(Q.get('speed') || 32);
   const ALT = Number(Q.get('alt') || 380);
   const PITCH = (Number(Q.get('pitch') || 14) * Math.PI) / 180;
   const START = Number(Q.get('start') || 0);
   let api = null;
   let ready = false;
-  let camY = 0;
   const THREE = await import('three');
   const lower = document.getElementById('lower');
   let lastLabel = '';
@@ -221,23 +220,14 @@ async function build() {
       if (!path) return;
       controls.enabled = false; controls.maxPolarAngle = Math.PI * 0.62; controls.minDistance = 1;
       if (Math.abs(cam.fov - FOV) > 0.01) { cam.fov = FOV; cam.updateProjectionMatrix(); }
-      const u = ((t * speed + START * path.len) / path.len) % 1;
-      const p = path.curve.getPointAt(u);
-      const q = path.curve.getPointAt((u + 0.018) % 1);
-      const dx = q.x - p.x, dz = q.z - p.z, dl = Math.hypot(dx, dz) || 1;
-      const sx = -dz / dl, sz = dx / dl;
-      const off = 340 + 110 * Math.sin(t * 0.07);
-      const px = p.x + sx * off, pz = p.z + sz * off;
-      const q2 = path.curve.getPointAt((u + 0.06) % 1);
-      const lx = q2.x + sx * off * 0.3, lz = q2.z + sz * off * 0.3;
-      const ground = Math.max(api.groundAt(px, pz), api.groundAt((px + lx) / 2, (pz + lz) / 2), api.groundAt(lx, lz) - 40);
-      const want = ground + ALT + 90 * Math.sin(t * 0.11);
-      camY += (want - camY) * Math.min(1, dt * 1.6);
-      const ly = camY - Math.hypot(lx - px, lz - pz) * Math.tan(PITCH);
-      cam.position.set(px, camY, pz);
+      const f = ((((t * speed + START * path.len) / path.len) % 1) + 1) % 1 * path.N;
+      const at = (arr, k) => { const i = Math.floor(k) % path.N; const j = (i + 1) % path.N; const r = k - Math.floor(k); return arr[i] * (1 - r) + arr[j] * r; };
+      const px = at(path.CX, f), pz = at(path.CZ, f), py = at(path.Y, f);
+      const lx = at(path.CX, f + path.LA), lz = at(path.CZ, f + path.LA);
+      const ly = py - Math.hypot(lx - px, lz - pz) * Math.tan(PITCH);
+      cam.position.set(px, py, pz);
       cam.up.set(0, 1, 0);
       cam.lookAt(lx, ly, lz);
-      cam.rotateZ(-0.05 * Math.sin(t * 0.13));
       controls.target.set(lx, Math.max(api.groundAt(lx, lz), 20), lz);
       hud.textContent = `seed ${seed} · sun ${sun.el}° · fov ${FOV} · speed ${speed}`;
       let near = null; let nd = 1e9;
@@ -252,21 +242,53 @@ async function build() {
   });
   api.update(layout.territories.map((t, i) => ({ id: i, owner: t.owner_seat, troops: t.owner_seat != null ? 10 + (i % 7) * 3 : 12, mine: false })));
   const all = api.sites().filter((s) => !sites[s.id].crossing_kind);
-  const pickPts = [];
-  let cur = all[Math.floor(all.length * 0.37)];
-  const left = new Set(all);
-  const want = Math.min(11, all.length);
-  while (pickPts.length < want && left.size) {
-    pickPts.push(cur);
-    left.delete(cur);
-    let best = null; let bd = 1e9;
-    for (const s of left) { const d = Math.hypot(s.x - cur.x, s.z - cur.z); if (d < bd) { bd = d; best = s; } }
-    if (!best) break;
-    cur = best;
+  const mx = all.reduce((s, q) => s + q.x, 0) / all.length;
+  const mz = all.reduce((s, q) => s + q.z, 0) / all.length;
+  const M = 48;
+  const sum = new Array(M).fill(0);
+  const cnt = new Array(M).fill(0);
+  let rAll = 0;
+  all.forEach((q) => {
+    const r = Math.hypot(q.x - mx, q.z - mz);
+    rAll += r;
+    const k = Math.floor(((Math.atan2(q.z - mz, q.x - mx) + Math.PI) / (2 * Math.PI)) * M) % M;
+    sum[k] += r; cnt[k] += 1;
+  });
+  rAll /= all.length;
+  let rad = sum.map((s, k) => (cnt[k] ? s / cnt[k] : rAll));
+  for (let pass = 0; pass < 8; pass++) rad = rad.map((_, k) => (rad[(k + M - 2) % M] + 2 * rad[(k + M - 1) % M] + 3 * rad[k] + 2 * rad[(k + 1) % M] + rad[(k + 2) % M]) / 9);
+  const N = 900;
+  const blur = (arr, w, passes) => {
+    let a = arr;
+    for (let p = 0; p < passes; p++) {
+      const out = new Array(N);
+      for (let i = 0; i < N; i++) { let s = 0; for (let k = -w; k <= w; k++) s += a[(i + k + N) % N]; out[i] = s / (2 * w + 1); }
+      a = out;
+    }
+    return a;
+  };
+  const rawX = []; const rawZ = [];
+  for (let i = 0; i < N; i++) {
+    const fb = (i / N) * M - 0.5;
+    const k0 = Math.floor(fb); const fr = fb - k0;
+    const r0 = rad[((k0 % M) + M) % M]; const r1 = rad[(((k0 + 1) % M) + M) % M];
+    const rr = Math.max((r0 * (1 - fr) + r1 * fr) * 0.92, rAll * 0.5);
+    const ang = (i / N) * 2 * Math.PI - Math.PI;
+    rawX.push(mx + rr * Math.cos(ang)); rawZ.push(mz + rr * Math.sin(ang));
   }
-  const curve = new THREE.CatmullRomCurve3(pickPts.map((s) => new THREE.Vector3(s.x, 0, s.z)), true, 'centripetal');
-  path = { curve, len: curve.getLength(), sites: all };
-  camY = api.groundAt(pickPts[0].x, pickPts[0].z) + 300;
+  const X = blur(rawX, 8, 2);
+  const Z = blur(rawZ, 8, 2);
+  const OFF = Math.min(300, rAll * 0.2);
+  const CX = []; const CZ = [];
+  for (let i = 0; i < N; i++) {
+    const dx = X[(i + 8) % N] - X[(i - 8 + N) % N]; const dz = Z[(i + 8) % N] - Z[(i - 8 + N) % N]; const l = Math.hypot(dx, dz) || 1;
+    CX.push(X[i] - (dz / l) * OFF); CZ.push(Z[i] + (dx / l) * OFF);
+  }
+  const towerLift = (x, z) => { let lift = 0; for (const s of all) { const d = Math.hypot(s.x - x, s.z - z); if (d < 650) lift = Math.max(lift, 230 * (1 - d / 650)); } return lift; };
+  const gmax = CX.map((x, i) => Math.max(api.groundAt(x, CZ[i]) + towerLift(x, CZ[i]), api.groundAt(CX[(i + 15) % N], CZ[(i + 15) % N]) - 20 + towerLift(CX[(i + 15) % N], CZ[(i + 15) % N]), api.groundAt(CX[(i + 30) % N], CZ[(i + 30) % N]) - 40));
+  let Y = blur(gmax.map((g) => g + ALT), 55, 3);
+  Y = blur(Y.map((y, i) => Math.max(y, gmax[i] + 120)), 25, 2);
+  path = { N, CX, CZ, Y, LA: Math.round(N * 0.045), len: CX.reduce((s, x, i) => s + Math.hypot(CX[(i + 1) % N] - x, CZ[(i + 1) % N] - CZ[i]), 0), sites: all };
   ready = true;
   document.getElementById('loading').classList.add('done');
 }

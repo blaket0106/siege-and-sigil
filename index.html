@@ -373,67 +373,78 @@
       kaldran: ['chief', 'tower'], veyra: ['pale', 'crescent'], dravos: ['bend', 'star'], halcyr: ['fess', 'sun'],
       mereth: ['chevron', 'star'], ostrand: ['quarterly', 'wave'], thornwick: ['pale', 'tree'], brannoch: ['bend', 'spear'],
     };
-    const SHIELD = 'M4 4H60V34C60 52 46 62 32 68C18 62 4 52 4 34Z';
+    const SHIELD = 'M8 10Q50 2 92 10V56C92 88 72 108 50 118C28 108 8 88 8 56Z';
+    const sigH = (w) => Math.round((w * 124) / 100);
     const DIVISIONS = {
-      chief: 'M0 0H64V20H0Z', pale: 'M32 0H64V72H32Z', bend: 'M0 0H18L64 54V72H46L0 20Z', fess: 'M0 25H64V43H0Z',
-      chevron: 'M0 56L32 28L64 56V68L32 40L0 68Z', quarterly: 'M32 0H64V36H32ZM0 36H32V72H0Z', plain: '',
+      chief: 'M0 0H100V34H0Z', pale: 'M50 0H100V124H50Z', bend: 'M0 0H26L100 78V124H70L0 30Z', fess: 'M0 42H100V70H0Z',
+      chevron: 'M0 86L50 44L100 86V104L50 62L0 104Z', quarterly: 'M50 0H100V60H50ZM0 60H50V124H0Z', plain: '',
     };
-    const CHARGE_AT = { x: 32, y: 34 };
-    const STAR = Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? 6.2 : 15; const a = (Math.PI * i) / 5 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(' ');
-    let sigilSeq = 0;
+    const STAR16 = Array.from({ length: 16 }, (_, i) => { const r = i % 2 ? 6.5 : 15.5; const a = (Math.PI * i) / 8 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(' ');
+    const SUN_RAYS = Array.from({ length: 12 }, (_, i) => { const a = (Math.PI * i) / 6; const wavy = i % 2; return `<path d="M${(9 * Math.cos(a)).toFixed(1)} ${(9 * Math.sin(a)).toFixed(1)}L${((wavy ? 13 : 16.5) * Math.cos(a)).toFixed(1)} ${((wavy ? 13 : 16.5) * Math.sin(a)).toFixed(1)}" stroke="url(#sg-gilt)" stroke-width="${wavy ? 2.2 : 2.8}" stroke-linecap="round" fill="none"/>`; }).join('');
+    const CHARGES = {
+      tower: { dy: 0.5, fill: true, svg: '<path d="M-9.5 -15h4.2v4.2h3.2v-4.2h4.2v4.2h3.2v-4.2h4.2v9.5h-2.2v19.5h-14.6v-19.5h-2.2Z"/><path d="M-2.8 14v-7a2.8 2.8 0 0 1 5.6 0v7Z" fill="rgba(0,0,0,.55)"/><rect x="-5.6" y="-3" width="2" height="4" fill="rgba(0,0,0,.45)"/><rect x="3.6" y="-3" width="2" height="4" fill="rgba(0,0,0,.45)"/>' },
+      crescent: { dy: 0, fill: true, svg: '<path d="M7.8 -12.5A15 15 0 1 0 7.8 12.5A12.6 12.6 0 0 1 7.8 -12.5Z" transform="translate(3.6 0)"/>' },
+      star: { dy: 1, fill: true, svg: `<polygon points="${STAR16}"/>` },
+      sun: { dy: 0, fill: false, svg: `${SUN_RAYS}<circle r="7" fill="url(#sg-gilt)"/><circle r="7" fill="none" stroke="rgba(0,0,0,.25)" stroke-width=".8"/>` },
+      wave: { dy: 0, fill: false, svg: [-8, 0, 8].map((dy) => `<path d="M-15 ${dy}q3.75-5.5 7.5 0t7.5 0 7.5 0 7.5 0" fill="none" stroke="url(#sg-gilt)" stroke-width="3.1" stroke-linecap="round"/>`).join('') },
+      tree: { dy: -0.5, fill: true, svg: '<path d="M0 -16L11 1.5H5L13 12H-13L-5 1.5H-11Z"/><path d="M-2.4 12H2.4V17.5H-2.4Z"/>' },
+      spear: { dy: 0, fill: true, svg: '<path d="M0 -16L6.4 -3H2.8V16H-2.8V-3H-6.4Z"/><path d="M-4.5 4H4.5V6H-4.5Z"/>' },
+    };
 
-    function luminance(hex) {
-      const n = parseInt(hex.replace('#', ''), 16);
-      return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+    const sigilTemplate = document.createElement('template');
+    function sigilDefs() {
+      if (document.getElementById('sigil-defs')) return;
+      sigilTemplate.innerHTML = `<svg id="sigil-defs" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+        <linearGradient id="sg-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1f4f6"/><stop offset=".35" stop-color="#8d959d"/><stop offset=".6" stop-color="#3a4148"/><stop offset="1" stop-color="#a9b1b8"/></linearGradient>
+        <linearGradient id="sg-gilt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3bd"/><stop offset=".4" stop-color="#e2b84e"/><stop offset=".75" stop-color="#9a6e22"/><stop offset="1" stop-color="#f0cf7a"/></linearGradient>
+        <radialGradient id="sg-sheen" cx=".3" cy=".22" r=".95"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+        <clipPath id="sg-clip"><path d="${SHIELD}"/></clipPath>
+        <filter id="sg-noise" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .9 -.25"/></filter>
+        <filter id="sg-relief" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="1.3" result="b"/>
+          <feSpecularLighting in="b" surfaceScale="4" specularConstant="1" specularExponent="26" lighting-color="#fff" result="sp"><feDistantLight azimuth="225" elevation="46"/></feSpecularLighting>
+          <feComposite in="sp" in2="SourceAlpha" operator="in" result="sh"/>
+          <feComposite in="SourceGraphic" in2="sh" operator="arithmetic" k1="0" k2="1" k3=".9" k4="0" result="lit"/>
+          <feDropShadow in="lit" dx=".6" dy="1.6" stdDeviation="1.1" flood-color="#000" flood-opacity=".65"/>
+        </filter></defs></svg>`;
+      document.body.prepend(sigilTemplate.content.firstElementChild);
+    }
+
+    function shieldSvg(H, width, opts = {}) {
+      sigilDefs();
+      const lod = width >= 56 ? 2 : width >= 30 ? 1 : 0;
+      const C = CHARGES[H.ch] || CHARGES.star;
+      const cy = (H.div === 'chief' ? 66 : 56) + C.dy;
+      const inner = lod === 2 ? C.svg : C.svg;
+      const chargeFill = C.fill ? `<g fill="url(#sg-gilt)"${lod < 2 ? ' stroke="rgba(0,0,0,.6)" stroke-width="1.6" paint-order="stroke" stroke-linejoin="round"' : ''}>${inner}</g>` : inner;
+      const charge = `<g transform="translate(50 ${cy}) scale(1.28)"${lod === 2 ? ' filter="url(#sg-relief)"' : ''}>${chargeFill}</g>`;
+      const rimW = lod === 2 ? 6.2 : 7.5;
+      const svgText = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 124" width="${width}" height="${sigH(width)}" class="sigil${H.cls ? ' ' + H.cls : ''}${opts.draw ? ' draw' : ''}" role="img" aria-label="${H.name} arms" style="overflow:visible">
+        <path d="${SHIELD}" fill="${H.c1}"/>
+        <g clip-path="url(#sg-clip)">
+          ${DIVISIONS[H.div] ? `<path d="${DIVISIONS[H.div]}" fill="${H.c2}"/>` : ''}
+          ${lod === 2 ? '<rect width="100" height="124" filter="url(#sg-noise)" opacity=".28" style="mix-blend-mode:multiply"/>' : ''}
+          ${lod >= 1 ? `<path d="${SHIELD}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1.2" transform="translate(50 62) scale(.84) translate(-50 -62)"/>` : ''}
+          ${charge}
+          <path d="${SHIELD}" fill="url(#sg-sheen)"/>
+        </g>
+        <path class="outline" d="${SHIELD}" fill="none" stroke="url(#sg-rim)" stroke-width="${rimW}" stroke-linejoin="round"/>
+        ${lod >= 1 ? `<path d="${SHIELD}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width=".8" transform="translate(50 62) scale(.945) translate(-50 -62)"/><path d="${SHIELD}" fill="none" stroke="url(#sg-gilt)" stroke-width="1.3" transform="translate(50 62) scale(.915) translate(-50 -62)"/>` : ''}
+        ${lod === 2 ? '<circle cx="19" cy="17" r="2.2" fill="url(#sg-rim)" stroke="rgba(0,0,0,.6)" stroke-width=".5"/><circle cx="81" cy="17" r="2.2" fill="url(#sg-rim)" stroke="rgba(0,0,0,.6)" stroke-width=".5"/>' : ''}
+      </svg>`;
+      sigilTemplate.innerHTML = svgText;
+      return sigilTemplate.content.firstElementChild;
     }
 
     function sigil(slug, width = 40, opts = {}) {
       const f = factionOf(slug);
-      const [division, charge] = ARMS[slug] || ['plain', 'star'];
-      const id = `sg${++sigilSeq}`;
-      const behind = ['fess', 'chevron', 'bend'].includes(division) ? f.color2 : (division === 'chief' || division === 'plain' ? f.color : null);
-      const dark = behind ? luminance(behind) > 0.5 : false;
-      const ink = dark ? '#1a2040' : '#f6e3a8';
-      const haloColor = dark ? 'rgba(255,250,235,0.9)' : 'rgba(12,8,5,0.78)';
-      const halo = { stroke: haloColor, 'stroke-width': 3.4, 'stroke-linejoin': 'round', 'paint-order': 'stroke' };
-      const solid = (d) => sv('path', { d, fill: ink, ...halo });
-      const line = (d, w) => [
-        sv('path', { d, fill: 'none', stroke: haloColor, 'stroke-width': w + 3.4, 'stroke-linecap': 'round' }),
-        sv('path', { d, fill: 'none', stroke: ink, 'stroke-width': w, 'stroke-linecap': 'round' }),
-      ];
-      const charges = {
-        tower: { dx: 0, dy: 0.5, parts: [solid('M-9 -14h4v4h3v-4h4v4h3v-4h4v9h-2v18h-14v-18h-2Z'), sv('path', { d: 'M-2.6 13v-6.5a2.6 2.6 0 0 1 5.2 0V13Z', fill: haloColor, opacity: 0.85 })] },
-        crescent: { dx: 3.33, dy: 0, parts: [solid('M7.33 -11.93A14 14 0 1 0 7.33 11.93A12 12 0 0 1 7.33 -11.93Z')] },
-        star: { dx: 0, dy: 1.4, parts: [sv('polygon', { points: STAR, fill: ink, ...halo })] },
-        sun: { dx: 0, dy: 0, parts: [
-          ...Array.from({ length: 8 }, (_, i) => { const a = (Math.PI * i) / 4; return line(`M${(9.5 * Math.cos(a)).toFixed(2)} ${(9.5 * Math.sin(a)).toFixed(2)}L${(14.5 * Math.cos(a)).toFixed(2)} ${(14.5 * Math.sin(a)).toFixed(2)}`, 2.4); }).flat(),
-          sv('circle', { cx: 0, cy: 0, r: 6.4, fill: ink, ...halo }),
-        ] },
-        wave: { dx: 0, dy: 0, parts: [-8, 0, 8].flatMap((dy) => line(`M-14 ${dy}q3.5-5 7 0t7 0 7 0 7 0`, 2.8)) },
-        tree: { dx: 0, dy: -0.5, parts: [solid('M0 -15L10 1H4.5L12 11H-12L-4.5 1H-10Z'), solid('M-2.2 11H2.2V16H-2.2Z')] },
-        spear: { dx: 0, dy: 0, parts: [solid('M0 -15L6 -3H2.5V15H-2.5V-3H-6Z')] },
-      };
-      const c = charges[charge] || charges.star;
-      return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'sigil' + (opts.draw ? ' draw' : ''), role: 'img', 'aria-label': `${f.name} arms` },
-        sv('defs', {},
-          sv('clipPath', { id }, sv('path', { d: SHIELD })),
-          sv('linearGradient', { id: `${id}s`, x1: 0, y1: 0, x2: 0, y2: 1 },
-            sv('stop', { offset: '0', 'stop-color': '#fff', 'stop-opacity': 0.26 }),
-            sv('stop', { offset: '0.42', 'stop-color': '#fff', 'stop-opacity': 0 }),
-            sv('stop', { offset: '1', 'stop-color': '#000', 'stop-opacity': 0.3 }))),
-        sv('path', { d: SHIELD, fill: f.color }),
-        DIVISIONS[division] ? sv('g', { 'clip-path': `url(#${id})` }, sv('path', { d: DIVISIONS[division], fill: f.color2 })) : null,
-        sv('g', { 'clip-path': `url(#${id})` },
-          sv('path', { d: SHIELD, fill: 'none', stroke: 'rgba(0,0,0,0.32)', 'stroke-width': 1, transform: 'translate(32 37) scale(0.84) translate(-32 -37)' }),
-          sv('g', { transform: `translate(${CHARGE_AT.x + c.dx} ${CHARGE_AT.y + c.dy})` }, ...c.parts),
-          sv('path', { d: SHIELD, fill: `url(#${id}s)` })),
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'rgba(0,0,0,0.55)', 'stroke-width': 4, 'stroke-linejoin': 'round' }),
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--gilt-hi)', 'stroke-width': 2, 'stroke-linejoin': 'round', class: 'outline' }));
+      const [div, ch] = ARMS[slug] || ['plain', 'star'];
+      return shieldSvg({ c1: f.color, c2: f.color2, div, ch, name: f.name }, width, opts);
     }
 
     function openShield(width = 20) {
-      return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'pip open', 'aria-hidden': 'true' },
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--dim)', 'stroke-width': 4, 'stroke-dasharray': '8 6' }));
+      return sv('svg', { viewBox: '0 0 100 124', width, height: sigH(width), class: 'pip open', 'aria-hidden': 'true' },
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--dim)', 'stroke-width': 6, 'stroke-dasharray': '12 9' }));
     }
 
     const ICONS = {
@@ -456,14 +467,7 @@
     }
 
     function emblem(width = 30, opts = {}) {
-      return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'sigil emblem' + (opts.draw ? ' draw' : ''), 'aria-hidden': 'true' },
-        sv('path', { d: SHIELD, fill: 'var(--ink-2)' }),
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--rule-soft)', 'stroke-width': 1, transform: 'translate(32 37) scale(0.84) translate(-32 -37)' }),
-        sv('g', { transform: 'translate(32 34.5)' },
-          sv('path', { d: 'M-9 -14h4v4h3v-4h4v4h3v-4h4v9h-2v18h-14v-18h-2Z', fill: 'var(--gilt-hi)' }),
-          sv('path', { d: 'M-2.6 13v-6.5a2.6 2.6 0 0 1 5.2 0V13Z', fill: 'var(--ink-2)' })),
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'rgba(0,0,0,0.55)', 'stroke-width': 4, 'stroke-linejoin': 'round' }),
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--gilt)', 'stroke-width': 2, 'stroke-linejoin': 'round', class: 'outline' }));
+      return shieldSvg({ c1: '#1b2029', c2: '#1b2029', div: 'plain', ch: 'tower', name: 'Siege & Sigil', cls: 'emblem' }, width, opts);
     }
 
     function factionPicker(taken, initial, onPick) {
@@ -472,7 +476,7 @@
       const draw = () => {
         const buttons = [
           h('button', { type: 'button', class: 'fac' + (chosen === null ? ' on' : ''), onclick: () => { chosen = null; onPick(null); draw(); } },
-            sv('svg', { viewBox: '0 0 64 72', width: 36, height: 41, 'aria-hidden': 'true' }, sv('path', { d: SHIELD, fill: 'var(--ink-3)', stroke: 'var(--dim)', 'stroke-width': 3 }), sv('text', { x: 32, y: 46, 'text-anchor': 'middle', 'font-size': 28, style: 'fill:var(--dim);font-family:var(--font-display)' }, '?')),
+            sv('svg', { viewBox: '0 0 100 124', width: 36, height: 45, 'aria-hidden': 'true' }, sv('path', { d: SHIELD, fill: 'var(--ink-3)', stroke: 'var(--dim)', 'stroke-width': 5 }), sv('text', { x: 50, y: 78, 'text-anchor': 'middle', 'font-size': 52, style: 'fill:var(--dim);font-family:var(--font-display)' }, '?')),
             'Random', h('small', {}, 'Let fate choose')),
           ...state.factions.map((f) =>
             h('button', {

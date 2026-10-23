@@ -280,7 +280,7 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .lobby-strip { display: grid; grid-template-columns: 1fr auto; gap: 12px 18px; align-items: center; }
 .lobby-strip .name { font-size: 1.05rem; }
 .pips { display: flex; gap: 4px; margin: 8px 0 2px; flex-wrap: wrap; }
-.pip { width: 20px; height: 24px; }
+.pip { width: 20px; height: 25px; }
 .pip.open { opacity: 0.4; }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 10px; }
 .fact { font-size: 0.88rem; border: 1px solid var(--rule-soft); border-radius: 2px; padding: 1px 10px; color: var(--dim); background: var(--recess); }
