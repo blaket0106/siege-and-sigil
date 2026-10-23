@@ -288,22 +288,20 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .honor .rank { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: var(--gilt); text-align: center; }
 
 /* auth */
-.welcome { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 430px); gap: 60px; align-items: center; min-height: 84vh; }
-.welcome .hero { text-align: center; }
-.welcome h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.9rem, 3.6vw, 2.9rem); letter-spacing: 0.26em; text-transform: uppercase; line-height: 1.15; margin: 26px 0 0; padding-left: 0.26em; color: var(--gilt-hi); text-shadow: var(--text-shadow); }
-.welcome .rule { position: relative; height: 9px; width: min(300px, 70%); margin: 20px auto 18px; background: linear-gradient(90deg, transparent, var(--gilt-lo)) left 0 top 4px / calc(50% - 14px) 1px no-repeat, linear-gradient(90deg, var(--gilt-lo), transparent) right 0 top 4px / calc(50% - 14px) 1px no-repeat; }
-.welcome .rule::after { content: ''; position: absolute; left: 50%; top: 1px; width: 7px; height: 7px; margin-left: -3.5px; background: var(--gilt); transform: rotate(45deg); }
-.welcome .lede { font-family: var(--font-ui); font-style: italic; font-size: 1.3rem; color: var(--text); margin: 0 auto; max-width: 30ch; line-height: 1.3; text-shadow: var(--text-shadow); }
-.welcome .roster { display: flex; justify-content: center; gap: 4px; margin-top: 34px; flex-wrap: wrap; }
-.welcome .housebtn, .welcome .housebtn:hover:not(:disabled), .welcome .housebtn:active:not(:disabled) { background: none; border: none; box-shadow: none; filter: none; padding: 6px 5px 9px; border-radius: 2px; opacity: 0.7; transition: opacity 0.18s, transform 0.18s; }
-.welcome .housebtn:hover:not(:disabled), .welcome .housebtn:focus-visible, .welcome .housebtn.on { opacity: 1; transform: translateY(-3px); }
-.welcome .housebtn::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 14px; height: 2px; margin-left: -7px; background: var(--gilt); opacity: 0; transition: opacity 0.18s; }
-.welcome .housebtn.on::after { opacity: 1; }
-.welcome .housebtn .sigil { filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45)); }
-.welcome .housename { margin-top: 12px; min-height: 1.4em; font-family: var(--font-display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); text-shadow: var(--text-shadow); }
-.welcome .bigcrest { width: 190px; margin: 0 auto; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.5)); }
-.welcome .bigcrest .sigil { width: 100%; height: auto; filter: none; }
-.welcome .bigcrest.swap .sigil { animation: crestswap 0.32s ease-out; }
+.login h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.9rem, 3.6vw, 2.9rem); letter-spacing: 0.26em; text-transform: uppercase; line-height: 1.15; margin: 26px 0 0; padding-left: 0.26em; color: var(--gilt-hi); text-shadow: var(--text-shadow); }
+.login .rule { position: relative; height: 9px; width: min(300px, 70%); margin: 20px auto 18px; background: linear-gradient(90deg, transparent, var(--gilt-lo)) left 0 top 4px / calc(50% - 14px) 1px no-repeat, linear-gradient(90deg, var(--gilt-lo), transparent) right 0 top 4px / calc(50% - 14px) 1px no-repeat; }
+.login .rule::after { content: ''; position: absolute; left: 50%; top: 1px; width: 7px; height: 7px; margin-left: -3.5px; background: var(--gilt); transform: rotate(45deg); }
+.login .lede { font-family: var(--font-ui); font-style: italic; font-size: 1.3rem; color: var(--text); margin: 0 auto; max-width: 30ch; line-height: 1.3; text-shadow: var(--text-shadow); }
+.login .roster { display: flex; justify-content: center; gap: 4px; margin-top: 34px; flex-wrap: wrap; }
+.login .housebtn, .login .housebtn:hover:not(:disabled), .login .housebtn:active:not(:disabled) { background: none; border: none; box-shadow: none; filter: none; padding: 6px 5px 9px; border-radius: 2px; opacity: 0.7; transition: opacity 0.18s, transform 0.18s; }
+.login .housebtn:hover:not(:disabled), .login .housebtn:focus-visible, .login .housebtn.on { opacity: 1; transform: translateY(-3px); }
+.login .housebtn::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 14px; height: 2px; margin-left: -7px; background: var(--gilt); opacity: 0; transition: opacity 0.18s; }
+.login .housebtn.on::after { opacity: 1; }
+.login .housebtn .sigil { filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45)); }
+.login .housename { margin-top: 12px; min-height: 1.4em; font-family: var(--font-display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); text-shadow: var(--text-shadow); }
+.login .bigcrest { width: 190px; margin: 0 auto; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.5)); }
+.login .bigcrest .sigil { width: 100%; height: auto; filter: none; }
+.login .bigcrest.swap .sigil { animation: crestswap 0.32s ease-out; }
 @keyframes crestswap { from { opacity: 0; transform: translateY(6px) scale(0.97); } to { opacity: 1; transform: none; } }
 .auth-card { position: relative; padding: 38px 36px 30px; border: 1px solid var(--rule); border-radius: 2px; background: linear-gradient(180deg, var(--surface-a), var(--surface-b)); background-blend-mode: normal; box-shadow: var(--shadow), inset 0 0 0 6px var(--surface-b), inset 0 0 0 7px var(--rule-soft); }
 .auth-card input { background: transparent; border: none; border-bottom: 1px solid var(--rule); border-radius: 0; box-shadow: none; padding: 9px 2px 10px; font-size: 1.1rem; }
@@ -469,7 +467,6 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 @media (max-width: 860px) {
   .home { grid-template-columns: 1fr; }
   .house { position: static; }
-  .welcome { grid-template-columns: 1fr; gap: 28px; min-height: 0; padding-top: 6vh; }
   .room-head { grid-template-columns: auto 1fr; }
   .room-head > :last-child { grid-column: 1 / -1; }
 }
@@ -602,3 +599,33 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 .fhead { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
 .modal:has(.friends), .modal:has(.fprofile) { max-width: 560px; }
 .friends { max-height: 62vh; overflow-y: auto; padding-right: 6px; }
+
+body.on-login #stage, body.on-login::after { display: none; }
+.login { --text: #ecdfc2; --dim: #b5a687; --faint: #7e7259; --gilt: #d6ab52; --gilt-hi: #f5dc94; --gilt-lo: #8d6a28; --rule: #7a5e32; --rule-soft: #3d2d1b; --gules: #9c2e26; --gules-hi: #cf5246; --recess: rgba(0, 0, 0, 0.42); --text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75); position: fixed; inset: 0; overflow: hidden; background: #07090d; color: var(--text); z-index: 3; }
+.login-poster { position: absolute; inset: 0; background: radial-gradient(ellipse 90% 55% at 66% 80%, rgba(233, 160, 96, 0.5), transparent 62%), linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
+.flyover { position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s ease; }
+.flyover.on { opacity: 1; }
+.flyover #ui, .flyover #labels, .flyover #load { display: none !important; }
+.login-grade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(255, 150, 70, 0.16) 0%, rgba(255, 190, 120, 0) 38%, rgba(10, 40, 70, 0.28) 100%); mix-blend-mode: soft-light; }
+.login-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 70% at 62% 48%, transparent 38%, rgba(2, 4, 8, 0.7) 100%), linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 18%, transparent 78%, rgba(0, 0, 0, 0.5)); }
+.login-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 380px; padding: 30px 36px 22px; display: flex; flex-direction: column; align-items: center; text-align: center; overflow-y: auto;
+  background: linear-gradient(180deg, rgba(6, 10, 18, 0.9) 0%, rgba(8, 12, 20, 0.82) 60%, rgba(6, 9, 15, 0.92) 100%); backdrop-filter: blur(6px);
+  border-right: 1px solid rgba(214, 171, 82, 0.55); box-shadow: 12px 0 50px rgba(0, 0, 0, 0.55); }
+.login .bigcrest { width: 140px; margin-top: 4px; }
+.login h1 { font-size: 1.65rem; letter-spacing: 0.3em; margin: 20px 0 0; padding-left: 0.3em; }
+.login .rule { width: 210px; margin: 14px auto 12px; }
+.login .lede { font-size: 1.12rem; color: var(--dim); }
+.login-rail .auth-card { background: none; border: 0; box-shadow: none; padding: 0; width: 100%; margin-top: 14px; text-align: left; }
+.login-rail .auth-card .tabs button { padding: 9px; }
+.login-rail .roster { margin-top: auto; padding-top: 16px; }
+.login .lower { position: absolute; left: 420px; bottom: 34px; font-family: var(--font-display); letter-spacing: 0.22em; font-size: 0.78rem; color: rgba(245, 220, 148, 0.85); text-shadow: 0 2px 8px #000; opacity: 0; transition: opacity 1.6s; pointer-events: none; }
+.login .lower b { display: block; margin-top: 4px; font-weight: 600; font-size: 1.05rem; letter-spacing: 0.26em; color: #fbefd6; }
+.login .lower.on { opacity: 1; }
+@media (max-width: 899px) {
+  .login-rail { top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 88vh; padding: 14px 22px 12px; border-right: 0; border-top: 1px solid rgba(214, 171, 82, 0.55); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55); }
+  .login .bigcrest { width: 58px; }
+  .login h1 { font-size: 1.15rem; margin-top: 10px; }
+  .login .rule, .login .lede, .login .roster, .login .housename { display: none; }
+  .login-rail .auth-card { margin-top: 6px; }
+  .login .lower { left: 20px; bottom: auto; top: 20px; }
+}

@@ -115,6 +115,7 @@
     function mount(node) {
       const app = document.getElementById('app');
       document.body.classList.toggle('in-map', state.view === 'map');
+      document.body.classList.toggle('on-login', node.classList.contains('login'));
       app.replaceChildren(node);
     }
 
@@ -503,7 +504,152 @@
       state.factions = data || [];
     }
 
+    const FLIGHT = { alt: 170, pitch: (9 * Math.PI) / 180, speed: 32, fov: 48, fog: 2.4, sun: { el: 9, az: 248 }, horizon: 0xe9b48a, exposure: 1.15 };
+
+    function loginWorld(opts, seed0) {
+      const src = 'self.onmessage = async (e) => { try { const m = await import(e.data.url); self.postMessage({ ok: true, layout: m.generateWorld(e.data.opts) }); } catch (err) { self.postMessage({ ok: false, error: String((err && err.message) || err) }); } };';
+      const worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })), { type: 'module' });
+      const genUrl = new URL('supabase/functions/start-game/generator.js', location.href).href;
+      return new Promise((resolve, reject) => {
+        let seed = seed0;
+        let tries = 0;
+        const attempt = () => worker.postMessage({ url: genUrl, opts: { ...opts, seed } });
+        worker.onmessage = (e) => {
+          if (e.data.ok) { worker.terminate(); resolve(e.data.layout); return; }
+          if (++tries < 8) { seed += 7919; attempt(); return; }
+          worker.terminate();
+          reject(new Error(e.data.error));
+        };
+        worker.onerror = () => { worker.terminate(); reject(new Error('worker failed')); };
+        attempt();
+      });
+    }
+
+    function flightTrack(api, castles, altitude) {
+      const N = 900;
+      const M = 48;
+      const blur = (arr, w, passes) => {
+        let a = arr;
+        for (let p = 0; p < passes; p++) {
+          const out = new Array(N);
+          for (let i = 0; i < N; i++) { let s = 0; for (let k = -w; k <= w; k++) s += a[(i + k + N) % N]; out[i] = s / (2 * w + 1); }
+          a = out;
+        }
+        return a;
+      };
+      const mx = castles.reduce((s, q) => s + q.x, 0) / castles.length;
+      const mz = castles.reduce((s, q) => s + q.z, 0) / castles.length;
+      const sum = new Array(M).fill(0);
+      const cnt = new Array(M).fill(0);
+      let rAll = 0;
+      castles.forEach((q) => {
+        const r = Math.hypot(q.x - mx, q.z - mz);
+        rAll += r;
+        const k = Math.floor(((Math.atan2(q.z - mz, q.x - mx) + Math.PI) / (2 * Math.PI)) * M) % M;
+        sum[k] += r; cnt[k] += 1;
+      });
+      rAll /= castles.length;
+      let rad = sum.map((s, k) => (cnt[k] ? s / cnt[k] : rAll));
+      for (let pass = 0; pass < 8; pass++) rad = rad.map((_, k) => (rad[(k + M - 2) % M] + 2 * rad[(k + M - 1) % M] + 3 * rad[k] + 2 * rad[(k + 1) % M] + rad[(k + 2) % M]) / 9);
+      const rawX = [];
+      const rawZ = [];
+      for (let i = 0; i < N; i++) {
+        const fb = (i / N) * M - 0.5;
+        const k0 = Math.floor(fb);
+        const fr = fb - k0;
+        const rr = Math.max((rad[((k0 % M) + M) % M] * (1 - fr) + rad[(((k0 + 1) % M) + M) % M] * fr) * 0.92, rAll * 0.5);
+        const ang = (i / N) * 2 * Math.PI - Math.PI;
+        rawX.push(mx + rr * Math.cos(ang)); rawZ.push(mz + rr * Math.sin(ang));
+      }
+      const X = blur(rawX, 8, 2);
+      const Z = blur(rawZ, 8, 2);
+      const off = Math.min(300, rAll * 0.2);
+      const CX = [];
+      const CZ = [];
+      for (let i = 0; i < N; i++) {
+        const dx = X[(i + 8) % N] - X[(i - 8 + N) % N];
+        const dz = Z[(i + 8) % N] - Z[(i - 8 + N) % N];
+        const l = Math.hypot(dx, dz) || 1;
+        CX.push(X[i] - (dz / l) * off); CZ.push(Z[i] + (dx / l) * off);
+      }
+      const lift = (x, z) => { let m = 0; for (const s of castles) { const d = Math.hypot(s.x - x, s.z - z); if (d < 650) m = Math.max(m, 230 * (1 - d / 650)); } return m; };
+      const ahead = (i, n, drop) => api.groundAt(CX[(i + n) % N], CZ[(i + n) % N]) + lift(CX[(i + n) % N], CZ[(i + n) % N]) - drop;
+      const gmax = CX.map((x, i) => Math.max(api.groundAt(x, CZ[i]) + lift(x, CZ[i]), ahead(i, 15, 20), ahead(i, 30, 40)));
+      let Y = blur(gmax.map((g) => g + altitude), 55, 3);
+      Y = blur(Y.map((y, i) => Math.max(y, gmax[i] + 120)), 25, 2);
+      const len = CX.reduce((s, x, i) => s + Math.hypot(CX[(i + 1) % N] - x, CZ[(i + 1) % N] - CZ[i]), 0);
+      return { N, CX, CZ, Y, LA: Math.round(N * 0.045), len };
+    }
+
+    async function startLoginFlyover(host, caption) {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (navigator.connection && navigator.connection.saveData) return;
+      let stopped = false;
+      let api = null;
+      const alive = () => host.isConnected && !stopped;
+      state.cleanup.push(() => { stopped = true; if (api) { try { api.dispose(); } catch {} } });
+      const phone = window.innerWidth < 900 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+      try {
+        const presets = ['highlands', 'river_valley', 'continental'];
+        const seed0 = Math.floor(Math.random() * 2 ** 30) + 1;
+        const layout = await loginWorld({ players: phone ? 2 : 3, mapSize: 'compact', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: phone ? 2.2 : 2.6, freeTravel: false, shape: 'continent', richness: 'standard', randomRoads: 'none', starScatter: 'random', mirrored: false, trails: true, preset: presets[seed0 % 3], homeDistance: 'medium' }, seed0);
+        if (!alive()) return;
+        const { createMap3D } = await import('./map3d.js');
+        if (!alive()) return;
+        const seats = ['kaldran', 'veyra', 'thornwick'];
+        const sites = layout.territories.map((t, i) => ({ id: i, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false }));
+        const edges = layout.edges.map((e) => ({ a: e.a, b: e.b, kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path }));
+        const pitch = phone ? (25 * Math.PI) / 180 : FLIGHT.pitch;
+        let track = null;
+        let castles = [];
+        let frames = 0;
+        let t0 = 0;
+        let checked = false;
+        let label = '';
+        const giveUp = () => { stopped = true; host.classList.remove('on'); setTimeout(() => { if (api) { try { api.dispose(); } catch {} api = null; } }, 2400); };
+        const made = await createMap3D(host, {
+          map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: !!phone,
+          colors: (pid) => { const f = factionOf(seats[pid]); return [f.color, f.color2]; },
+          sun: FLIGHT.sun, horizon: FLIGHT.horizon, fogMul: FLIGHT.fog, exposure: FLIGHT.exposure,
+          onFrame: (t, dt, cam, controls) => {
+            if (!track || stopped) return;
+            if (!t0) t0 = performance.now();
+            frames += 1;
+            const el = performance.now() - t0;
+            if (!checked && el > 6000) { checked = true; if ((frames * 1000) / el < 18) { giveUp(); return; } }
+            controls.enabled = false; controls.maxPolarAngle = Math.PI * 0.62; controls.minDistance = 1;
+            if (Math.abs(cam.fov - FLIGHT.fov) > 0.01) { cam.fov = FLIGHT.fov; cam.updateProjectionMatrix(); }
+            const f = ((((t * FLIGHT.speed) / track.len) % 1) + 1) % 1 * track.N;
+            const at = (arr, k) => { const i = Math.floor(k) % track.N; const j = (i + 1) % track.N; const r = k - Math.floor(k); return arr[i] * (1 - r) + arr[j] * r; };
+            const px = at(track.CX, f); const pz = at(track.CZ, f); const py = at(track.Y, f);
+            const lx = at(track.CX, f + track.LA); const lz = at(track.CZ, f + track.LA);
+            const ly = py - Math.hypot(lx - px, lz - pz) * Math.tan(pitch);
+            cam.position.set(px, py, pz); cam.up.set(0, 1, 0); cam.lookAt(lx, ly, lz);
+            controls.target.set(lx, Math.max(made.groundAt(lx, lz), 20), lz);
+            let near = null; let nd = 1e9;
+            for (const s of castles) { const d = Math.hypot(s.x - px, s.z - pz); if (d < nd) { nd = d; near = s; } }
+            if (near && nd < 1500 && near.name !== label) {
+              label = near.name;
+              const owner = sites[near.id].owner;
+              caption.replaceChildren(document.createTextNode(owner != null ? `LANDS OF HOUSE ${factionOf(seats[owner]).name.toUpperCase()}` : 'FREE HOLDING'), h('b', {}, near.name.toUpperCase()));
+              caption.classList.add('on');
+            } else if (nd >= 1800 && label) { label = ''; caption.classList.remove('on'); }
+          },
+        });
+        api = made;
+        if (!alive()) { try { made.dispose(); } catch {} api = null; return; }
+        made.update(layout.territories.map((t, i) => ({ id: i, owner: t.owner_seat, troops: t.owner_seat != null ? 10 + (i % 7) * 3 : 12, mine: false })));
+        castles = made.sites().filter((s) => !sites[s.id].crossing_kind);
+        track = flightTrack(made, castles, phone ? 260 : FLIGHT.alt);
+        host.classList.add('on');
+      } catch (err) {
+        console.warn('Login fly-over unavailable:', err);
+        if (api) { try { api.dispose(); } catch {} api = null; }
+      }
+    }
+
     function renderAuth(recovery) {
+      clearCleanup();
       let tab = recovery ? 'recovery' : state.authTab;
       const message = h('div', { class: 'msg' });
       const email = h('input', { type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
@@ -579,15 +725,21 @@
         buttons.forEach((btn, i) => btn.classList.toggle('on', slugs[i] === sl));
       }
       showCrest(current, true);
-      mount(h('div', { class: 'wrap' }, h('div', { class: 'welcome' },
-        h('div', { class: 'hero' },
+      const flyHost = h('div', { class: 'flyover' });
+      const caption = h('div', { class: 'lower' });
+      mount(h('div', { class: 'login' },
+        h('div', { class: 'login-poster' }), flyHost,
+        h('div', { class: 'login-grade' }), h('div', { class: 'login-vignette' }),
+        h('aside', { class: 'login-rail' },
           crestHost,
           h('h1', {}, 'Siege & Sigil'),
           h('div', { class: 'rule' }),
           h('p', { class: 'lede' }, 'Raise a house. Hold the castles.'),
+          h('div', { class: 'auth-card' }, form),
           h('div', { class: 'roster', role: 'group', 'aria-label': 'The eight houses' }, buttons),
           houseName),
-        h('div', { class: 'auth-card' }, form))));
+        caption));
+      setTimeout(() => startLoginFlyover(flyHost, caption), 700);
     }
 
     function topbar() {
