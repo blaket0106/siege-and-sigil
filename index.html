@@ -892,8 +892,16 @@
         ['h', 'Rules'],
         ['list', [
           '[[basics#how-time-works|Tick speed]], [[basics#what-wins-the-game|victory share]], [[fog|fog of war]], seasons, events and mercenaries.',
+          'Who can join: Open (listed for everyone), Friends only (listed for your [[friends|friends]]) or Invite only (not listed).',
           'Player names: shown, or hidden until the game ends. When hidden, everyone appears under their house name.',
           'AI players fill any seats left open when the game starts.',
+        ]],
+        ['h', 'Inviting players'],
+        ['list', [
+          'Every game has a short code, such as K7M2-9QX4, and a share link. Find them in the lobby under Invite players, and copy either one to anyone, friend or not.',
+          'Players enter the code in Join by code on the home screen, or open the link after signing in.',
+          'Invite friends lists your [[friends|friends]]. They see "invited you" at the top of their home screen and can join or decline.',
+          'In an Invite only game, only people with the code, the link or an invitation can join. A password, if you set one, still applies.',
         ]],
         ['h', 'Host tools'],
         ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. Finished games can be replayed from the Replay bar.'],
@@ -908,6 +916,7 @@
           ['Commander', 'A leader who carries troops and has abilities ([[commanders|Commanders]]).'],
           ['Crossing', 'A river castle or pass castle that controls a barrier ([[map#rivers-and-mountains|Rivers and mountains]]).'],
           ['Friend code', 'A short code you share so another player can send you a friend request ([[friends|Friends]]).'],
+          ['Game code', 'A short code that lets anyone join a specific game from the home screen ([[hosting#inviting-players|Inviting players]]).'],
           ['Garrison', 'The troops standing in a castle, and the commander who leads them ([[commanders#garrison-commanders|Garrison commanders]]).'],
           ['Guildhall', 'The realm area that makes upgrades cheaper ([[areas|Realm areas]]).'],
           ['Friend', 'A player you approve who can see your profile and stats ([[friends|Friends]]).'],
@@ -1359,6 +1368,9 @@
       await Promise.all([loadFactions(), state.profile ? null : loadProfile()]);
 
       const openList = h('div', { class: 'list' });
+      const inviteStrip = h('div', { class: 'invites' });
+      const codeInput = h('input', { type: 'text', placeholder: 'Game code, such as K7M2-9QX4', maxlength: '12', 'aria-label': 'Game code', autocomplete: 'off' });
+      codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = codeInput.value.trim(); if (v) joinByCode(v); } });
       const bannerGrid = h('div', { class: 'banners' });
       const boardList = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Loading'));
       const crestHolder = h('div', { class: 'crest' });
@@ -1393,9 +1405,10 @@
 
       const refresh = async () => {
         if (state.view !== 'home') return;
-        const [open, mine] = await Promise.all([
+        const [open, mine, inv] = await Promise.all([
           sb.rpc('list_open_games'),
           sb.rpc('my_games'),
+          sb.rpc('my_game_invites'),
         ]);
         if (state.view !== 'home') return;
 
@@ -1404,6 +1417,12 @@
           openList.replaceChildren(...(open.data.length ? open.data.map(openRow) : [h('div', { class: 'empty' }, 'No open lobbies right now. Raise a campaign and others can join it.')]));
         }
 
+        const invites = inv.data || [];
+        inviteStrip.replaceChildren(...invites.map((i) => h('div', { class: 'panel invite' },
+          h('div', {}, h('b', {}, i.host_name), ' invited you to ', h('b', {}, i.game_name)),
+          h('div', { class: 'row', style: 'display:flex;gap:8px' },
+            h('button', { class: 'primary small', onclick: () => { const g = (open.data || []).find((x) => x.id === i.game_id); if (g) joinDialog(g); else toast('That game is no longer open'); } }, 'Join'),
+            h('button', { class: 'small', onclick: (e) => run(e.currentTarget, async () => { const r = await sb.rpc('decline_game_invite', { p_id: i.id }); if (r.error) throw r.error; await refresh(); }) }, 'Decline')))));
         if (mine.error) toast(mine.error.message);
         else {
           const rows = (mine.data || []).filter((r) => r.games).sort((a, b) => b.games.id - a.games.id);
@@ -1429,10 +1448,11 @@
               h('button', { class: 'primary', onclick: createDialog }, 'Raise a campaign'),
               h('button', { class: 'ghost', onclick: helpDialog }, 'How to play'))),
           h('main', {},
+            inviteStrip,
             h('div', { class: 'section-title' }, h('h2', {}, 'Your campaigns')),
             bannerGrid,
             h('div', { class: 'section-title' }, h('h2', {}, 'Open lobbies'), h('button', { class: 'ghost', onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh')),
-            h('div', { class: 'panel' }, openList),
+            h('div', { class: 'panel' }, h('div', { class: 'joincode' }, codeInput, h('button', { class: 'small', onclick: () => { const v = codeInput.value.trim(); if (v) joinByCode(v); } }, 'Join by code')), openList),
             h('div', { class: 'section-title' }, h('h2', {}, 'Roll of honor')),
             h('div', { class: 'panel' }, boardList),
             legalLinks()))));
@@ -1448,12 +1468,47 @@
       });
 
       await refresh();
+      try { const pending = sessionStorage.getItem('ss-join'); if (pending) { sessionStorage.removeItem('ss-join'); joinByCode(pending); } } catch {}
 
       const timer = setInterval(refresh, 8000);
       state.cleanup.push(() => clearInterval(timer));
     }
 
-    function joinDialog(g) {
+    const JOIN_HASH = /^#join=([A-Za-z0-9-]{3,12})$/;
+    try {
+      const m = JOIN_HASH.exec(location.hash);
+      if (m) { sessionStorage.setItem('ss-join', m[1].toUpperCase()); history.replaceState(null, '', location.pathname + location.search); }
+    } catch {}
+
+    async function joinByCode(code) {
+      const { data, error } = await sb.rpc('lookup_game_by_code', { p_code: code });
+      if (error) return toast(error.message);
+      if (data && data.error) return toast(data.error);
+      if (data.joined) return showRoom(data.id);
+      if (data.player_count >= data.max_players) return toast('That game is full');
+      joinDialog(data, code);
+    }
+
+    async function inviteFriendsDialog(gameId) {
+      const body = h('div', { class: 'friends' }, h('div', { class: 'empty' }, 'Loading'));
+      const sent = new Set();
+      const draw = (data) => {
+        if (!data.friends.length) { body.replaceChildren(h('div', { class: 'empty' }, 'You have no friends yet. Open Friends from the top bar to add some, or share the code or link instead.')); return; }
+        body.replaceChildren(...data.friends.map((f) => h('div', { class: 'frow' },
+          h('span', {}, h('b', {}, f.name)),
+          h('button', {
+            class: sent.has(f.id) ? 'small' : 'primary small',
+            disabled: sent.has(f.id),
+            onclick: (e) => run(e.currentTarget, async () => { const r = await sb.rpc('invite_friend', { p_game_id: gameId, p_friendship_id: f.id }); if (r.error) throw r.error; sent.add(f.id); toast(`${f.name} invited`, true); draw(data); }),
+          }, sent.has(f.id) ? 'Invited' : 'Invite'))));
+      };
+      modal('Invite friends', body, (close) => [h('button', { class: 'primary', onclick: close }, 'Done')]);
+      const { data, error } = await sb.rpc('list_friends');
+      if (error) { toast(error.message); return; }
+      draw(data);
+    }
+
+    function joinDialog(g, code) {
       let pick = null;
       const picker = factionPicker(g.taken_factions, null, (v) => { pick = v; });
       const pw = h('input', { type: 'password', placeholder: 'game password' });
@@ -1462,8 +1517,11 @@
         h('button', {
           class: 'primary',
           onclick: (e) => run(e.currentTarget, async () => {
-            const { error } = await sb.rpc('join_game', { p_game_id: g.id, p_faction_slug: pick, p_password: g.has_password ? pw.value : null });
+            const { data, error } = code
+              ? await sb.rpc('join_game_by_code', { p_code: code, p_faction_slug: pick, p_password: g.has_password ? pw.value : null })
+              : await sb.rpc('join_game', { p_game_id: g.id, p_faction_slug: pick, p_password: g.has_password ? pw.value : null });
             if (error) throw error;
+            if (code && data === null) throw new Error('No game has that code');
             close();
             await showRoom(g.id);
           }),
@@ -1542,6 +1600,7 @@
       const travelSel = selectOf(TRAVEL_INFO, 'trails');
       const mapPreset = selectOf(PRESET_INFO, 'continental');
       const anonSel = selectOf({ normal: 'Names shown', extra: 'Names hidden until the game ends' }, 'normal');
+      const visSel = selectOf({ open: 'Open: anyone can find it', friends: 'Friends only: your friends can find it', invite: 'Invite only: needs a code, link or invitation' }, 'open');
       const homeSel = selectOf(HOME_INFO, 'medium');
       const richness = selectOf({ sparse: 'Sparse (expensive to build on)', standard: 'Standard', plentiful: 'Plentiful (cheap to build on)' }, 'standard');
       const fog = choice([['fog', 'Fog', 'The whole map is visible. Enemy troops and upgrades are hidden outside your scan range.'], ['dark', 'Dark', 'The map is black until you explore it. Explored ground stays visible.'], ['off', 'No fog', 'Everything is visible to everyone.']], 'fog', update);
@@ -1687,7 +1746,7 @@
           mirror.row)],
         ['Rules', sec(heading('Set the rules', 'How the war is won and what each house can see.'),
           h('label', {}, 'Fog of war'), fog.el,
-          h('div', { class: 'grid2' }, field('Castles to win (% of all)', victory), field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'), field('Formal alliances', alliances), field('Player names', anonSel, 'Hidden names show only each house\'s faction. Real names return when the game ends.')),
+          h('div', { class: 'grid2' }, field('Castles to win (% of all)', victory), field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'), field('Formal alliances', alliances), field('Player names', anonSel, 'Hidden names show only each house\'s faction. Real names return when the game ends.'), field('Who can join', visSel, 'You can share a code or link, or invite friends, whatever you choose.')),
           h('label', {}, 'Starting locations'), startSel.el,
           h('div', { class: 'grid2' }, field('Time to choose (minutes)', pickMins)),
           seasons.row, field('Season length (ticks, 12 to 240)', seasonLen), events.row, mercs.row)],
@@ -1751,6 +1810,7 @@
           world_seed: preview.seed,
           home_distance: homeSel.value,
           anonymity: anonSel.value,
+          visibility: visSel.value,
           resource_richness: richness.value,
           roads_mode: roadsMode.value,
           random_roads: randomRoads.value,
@@ -1890,6 +1950,7 @@
       mount(container);
 
       let schoolsDraft = null;
+      let inviteInfo = null;
       const chatInput = h('input', { type: 'text', maxlength: '500', placeholder: 'Message the lobby' });
 
       const draw = async () => {
@@ -1940,6 +2001,18 @@
           }
         }
         parts.push(h('div', { class: 'panel' }, h('h2', {}, 'The table'), h('div', { class: 'slots' }, slots)));
+        if (game.status === 'lobby' && isHost) {
+          if (!inviteInfo) sb.rpc('game_invite_info', { p_game_id: gameId }).then((r) => { if (r.data) { inviteInfo = r.data; draw(); } });
+          const link = inviteInfo ? `${location.origin}${location.pathname}#join=${inviteInfo.code}` : '';
+          const copy = (text, what) => { try { navigator.clipboard.writeText(text); toast(`${what} copied`, true); } catch { toast(text); } };
+          parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Invite players'),
+            inviteInfo ? h('div', {},
+              h('div', { class: 'frow', style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0' }, h('b', { class: 'fcode' }, inviteInfo.code),
+                h('span', { class: 'row', style: 'gap:6px;display:flex' }, h('button', { class: 'small', onclick: () => copy(inviteInfo.code, 'Code') }, 'Copy code'), h('button', { class: 'small', onclick: () => copy(link, 'Link') }, 'Copy link'))),
+              h('div', { class: 'tip' }, { open: 'Anyone can also find this game in Open lobbies.', friends: 'Your friends can find this game in Open lobbies. Anyone with the code or link can join.', invite: 'This game is not listed. Players need the code, the link or an invitation.' }[inviteInfo.visibility]),
+              h('div', { style: 'margin-top:12px' }, h('button', { class: 'primary', onclick: () => inviteFriendsDialog(gameId) }, 'Invite friends')))
+              : h('div', { class: 'empty' }, 'Loading')));
+        }
 
         if (game.status === 'lobby' && me) {
           const count = 1 + game.starting_commanders;

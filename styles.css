@@ -655,3 +655,10 @@ body.on-login #stage, body.on-login::after { display: none; }
   .topnav .hide-m, .topnav .who { display: none; }
   .topbar { margin-bottom: 18px; }
 }
+.invites { display: grid; gap: 10px; margin-bottom: 14px; }
+.invites:empty { display: none; margin: 0; }
+.panel.invite { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 18px; }
+.joincode { display: flex; gap: 8px; margin-bottom: 12px; }
+.joincode input { flex: 1; }
+
+:root[data-theme='light'] .room-head { background: linear-gradient(180deg, var(--ink-2), var(--ink-1)); border: 1px solid var(--rule); border-radius: 2px; padding: 14px 18px; box-shadow: 0 8px 16px -10px rgba(60, 38, 8, 0.6); }

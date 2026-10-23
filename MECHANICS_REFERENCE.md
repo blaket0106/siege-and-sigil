@@ -1469,3 +1469,10 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - `friend_profile` shows honor, infamy, games, wins, favorite house and the last 8 finished games only, so a friend cannot learn which seat you hold in an anonymous game in progress.
 - `get_leaderboard` lists only players whose `stats_visibility` is `public`.
 - Not built: blocking, lobby invites, "friend is hosting" tags.
+
+**Invites and visibility** (migration `invites`)
+- `games.visibility` is `open` (listed for everyone), `friends` (listed for the host's friends) or `invite` (listed only for invited players and members). Every game has a unique `join_code` (`XXXX-XXXX`, eight characters from a 32-letter alphabet, generated with pgcrypto); the column is not readable by clients, only through `game_invite_info` (host) and `lookup_game_by_code`.
+- `game_invites` has no client access. Functions: `invite_friend` (host, friends only, 20 per game), `my_game_invites`, `decline_game_invite`, `lookup_game_by_code`, `join_game_by_code`, `game_invite_info`.
+- `join_game` now refuses non-open games unless the caller is the host, was invited, is a friend (friends games) or arrived through `join_game_by_code`. The code path sets a transaction-local setting that clients cannot set.
+- `list_open_games` honours visibility. Share links look like `#join=ABC-123`; the client keeps the code across sign-in and opens the join dialog on the home screen.
+- Wrong-code guesses are limited: more than 15 misses in 10 minutes blocks `lookup_game_by_code` and `join_game_by_code` for that user. A miss returns an error object (lookup) or null (join) instead of raising, so the failure is recorded in `join_code_failures` (no client access). Friend codes use the same generator.
