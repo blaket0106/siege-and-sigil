@@ -3,6 +3,14 @@ export const SEA = 0.2;
 const LAND_T = 0.36;
 const MOUNT_T = 0.53;
 
+export const PRESETS = {
+  continental: { rivers: 1, mountain: 1, wet: 0 },
+  highlands: { rivers: 0.6, mountain: 1.3, wet: -0.05 },
+  river_valley: { rivers: 2, mountain: 0.35, wet: 0.05 },
+  forest: { rivers: 1, mountain: 0.5, wet: 0.2 },
+  plains: { rivers: 0, mountain: 0, wet: 0 },
+};
+
 function smoothstep(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -137,8 +145,430 @@ function decorSeed(parts) {
   return h >>> 0;
 }
 
+export const trailDebug = { reason: '' };
+const TRAIL_CAP = 1.9;
+const MAX_DETOUR = 1.45;
+
+function planTrails(c, lenient = 0) {
+  const wet = (sc) => (lenient ? sc.oceanFrac > lenient : sc.ocean);
+  const { points, edges, spacing, cell, G, sample, height, moist, riverSegs, scanLine, nearestOnSegment, MOUNT_T, SEA: sea } = c;
+  const N0 = points.length;
+  const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+  const key = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
+  const SG = cell * 2;
+  const segGrid = new Map();
+  for (const seg of riverSegs) {
+    for (let gx = Math.floor(seg.x0 / SG); gx <= Math.floor(seg.x1 / SG); gx++) {
+      for (let gy = Math.floor(seg.y0 / SG); gy <= Math.floor(seg.y1 / SG); gy++) {
+        const k = gx * 100003 + gy;
+        const l = segGrid.get(k);
+        if (l) l.push(seg);
+        else segGrid.set(k, [seg]);
+      }
+    }
+  }
+  const riverCross = (A, B) => {
+    const out = [];
+    const seen = new Set();
+    const lx0 = Math.min(A.x, B.x);
+    const lx1 = Math.max(A.x, B.x);
+    const ly0 = Math.min(A.y, B.y);
+    const ly1 = Math.max(A.y, B.y);
+    for (let gx = Math.floor(lx0 / SG); gx <= Math.floor(lx1 / SG); gx++) {
+      for (let gy = Math.floor(ly0 / SG); gy <= Math.floor(ly1 / SG); gy++) {
+        const l = segGrid.get(gx * 100003 + gy);
+        if (!l) continue;
+        for (const seg of l) {
+          if (seen.has(seg)) continue;
+          seen.add(seg);
+          if (seg.x1 < lx0 || seg.x0 > lx1 || seg.y1 < ly0 || seg.y0 > ly1) continue;
+          const q = segIntersect(A, B, seg.a, seg.b);
+          if (q) out.push({ x: q.x, y: q.y, ri: seg.ri });
+        }
+      }
+    }
+    return out;
+  };
+
+  const cands = new Map();
+  for (const [a, b] of edges) cands.set(key(a, b), { a: Math.min(a, b), b: Math.max(a, b), len: dist(points[a], points[b]) });
+  for (let a = 0; a < N0; a++) {
+    for (let b = a + 1; b < N0; b++) {
+      const len = dist(points[a], points[b]);
+      if (len <= TRAIL_CAP * spacing && !cands.has(key(a, b))) cands.set(key(a, b), { a, b, len });
+    }
+  }
+  const free = [];
+  const cross1 = [];
+  for (const cd of cands.values()) {
+    const A = points[cd.a];
+    const B = points[cd.b];
+    const sc0 = scanLine(A, B);
+    if (wet(sc0)) continue;
+    const hits = riverCross(A, B);
+    if (!hits.length && !sc0.runs.length) {
+      free.push(cd);
+    } else if (!hits.length && sc0.runs.length === 1) {
+      const low = sc0.runs[0].low;
+      cross1.push({ a: cd.a, b: cd.b, pts: [{ x: low.x, y: low.y, pass: true }], len: cd.len, direct: cd.len });
+    } else if (hits.length === 1 && !sc0.runs.length) {
+      let best = null;
+      let bd = Infinity;
+      for (const seg of riverSegs) {
+        const q = nearestOnSegment(hits[0], seg);
+        const d = Math.hypot(q.x - hits[0].x, q.y - hits[0].y);
+        if (d < bd) {
+          bd = d;
+          best = { x: q.x, y: q.y, ri: seg.ri };
+        }
+      }
+      if (!best || sample(height, best.x, best.y) < sea + 0.02) continue;
+      const P = { x: best.x, y: best.y };
+      const d1 = dist(A, P);
+      const d2 = dist(P, B);
+      if (d1 < spacing * 0.2 || d2 < spacing * 0.2) continue;
+      const bad = (S, T) => wet(scanLine(S, T)) || riverCross(S, T).some((h) => Math.hypot(h.x - P.x, h.y - P.y) > spacing * 0.07);
+      if (bad(A, P) || bad(P, B)) continue;
+      cross1.push({ a: cd.a, b: cd.b, pts: [{ x: P.x, y: P.y, ri: best.ri }], len: d1 + d2, direct: cd.len });
+    }
+  }
+
+  const snapRiver = (h) => {
+    let best = null;
+    let bd = Infinity;
+    for (const seg of riverSegs) {
+      if (seg.x1 < h.x - spacing || seg.x0 > h.x + spacing || seg.y1 < h.y - spacing || seg.y0 > h.y + spacing) continue;
+      const q = nearestOnSegment(h, seg);
+      const d = Math.hypot(q.x - h.x, q.y - h.y);
+      if (d < bd) {
+        bd = d;
+        best = { x: q.x, y: q.y, ri: seg.ri };
+      }
+    }
+    return best;
+  };
+  const parent = Array.from({ length: N0 }, (_, i) => i);
+  const root = (i) => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+  for (const e of free) parent[root(e.a)] = root(e.b);
+  const picked = [];
+  cross1.sort((x, y) => x.len - y.len || x.a - y.a || x.b - y.b);
+  for (const cd of cross1) {
+    if (root(cd.a) === root(cd.b)) continue;
+    parent[root(cd.a)] = root(cd.b);
+    picked.push(cd);
+  }
+  let roots = new Set(Array.from({ length: N0 }, (_, i) => root(i)));
+  for (let guard = 0; roots.size > 1 && guard < 40; guard++) {
+    const pairs = [];
+    for (let a = 0; a < N0; a++) {
+      for (let b = a + 1; b < N0; b++) {
+        if (root(a) === root(b)) continue;
+        const len = dist(points[a], points[b]);
+        if (len <= 5.6 * spacing) pairs.push({ a, b, len });
+      }
+    }
+    pairs.sort((x, y) => x.len - y.len || x.a - y.a || x.b - y.b);
+    let joined = false;
+    for (const pr of pairs.slice(0, 80)) {
+      const A = points[pr.a];
+      const B = points[pr.b];
+      const scAB = scanLine(A, B);
+      if (wet(scAB)) continue;
+      const hits = riverCross(A, B);
+      const snapped = hits.map(snapRiver);
+      if (snapped.some((s) => !s || sample(height, s.x, s.y) < sea + 0.02)) continue;
+      const barriers = [...snapped, ...scAB.runs.map((r) => ({ x: r.low.x, y: r.low.y, pass: true }))].sort((x, y) => dist(A, x) - dist(A, y));
+      if (!barriers.length || barriers.length > 4) continue;
+      const chain = [A, ...barriers, B];
+      let valid = true;
+      for (let k = 0; k < chain.length - 1 && valid; k++) {
+        if (dist(chain[k], chain[k + 1]) < spacing * 0.05) valid = false;
+        else if (wet(scanLine(chain[k], chain[k + 1]))) valid = false;
+        else {
+          if (riverCross(chain[k], chain[k + 1]).some((h) => chain.every((p) => Math.hypot(h.x - p.x, h.y - p.y) > spacing * 0.12))) valid = false;
+        }
+      }
+      if (!valid) continue;
+      parent[root(pr.a)] = root(pr.b);
+      picked.push({ a: pr.a, b: pr.b, pts: barriers, len: pr.len, direct: pr.len });
+      joined = true;
+      break;
+    }
+    if (!joined) break;
+    roots = new Set(Array.from({ length: N0 }, (_, i) => root(i)));
+  }
+  if (roots.size > 1) {
+    let mind = Infinity;
+    for (let a = 0; a < N0; a++) for (let b = a + 1; b < N0; b++) if (root(a) !== root(b)) mind = Math.min(mind, dist(points[a], points[b]));
+    trailDebug.reason = `components ${roots.size} candidates ${cross1.length} gap ${(mind / spacing).toFixed(2)} spacings`;
+    return null;
+  }
+
+  const adj = Array.from({ length: N0 + 64 }, () => []);
+  const nodes = points.map((p) => ({ x: p.x, y: p.y }));
+  const out = [];
+  const link = (a, b, w, kind) => {
+    while (adj.length <= Math.max(a, b)) adj.push([]);
+    adj[a].push([b, w]);
+    adj[b].push([a, w]);
+    out.push({ a, b, kind });
+  };
+  const sp = (from, to, limit) => {
+    const best = new Map([[from, 0]]);
+    const h = new MinHeap();
+    h.push(0, from);
+    while (h.size) {
+      const u = h.pop();
+      const du = best.get(u);
+      if (u === to) return du;
+      if (du > limit) return Infinity;
+      for (const [v, w] of adj[u] || []) {
+        const nd = du + w;
+        if (nd < (best.get(v) ?? Infinity)) {
+          best.set(v, nd);
+          h.push(nd, v);
+        }
+      }
+    }
+    return Infinity;
+  };
+  const crossings = [];
+  const carve = (A, B) => {
+    const rad = cell * 3;
+    const base = MOUNT_T - 0.1;
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const len2 = dx * dx + dy * dy || 1;
+    const gx0 = Math.max(0, Math.floor((Math.min(A.x, B.x) - rad) / cell));
+    const gx1 = Math.min(G - 1, Math.floor((Math.max(A.x, B.x) + rad) / cell));
+    const gy0 = Math.max(0, Math.floor((Math.min(A.y, B.y) - rad) / cell));
+    const gy1 = Math.min(G - 1, Math.floor((Math.max(A.y, B.y) + rad) / cell));
+    for (let gy = gy0; gy <= gy1; gy++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const i = gy * G + gx;
+        if (height[i] <= base) continue;
+        const px = (gx + 0.5) * cell - A.x;
+        const py = (gy + 0.5) * cell - A.y;
+        const t = Math.min(1, Math.max(0, (px * dx + py * dy) / len2));
+        const d = Math.hypot(px - t * dx, py - t * dy);
+        if (d >= rad) continue;
+        const target = base + smoothstep(0, rad, d) * (height[i] - base);
+        if (height[i] > target) height[i] = target;
+      }
+    }
+  };
+  const addCrossing = (cd) => {
+    let prev = cd.a;
+    let prevPt = points[cd.a];
+    const chainPts = [points[cd.a], ...cd.pts, points[cd.b]];
+    for (let k = 0; k < chainPts.length - 1; k++) if (chainPts[k].pass || chainPts[k + 1].pass) carve(chainPts[k], chainPts[k + 1]);
+    for (const pt of cd.pts) {
+      const idx = N0 + crossings.length;
+      nodes.push({ x: pt.x, y: pt.y });
+      crossings.push({ idx, x: pt.x, y: pt.y, ri: pt.ri, pass: !!pt.pass, a: cd.a, b: cd.b });
+      link(prev, idx, dist(prevPt, pt), pt.pass ? 'pass' : 'river');
+      prev = idx;
+      prevPt = pt;
+    }
+    link(prev, cd.b, dist(prevPt, points[cd.b]), 'river');
+  };
+  picked.forEach(addCrossing);
+  free.sort((x, y) => x.len - y.len || x.a - y.a || x.b - y.b);
+  for (const e of free) {
+    if (sp(e.a, e.b, e.len * MAX_DETOUR * 1.01) <= e.len * MAX_DETOUR) continue;
+    link(e.a, e.b, e.len, 'land');
+  }
+  const maxCross = Math.max(picked.length, Math.ceil(0.1 * N0));
+  const pickedKeys = new Set(picked.map((p) => key(p.a, p.b)));
+  const extras = cross1.filter((cd) => !pickedKeys.has(key(cd.a, cd.b))).sort((x, y) => x.len - y.len);
+  for (const cd of extras) {
+    if (crossings.length >= maxCross) break;
+    if (crossings.some((q) => Math.hypot(q.x - cd.pts[0].x, q.y - cd.pts[0].y) < spacing * 1.8)) continue;
+    if (sp(cd.a, cd.b, Infinity) <= 2 * cd.direct) continue;
+    addCrossing(cd);
+  }
+
+  const G2 = G * G;
+  const gcost = new Float32Array(G2);
+  const blocked = new Uint8Array(G2);
+  for (let gy = 0; gy < G; gy++) {
+    for (let gx = 0; gx < G; gx++) {
+      const i = gy * G + gx;
+      const h = height[i];
+      if (h < sea || h > MOUNT_T) blocked[i] = 1;
+      gcost[i] = h > MOUNT_T ? 3.2 : h > 0.42 ? 1.5 : moist[i] > 0.58 ? 1.45 : h > sea + 0.17 ? 1.2 : 1;
+    }
+  }
+  const riverCell = new Uint8Array(G2);
+  for (const seg of riverSegs) {
+    const len = Math.hypot(seg.b.x - seg.a.x, seg.b.y - seg.a.y);
+    const n = Math.max(1, Math.ceil(len / (cell * 0.25)));
+    let pgx = -1;
+    let pgy = -1;
+    for (let s = 0; s <= n; s++) {
+      const x = seg.a.x + ((seg.b.x - seg.a.x) * s) / n;
+      const y = seg.a.y + ((seg.b.y - seg.a.y) * s) / n;
+      const gx = Math.min(G - 1, Math.max(0, Math.floor(x / cell)));
+      const gy = Math.min(G - 1, Math.max(0, Math.floor(y / cell)));
+      riverCell[gy * G + gx] = 1;
+      if (pgx >= 0 && gx !== pgx && gy !== pgy) riverCell[pgy * G + gx] = 1;
+      pgx = gx;
+      pgy = gy;
+    }
+  }
+  for (let i = 0; i < G2; i++) if (riverCell[i]) blocked[i] = 1;
+  const opened = new Uint8Array(G2);
+  const openAround = (p, rad) => {
+    const gx0 = Math.floor(p.x / cell);
+    const gy0 = Math.floor(p.y / cell);
+    const r = Math.ceil(rad / cell);
+    for (let gy = Math.max(0, gy0 - r); gy <= Math.min(G - 1, gy0 + r); gy++) {
+      for (let gx = Math.max(0, gx0 - r); gx <= Math.min(G - 1, gx0 + r); gx++) {
+        if (Math.hypot((gx + 0.5) * cell - p.x, (gy + 0.5) * cell - p.y) <= rad) opened[gy * G + gx] = 1;
+      }
+    }
+  };
+  for (const cr of crossings) openAround(cr, cell * 2.4);
+  for (const p of points) openAround(p, sample(height, p.x, p.y) > MOUNT_T ? Math.max(cell * 1.1, spacing * 0.32) : cell * 1.1);
+
+  const gstamp = new Uint32Array(G2);
+  const gscore = new Float64Array(G2);
+  const came = new Int32Array(G2);
+  let stampId = 0;
+  const astar = (A, B) => {
+    const sx = Math.min(G - 1, Math.max(0, Math.floor(A.x / cell)));
+    const sy = Math.min(G - 1, Math.max(0, Math.floor(A.y / cell)));
+    const tx = Math.min(G - 1, Math.max(0, Math.floor(B.x / cell)));
+    const ty = Math.min(G - 1, Math.max(0, Math.floor(B.y / cell)));
+    const pad = 7;
+    const x0 = Math.max(0, Math.min(sx, tx) - pad);
+    const x1 = Math.min(G - 1, Math.max(sx, tx) + pad);
+    const y0 = Math.max(0, Math.min(sy, ty) - pad);
+    const y1 = Math.min(G - 1, Math.max(sy, ty) + pad);
+    stampId += 1;
+    const open = new MinHeap();
+    const s = sy * G + sx;
+    const t = ty * G + tx;
+    gstamp[s] = stampId;
+    gscore[s] = 0;
+    came[s] = -1;
+    open.push(Math.hypot(tx - sx, ty - sy), s);
+    while (open.size) {
+      const cur = open.pop();
+      if (cur === t) {
+        const cells = [];
+        for (let k = cur; k >= 0; k = came[k]) cells.push(k);
+        return cells.reverse();
+      }
+      const cgx = cur % G;
+      const cgy = (cur / G) | 0;
+      const gc = gscore[cur];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cgx + dx;
+          const ny = cgy + dy;
+          if (nx < x0 || nx > x1 || ny < y0 || ny > y1) continue;
+          const n = ny * G + nx;
+          if (blocked[n] && !opened[n] && n !== t) continue;
+          if (riverCell[n] && !opened[n]) continue;
+          if (dx && dy && ((riverCell[cgy * G + nx] && !opened[cgy * G + nx]) || (riverCell[ny * G + cgx] && !opened[ny * G + cgx]))) continue;
+          const step = (dx && dy ? 1.4142 : 1) * (gcost[n] + gcost[cur]) * 0.5;
+          const ng = gc + step;
+          if (gstamp[n] !== stampId || ng < gscore[n]) {
+            gstamp[n] = stampId;
+            gscore[n] = ng;
+            came[n] = cur;
+            open.push(ng + Math.hypot(tx - nx, ty - ny), n);
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const finals = [];
+  const edgeKind = (e) => {
+    const ends = [e.a, e.b].filter((n) => n >= N0).map((n) => crossings[n - N0]);
+    if (!ends.length) return 'land';
+    return ends.every((c) => c.pass) ? 'pass' : 'river';
+  };
+  for (const e of out) {
+    const A = nodes[e.a];
+    const B = nodes[e.b];
+    const straight = dist(A, B);
+    let pts = null;
+    const cells = astar(A, B);
+    if (cells) {
+      const raw = [[A.x, A.y], ...cells.slice(1, -1).map((k) => [((k % G) + 0.5) * cell, (((k / G) | 0) + 0.5) * cell]), [B.x, B.y]];
+      pts = chaikin(raw, 2);
+    }
+    const crosses = (poly) => {
+      for (let k = 0; k < poly.length - 1; k++) {
+        const hits = riverCross({ x: poly[k][0], y: poly[k][1] }, { x: poly[k + 1][0], y: poly[k + 1][1] });
+        for (const h of hits) {
+          const near = [e.a, e.b].some((n) => n >= N0 && Math.hypot(nodes[n].x - h.x, nodes[n].y - h.y) < spacing * 0.09);
+          if (!near) return true;
+        }
+      }
+      return false;
+    };
+    const plen = (poly) => poly.reduce((s, p, k) => (k ? s + Math.hypot(p[0] - poly[k - 1][0], p[1] - poly[k - 1][1]) : 0), 0);
+    if (pts && (crosses(pts) || plen(pts) > 2.1 * straight)) pts = null;
+    if (!pts) {
+      const direct = [[A.x, A.y], [B.x, B.y]];
+      const scD = scanLine(A, B);
+      if (!wet(scD) && !scD.runs.length && !crosses(direct)) pts = direct;
+    }
+    if (!pts) continue;
+    const length = plen(pts);
+    let costSum = 0;
+    let count = 0;
+    for (let k = 0; k < pts.length - 1; k++) {
+      const sx = pts[k][0];
+      const sy = pts[k][1];
+      const ex = pts[k + 1][0];
+      const ey = pts[k + 1][1];
+      const n = Math.max(1, Math.ceil(Math.hypot(ex - sx, ey - sy) / (cell * 0.5)));
+      for (let s = 0; s < n; s++) {
+        const x = sx + ((ex - sx) * s) / n;
+        const y = sy + ((ey - sy) * s) / n;
+        const h = sample(height, x, y);
+        costSum += h > MOUNT_T ? 2 : h > 0.42 ? 1.4 : sample(moist, x, y) > 0.58 ? 1.4 : h > sea + 0.17 ? 1.15 : 1;
+        count += 1;
+      }
+    }
+    const mult = Math.round(Math.min(2.6, costSum / Math.max(1, count)) * 100) / 100;
+    finals.push({ a: e.a, b: e.b, kind: edgeKind(e), length, mult, path: pts.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]) });
+  }
+
+  const par2 = Array.from({ length: nodes.length }, (_, i) => i);
+  const root2 = (i) => {
+    while (par2[i] !== i) {
+      par2[i] = par2[par2[i]];
+      i = par2[i];
+    }
+    return i;
+  };
+  for (const e of finals) par2[root2(e.a)] = root2(e.b);
+  const rs = new Set(nodes.map((_, i) => root2(i)));
+  if (rs.size > 1) {
+    trailDebug.reason = `paths left ${rs.size} components`;
+    return null;
+  }
+  const at = (q) => ({ x: q.x, y: q.y });
+  return { crossings, edges: finals, passes: crossings.filter((q) => q.pass).map(at), fords: crossings.filter((q) => !q.pass).map(at) };
+}
+
 export function buildTerrain(o) {
   const { points, edges, mapW, spacing } = o;
+  const preset = PRESETS[o.preset || 'continental'];
   const G = GRID;
   const cell = mapW / G;
   const noiseA = makeNoise(o.makeRng(o.seed, 100 + o.salt * 10));
@@ -215,17 +645,17 @@ export function buildTerrain(o) {
 
       const nr = fbm(noiseB, fx / (spacing * 1.9), fy / (spacing * 1.9), 5);
       const ridge = 1 - Math.abs(2 * nr - 1);
-      const mount = smoothstep(0.82, 0.98, ridge);
+      const mount = smoothstep(0.82 - 0.12 * (preset.mountain - 1), 0.98 - 0.08 * (preset.mountain - 1), ridge);
       const flat = Math.max(near[i], 0.55 * corr[i]);
       const land = smoothstep(LAND_T, LAND_T + 0.12, score[i]);
       const roll = fbm(noiseC, fx / (spacing * 0.9), fy / (spacing * 0.9), 3);
       if (isLand[i]) {
-        height[i] = SEA + 0.04 * land + land * (0.1 * roll + 0.55 * mount * (1 - 0.9 * flat));
+        height[i] = SEA + 0.04 * land + land * (0.1 * roll + 0.55 * preset.mountain * mount * (1 - 0.9 * flat));
       } else {
         height[i] = SEA * smoothstep(0, LAND_T, score[i]);
       }
       const wet = fbm(noiseD, fx / (spacing * 1.3), fy / (spacing * 1.3), 3);
-      moist[i] = Math.min(1, Math.max(0, (wet - 0.5) * 2.4 + 0.5 - 0.12 * Math.max(0, height[i] - 0.5)));
+      moist[i] = Math.min(1, Math.max(0, (wet - 0.5) * 2.4 + 0.5 + preset.wet - 0.12 * Math.max(0, height[i] - 0.5)));
     }
   }
 
@@ -263,7 +693,7 @@ export function buildTerrain(o) {
   const neutralIdx = [];
   for (let t = 0; t < points.length; t++) if (!o.owned[t] && o.tiers[t] <= 2) neutralIdx.push(t);
   neutralIdx.sort((a, b) => meanHeight(points[b], spacing * 0.6) - meanHeight(points[a], spacing * 0.6) || a - b);
-  const fortressCount = Math.ceil(0.12 * neutralIdx.length);
+  const fortressCount = preset.mountain ? Math.ceil(0.12 * neutralIdx.length) : 0;
   const fortress = new Set(neutralIdx.slice(0, fortressCount));
   for (const t of fortress) {
     const p = points[t];
@@ -319,7 +749,7 @@ export function buildTerrain(o) {
 
   const rivers = [];
   const riverCount = new Uint16Array(G * G);
-  const wanted = Math.max(4, Math.round(points.length / 3.5));
+  const wanted = preset.rivers ? Math.max(3, Math.round((points.length / 3.5) * preset.rivers)) : 0;
   const candidates = [];
   for (let i = 0; i < G * G; i++) {
     if (isLand[i] && height[i] > SEA + 0.2) {
@@ -364,11 +794,11 @@ export function buildTerrain(o) {
     return { w: Math.round((1.6 + 0.7 * (share - 1)) * 10) / 10, p: pts.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]) };
   });
   const riverSegs = [];
-  for (const r of riverPolys) {
+  for (const [ri, r] of riverPolys.entries()) {
     for (let k = 0; k < r.p.length - 1; k++) {
       const sa = { x: r.p[k][0], y: r.p[k][1] };
       const sb = { x: r.p[k + 1][0], y: r.p[k + 1][1] };
-      riverSegs.push({ a: sa, b: sb, x0: Math.min(sa.x, sb.x), x1: Math.max(sa.x, sb.x), y0: Math.min(sa.y, sb.y), y1: Math.max(sa.y, sb.y) });
+      riverSegs.push({ ri, a: sa, b: sb, x0: Math.min(sa.x, sb.x), x1: Math.max(sa.x, sb.x), y0: Math.min(sa.y, sb.y), y1: Math.max(sa.y, sb.y) });
     }
   }
 
@@ -385,6 +815,7 @@ export function buildTerrain(o) {
     const steps = Math.max(4, Math.ceil(len / (cell * 0.7)));
     let cost = 0;
     let ocean = false;
+    let oceanCount = 0;
     const runs = [];
     let run = null;
     for (let s = 0; s <= steps; s++) {
@@ -392,7 +823,10 @@ export function buildTerrain(o) {
       const x = A.x + (B.x - A.x) * t;
       const y = A.y + (B.y - A.y) * t;
       const h = sample(height, x, y);
-      if (h < SEA) ocean = true;
+      if (h < SEA) {
+        ocean = true;
+        oceanCount += 1;
+      }
       let c = 1;
       if (h > MOUNT_T) c = 2;
       else if (h > 0.42) c = 1.4;
@@ -400,9 +834,14 @@ export function buildTerrain(o) {
       else if (h > SEA + 0.17) c = 1.15;
       cost += c;
       if (t * len > spacing * 0.3 && (1 - t) * len > spacing * 0.3 && h > MOUNT_T) {
-        if (!run) run = { sx: x, sy: y };
+        if (!run) run = { sx: x, sy: y, lx: x, ly: y, lh: h };
         run.ex = x;
         run.ey = y;
+        if (h < run.lh) {
+          run.lx = x;
+          run.ly = y;
+          run.lh = h;
+        }
       } else if (run) {
         runs.push(run);
         run = null;
@@ -419,7 +858,7 @@ export function buildTerrain(o) {
       const q = segIntersect(A, B, seg.a, seg.b);
       if (q && !crossings.some((c) => Math.hypot(c.x - q.x, c.y - q.y) < spacing * 0.08)) crossings.push(q);
     }
-    return { len, ocean, cost: cost / (steps + 1), runs: runs.map((r) => ({ x: (r.sx + r.ex) / 2, y: (r.sy + r.ey) / 2 })), crossings };
+    return { len, ocean, oceanFrac: oceanCount / (steps + 1), cost: cost / (steps + 1), runs: runs.map((r) => ({ x: (r.sx + r.ex) / 2, y: (r.sy + r.ey) / 2, low: { x: r.lx, y: r.ly } })), crossings };
   };
 
   const fords = [];
@@ -485,15 +924,19 @@ export function buildTerrain(o) {
 
   const seatOf = o.seatOf;
   const seats = o.players;
+  const trailCtx = { points, edges, spacing, cell, G, sample, height, moist, riverSegs, scanLine, nearestOnSegment, MOUNT_T, SEA };
+  const trails = o.trails ? planTrails(trailCtx) || planTrails(trailCtx, 0.25) || planTrails(trailCtx, 0.6) : null;
   const pen = new Array(seats).fill(0);
-  edges.forEach(([a, b], k) => {
-    const w = edgeInfo[k].kind === 'pass' ? 2 : edgeInfo[k].kind === 'river' ? 1 : (edgeInfo[k].mult - 1) * 1.5;
-    if (!w) return;
-    for (const t of [a, b]) if (o.owned[t]) pen[seatOf[t]] += w;
-  });
+  const penEdges = trails
+    ? trails.edges.map((e) => ({ a: e.a, b: e.b, w: e.kind === 'pass' ? 2 : e.kind === 'river' ? 1.5 : (e.mult - 1) * 1.5 }))
+    : edges.map(([a, b], k) => ({ a, b, w: edgeInfo[k].kind === 'pass' ? 2 : edgeInfo[k].kind === 'river' ? 1 : (edgeInfo[k].mult - 1) * 1.5 }));
+  for (const { a, b, w } of penEdges) {
+    if (!w) continue;
+    for (const t of [a, b]) if (t < points.length && o.owned[t]) pen[seatOf[t]] += w;
+  }
   const spread = Math.max(...pen) - Math.min(...pen);
   const total = pen.reduce((s, v) => s + v, 0);
-  const fairness = spread * 10 + total / seats;
+  const fairness = o.trails && !trails ? Infinity : spread * 10 + total / seats;
 
   const hStr = [];
   const mStr = [];
@@ -508,6 +951,7 @@ export function buildTerrain(o) {
     terrain,
     edgeInfo,
     links,
+    trails,
     art: {
       v: 1,
       grid: G,
@@ -516,8 +960,8 @@ export function buildTerrain(o) {
       h: hStr.join(''),
       m: mStr.join(''),
       rivers: riverPolys,
-      fords: fords.map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
-      passes: passes.map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
+      fords: (trails ? trails.fords : fords).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
+      passes: (trails ? trails.passes.filter((p, i, arr) => arr.findIndex((q) => Math.hypot(q.x - p.x, q.y - p.y) < spacing * 0.15) === i) : passes).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
     },
     stats: {
       landShare: isLand.reduce((s, v) => s + v, 0) / (G * G),
@@ -531,9 +975,12 @@ export function buildTerrain(o) {
 export function bestTerrain(o) {
   let best = null;
   const count = o.points.length > 150 ? 3 : o.points.length > 60 ? 4 : 5;
-  for (let salt = 0; salt < count; salt++) {
+  const extra = o.trails ? 6 : 0;
+  for (let salt = 0; salt < count + extra; salt++) {
+    if (salt >= count && best && Number.isFinite(best.fairness)) break;
     const result = buildTerrain({ ...o, salt });
     if (!best || result.fairness < best.fairness) best = result;
   }
+  if (o.trails && (!best || !Number.isFinite(best.fairness))) throw new Error('could not connect every castle with trails for these settings');
   return best;
 }

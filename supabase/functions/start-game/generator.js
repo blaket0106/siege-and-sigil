@@ -1,4 +1,4 @@
-import { bestTerrain } from './terrain.js';
+import { bestTerrain, PRESETS } from './terrain.js';
 
 export const GENERATOR_VERSION = 4;
 export const SPACING = 150;
@@ -10,6 +10,10 @@ const TERRITORIES_PER_PLAYER = { tiny: 8, small: 16, compact: 12, standard: 24, 
 const RICHNESS = { sparse: [6, 2, 1], standard: [3, 2, 1], plentiful: [2, 2, 2] };
 const ROAD_CHANCE = { none: 0, rare: 0.1, common: 0.3 };
 const RING_VALUES = { inner: 45, outer: 18 };
+const HOME_SHIFT = { close: -0.18, medium: 0, far: 0.2 };
+const WORMHOLE_DIVISOR = { none: 0, rare: 40, common: 16 };
+const WORMHOLE_TICKS = 24;
+const clampRadius = (v) => Math.min(0.92, Math.max(0.25, v));
 
 export const tierOf = (resources) => (resources <= 20 ? 1 : resources <= 40 ? 2 : 3);
 const START_RESOURCES = [50, 30, 12, 12, 12, 12, 12, 12, 12, 12];
@@ -67,7 +71,7 @@ function round4(value) {
   return Math.round(value * 1e4) / 1e4;
 }
 
-function placeWedge({ rng, players, start, radius, wedge, minDist, rMin = 0, capRange = [0.5, 0.65] }) {
+function placeWedge({ rng, players, start, radius, wedge, minDist, rMin = 0, capRange = [0.5, 0.65], shift = 0 }) {
   const placed = [];
   const locals = [];
   const innerMin = Math.max(rMin, minDist / (2 * Math.sin(Math.PI / players)));
@@ -90,7 +94,7 @@ function placeWedge({ rng, players, start, radius, wedge, minDist, rMin = 0, cap
     locals.push(p);
   };
 
-  const capR = radius * (capRange[0] + rng() * (capRange[1] - capRange[0]));
+  const capR = radius * (clampRadius(capRange[0] + shift) + rng() * (clampRadius(capRange[1] + shift) - clampRadius(capRange[0] + shift)));
   const capT = wedge * (0.4 + rng() * 0.2);
   const capital = { x: capR * Math.cos(capT), y: capR * Math.sin(capT) };
   if (!fits(capital)) return null;
@@ -307,7 +311,7 @@ function placeClusters({ rng, players, start, shape, minDist, R }) {
 
 const quad = (p) => [p, { x: -p.x, y: p.y }, { x: p.x, y: -p.y }, { x: -p.x, y: -p.y }];
 
-function placeMirrored({ rng, players, start, radius, minDist, clump, neutralCount }) {
+function placeMirrored({ rng, players, start, radius, minDist, clump, neutralCount, shift = 0 }) {
   const copies = (p) => (players === 2 ? [p, { x: -p.x, y: -p.y }] : quad(p));
   const all = [];
   const minSq = minDist * minDist;
@@ -331,7 +335,7 @@ function placeMirrored({ rng, players, start, radius, minDist, clump, neutralCou
     let placed = null;
     for (let t = 0; t < 600 && !placed; t++) {
       const mark = all.length;
-      const r = radius * (0.45 + 0.25 * rng());
+      const r = radius * clampRadius(0.45 + shift + 0.25 * rng());
       const a = ((15 + 60 * rng()) * Math.PI) / 180;
       const cap = { x: r * Math.cos(a), y: r * Math.sin(a) };
       const members = [copies(cap)];
@@ -400,8 +404,8 @@ function placeMirrored({ rng, players, start, radius, minDist, clump, neutralCou
   return { homes, neutrals, quads };
 }
 
-function placeTwinRings({ rng, players, start, radius, wedge, minDist, ringMin, neutralCount }) {
-  const local = placeWedge({ rng, players, start, radius, wedge, minDist, rMin: 0, capRange: [0.55, 0.68] });
+function placeTwinRings({ rng, players, start, radius, wedge, minDist, ringMin, neutralCount, shift = 0 }) {
+  const local = placeWedge({ rng, players, start, radius, wedge, minDist, rMin: 0, capRange: [0.55, 0.68], shift });
   if (!local) return null;
   const homePhase = rng() * 2 * Math.PI;
   const homes = [];
@@ -481,11 +485,14 @@ function neutralResources(rng, count, ratio) {
   return values;
 }
 
-export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false, shape: requestedShape = 'continent', richness = 'standard', randomRoads = 'none', starScatter = 'random', mirrored = false }) {
+export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false, shape: requestedShape = 'continent', richness = 'standard', randomRoads = 'none', starScatter = 'random', mirrored = false, trails = false, preset = 'continental', homeDistance = 'medium', wormholes = 'none' }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
   if (!perPlayer) throw new Error(`unknown map size: ${mapSize}`);
   if (!SHAPES.includes(requestedShape)) throw new Error(`unknown map shape: ${requestedShape}`);
+  if (!PRESETS[preset]) throw new Error(`unknown map preset: ${preset}`);
+  if (!(homeDistance in HOME_SHIFT)) throw new Error(`unknown home distance: ${homeDistance}`);
+  if (!(wormholes in WORMHOLE_DIVISOR)) throw new Error(`unknown wormholes setting: ${wormholes}`);
   if (!RICHNESS[richness]) throw new Error(`unknown resource richness: ${richness}`);
   if (!(randomRoads in ROAD_CHANCE)) throw new Error(`unknown random roads setting: ${randomRoads}`);
   if (starScatter !== 'random' && starScatter !== 'twin_rings') throw new Error(`unknown star scatter: ${starScatter}`);
@@ -523,18 +530,18 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     let homes = [];
     let placed = null;
     if (mirrored) {
-      placed = placeMirrored({ rng, players, start: startingTerritories, radius, minDist: homeDist, clump: styleConfig.clump, neutralCount: neutralTotal });
+      placed = placeMirrored({ rng, players, start: startingTerritories, radius, minDist: homeDist, clump: styleConfig.clump, neutralCount: neutralTotal, shift: HOME_SHIFT[homeDistance] });
       if (!placed) continue;
       homes = placed.homes;
       neutrals = placed.neutrals;
     } else if (starScatter === 'twin_rings') {
-      placed = placeTwinRings({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, ringMin: minDist, neutralCount: neutralTotal });
+      placed = placeTwinRings({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, ringMin: minDist, neutralCount: neutralTotal, shift: HOME_SHIFT[homeDistance] });
       if (!placed) continue;
       homes = placed.homes;
       neutrals = placed.neutrals;
     } else {
       if (shape.symmetric) {
-        const local = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, rMin: shape.rMin, capRange: shape.capRange });
+        const local = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, rMin: shape.rMin, capRange: shape.capRange, shift: HOME_SHIFT[homeDistance] });
         if (!local) continue;
         for (let k = 0; k < players; k++) {
           for (const l of local) {
@@ -673,6 +680,8 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       players,
       shapeLand: shapeKind === 'continent' ? null : shapeAbs.land,
       mirror: mirrored,
+      trails: trails && terrain,
+      preset,
     });
     territories.forEach((t, g) => {
       t.terrain = world.terrain[g];
@@ -682,7 +691,58 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       e.move_cost_mult = world.edgeInfo[k].mult;
     });
     layout.art = world.art;
-    if (freeTravel) {
+    if (world.trails) {
+      const tr = world.trails;
+      const cnames = makeNames(tr.crossings.length, makeRng(seed, 8));
+      const crng = makeRng(seed, 9);
+      const base = points.length;
+      tr.crossings.forEach((c, k) => {
+        const natural = 4 + Math.floor(crng() * 7);
+        territories.push({
+          idx: c.idx,
+          name: c.pass ? `${cnames[k]} Pass` : `${cnames[k]} Crossing`,
+          slug: `${cnames[k]}-${c.pass ? 'pass' : 'crossing'}`.toLowerCase(),
+          tier: 1,
+          natural_resources: natural,
+          x: round4(c.x),
+          y: round4(c.y),
+          owner_seat: null,
+          troops: startingGarrison,
+          treasury_level: 0,
+          industry_level: 1,
+          prestige_level: 0,
+          resources: natural,
+          terrain: c.pass ? 'hills' : 'plains',
+          crossing: true,
+          crossing_kind: c.pass ? 'pass' : 'river',
+          river_idx: c.pass ? null : c.ri,
+        });
+      });
+      layout.edges = tr.edges.map((e) => ({ a: Math.min(e.a, e.b), b: Math.max(e.a, e.b), kind: e.kind, length: round4(e.length), move_cost_mult: e.mult, defense_mult: e.a >= base || e.b >= base ? 1.25 : 1, path: e.a < e.b ? e.path : [...e.path].reverse() }));
+      layout.trails = true;
+      if (WORMHOLE_DIVISOR[wormholes]) {
+        const wrng = makeRng(seed, 10);
+        const used = new Set();
+        const pool = [];
+        for (let g = startTotal; g < base; g++) pool.push(g);
+        const far = 4 * spacing;
+        for (let k = 0, want = Math.ceil(total / WORMHOLE_DIVISOR[wormholes]); k < want; k++) {
+          const pairs = [];
+          for (let i = 0; i < pool.length; i++) {
+            if (used.has(pool[i])) continue;
+            for (let j = i + 1; j < pool.length; j++) {
+              if (!used.has(pool[j]) && Math.hypot(points[pool[i]].x - points[pool[j]].x, points[pool[i]].y - points[pool[j]].y) >= far) pairs.push([pool[i], pool[j]]);
+            }
+          }
+          if (!pairs.length) break;
+          const [a, b] = pairs[Math.floor(wrng() * pairs.length)];
+          used.add(a);
+          used.add(b);
+          const len = Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);
+          layout.edges.push({ a, b, kind: 'wormhole', length: round4(len), move_cost_mult: round4(Math.max(0.05, (WORMHOLE_TICKS * 17.5 * scale) / len)), defense_mult: 1, path: [[round4(points[a].x), round4(points[a].y)], [round4(points[b].x), round4(points[b].y)]] });
+        }
+      }
+    } else if (freeTravel) {
       layout.edges = world.links(LINK_CAP * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
     }
   }

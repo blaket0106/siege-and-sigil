@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateWorld, assignSeats, SPACING, SHAPES } from './generator.js';
+import { PRESETS } from './terrain.js';
 
 const SIZES = { compact: 12, standard: 24, large: 36 };
 const SEEDS = [1, 42, 987654321, 9007199254740991];
@@ -371,4 +372,203 @@ test('random roads, richness, tiny maps and larger starts', () => {
   assert.equal(generateWorld({ ...NEW_BASE, players: 2, mapSize: 'small' }).territories.length, 32);
   const big = generateWorld({ ...NEW_BASE, players: 4, startingTerritories: 8 });
   assert.equal(big.territories.filter((t) => t.owner_seat === 0).length, 8);
+});
+
+const TRAIL_CASES = [
+  { players: 2, mapSize: 'compact', seed: 1, scale: 2 },
+  { players: 2, mapSize: 'compact', seed: 5, scale: 2 },
+  { players: 4, mapSize: 'standard', seed: 5, scale: 3 },
+  { players: 4, mapSize: 'large', seed: 7, scale: 4 },
+  { players: 8, mapSize: 'large', seed: 11, scale: 4 },
+];
+const trailLayout = (c) => generateWorld({ style: 'scatter', startingTerritories: 4, startingGarrison: 10, freeTravel: true, trails: true, ...c });
+
+function segCross(p, p2, q, q2) {
+  const d1x = p2[0] - p[0];
+  const d1y = p2[1] - p[1];
+  const d2x = q2[0] - q[0];
+  const d2y = q2[1] - q[1];
+  const den = d1x * d2y - d1y * d2x;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((q[0] - p[0]) * d2y - (q[1] - p[1]) * d2x) / den;
+  const u = ((q[0] - p[0]) * d1y - (q[1] - p[1]) * d1x) / den;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return [p[0] + t * d1x, p[1] + t * d1y];
+}
+
+test('trails: every castle joins one trail network, edges carry a path, and the build is deterministic', () => {
+  for (const c of TRAIL_CASES) {
+    const layout = trailLayout(c);
+    assert.equal(layout.trails, true);
+    assert.ok(isConnected(layout), `connected ${JSON.stringify(c)}`);
+    for (const e of layout.edges) {
+      assert.ok(e.a < e.b, 'edges list the lower index first');
+      assert.ok(Array.isArray(e.path) && e.path.length >= 2, 'edge has a path');
+      const A = layout.territories[e.a];
+      const B = layout.territories[e.b];
+      assert.ok(Math.hypot(e.path[0][0] - A.x, e.path[0][1] - A.y) < 1);
+      assert.ok(Math.hypot(e.path.at(-1)[0] - B.x, e.path.at(-1)[1] - B.y) < 1);
+      assert.ok(e.length >= Math.hypot(A.x - B.x, A.y - B.y) - 1);
+      assert.ok(e.move_cost_mult >= 1 && e.move_cost_mult <= 2.6);
+    }
+    const again = trailLayout(c);
+    assert.deepEqual(again.edges, layout.edges);
+    assert.deepEqual(again.territories.map((t) => [t.x, t.y]), layout.territories.map((t) => [t.x, t.y]));
+  }
+});
+
+test('trails: rivers are walls, crossed only at river castles', () => {
+  for (const c of TRAIL_CASES) {
+    const layout = trailLayout(c);
+    const rivers = layout.art.rivers;
+    const crossings = layout.territories.map((t, i) => (t.crossing_kind === 'river' ? i : -1)).filter((i) => i >= 0);
+    for (const e of layout.edges) {
+      const touches = crossings.filter((i) => e.a === i || e.b === i);
+      for (let k = 0; k < e.path.length - 1; k++) {
+        for (const r of rivers) {
+          for (let m = 0; m < r.p.length - 1; m++) {
+            const hit = segCross(e.path[k], e.path[k + 1], r.p[m], r.p[m + 1]);
+            if (!hit) continue;
+            const ok = touches.some((i) => Math.hypot(layout.territories[i].x - hit[0], layout.territories[i].y - hit[1]) < SPACING * (layout.world_scale || 1) * 0.12);
+            assert.ok(ok, `an edge crosses a river away from a crossing castle ${JSON.stringify(c)}`);
+          }
+        }
+      }
+      const incident = crossings.some((i) => e.a === i || e.b === i);
+      const atPass = layout.territories.some((t, i) => t.crossing_kind === 'pass' && (e.a === i || e.b === i));
+      assert.equal(e.kind === 'river', incident, 'river edges are exactly the edges at river castles');
+      if (atPass && !incident) assert.equal(e.kind, 'pass');
+    }
+  }
+});
+
+test('trails: river castles are low-tier neutral posts standing on a river, each bridging two banks', () => {
+  for (const c of TRAIL_CASES) {
+    const layout = trailLayout(c);
+    const crossings = layout.territories.filter((t) => t.crossing_kind === 'river');
+    const total = layout.territories.length;
+    assert.ok(crossings.length <= Math.ceil(0.12 * (total - layout.territories.filter((t) => t.crossing).length)) + 1);
+    for (const t of crossings) {
+      assert.equal(t.tier, 1);
+      assert.ok(t.natural_resources >= 4 && t.natural_resources <= 10);
+      assert.equal(t.owner_seat, null);
+      assert.equal(t.terrain, 'plains');
+      assert.ok(t.troops > 0);
+      const onRiver = layout.art.rivers.some((r) => r.p.some(([x, y]) => Math.hypot(x - t.x, y - t.y) < SPACING * (layout.world_scale || 1) * 0.15));
+      assert.ok(onRiver, 'crossing sits on a river');
+      const degree = layout.edges.filter((e) => e.a === t.idx || e.b === t.idx).length;
+      assert.ok(degree >= 2);
+    }
+    assert.deepEqual(layout.art.fords.length, crossings.length);
+    assert.ok(layout.territories.every((t, i) => t.idx === i));
+  }
+});
+
+const gridHeight = (layout, x, y) => {
+  const G = layout.art.grid;
+  const cell = layout.map_w / G;
+  const gx = Math.min(G - 1, Math.max(0, Math.floor(x / cell)));
+  const gy = Math.min(G - 1, Math.max(0, Math.floor(y / cell)));
+  const i = gy * G + gx;
+  return parseInt(layout.art.h.slice(2 * i, 2 * i + 2), 36) / 1295;
+};
+
+test('trails: mountains are walls, crossed only at pass castles', () => {
+  let passTotal = 0;
+  for (const c of TRAIL_CASES) {
+    const layout = trailLayout(c);
+    const near = SPACING * (layout.world_scale || 1) * 0.36;
+    const castles = layout.territories;
+    for (const e of layout.edges) {
+      for (const [x, y] of e.path) {
+        if (castles.some((t) => Math.hypot(t.x - x, t.y - y) < near)) continue;
+        assert.ok(gridHeight(layout, x, y) <= 0.54, `trail climbs a mountain away from a castle ${JSON.stringify(c)}`);
+      }
+    }
+    const passes = castles.filter((t) => t.crossing_kind === 'pass');
+    passTotal += passes.length;
+    for (const t of passes) {
+      assert.equal(t.tier, 1);
+      assert.equal(t.owner_seat, null);
+      assert.ok(t.natural_resources >= 4 && t.natural_resources <= 10);
+      assert.ok(layout.edges.filter((e) => e.a === t.idx || e.b === t.idx).length >= 2);
+      assert.ok(layout.art.passes.some(([x, y]) => Math.hypot(x - t.x, y - t.y) < 1));
+    }
+  }
+  assert.ok(passTotal > 0, 'at least one case needs a pass');
+});
+
+const PRESET_CASES = [
+  { players: 2, mapSize: 'compact', seed: 3, scale: 2 },
+  { players: 4, mapSize: 'standard', seed: 5, scale: 3 },
+];
+
+test('presets: every preset builds a connected trail network', () => {
+  for (const preset of Object.keys(PRESETS)) {
+    for (const c of PRESET_CASES) {
+      const layout = trailLayout({ ...c, preset });
+      assert.ok(isConnected(layout), `connected ${preset} ${JSON.stringify(c)}`);
+    }
+  }
+});
+
+test('presets: plains has no rivers, mountains or crossings; river valley has rivers; highlands has passes', () => {
+  for (const c of PRESET_CASES) {
+    const plains = trailLayout({ ...c, preset: 'plains' });
+    assert.equal(plains.art.rivers.length, 0);
+    assert.ok(plains.territories.every((t) => !t.crossing && t.terrain !== 'mountain'));
+    assert.ok(plains.edges.every((e) => e.kind === 'land'));
+    assert.ok(trailLayout({ ...c, preset: 'river_valley' }).art.rivers.length > 0);
+  }
+  const high = trailLayout({ players: 4, mapSize: 'standard', seed: 5, scale: 3, preset: 'highlands' });
+  assert.ok(high.territories.some((t) => t.crossing_kind === 'pass'));
+  assert.throws(() => generateWorld({ style: 'scatter', players: 2, mapSize: 'compact', seed: 1, startingTerritories: 4, startingGarrison: 10, preset: 'nope' }), /unknown map preset/);
+});
+
+test('home distance: close homes sit nearer the centre than medium, and medium nearer than far', () => {
+  const spread = (homeDistance, shape, mirrored) => {
+    const layout = generateWorld({ style: 'scatter', players: 4, mapSize: 'standard', seed: 5, startingTerritories: 4, startingGarrison: 10, scale: 1, terrain: false, shape, mirrored, homeDistance });
+    const c = layout.map_w / 2;
+    return layout.seats.reduce((sum, st) => sum + Math.hypot(layout.territories[st.capital_idx].x - c, layout.territories[st.capital_idx].y - c), 0) / layout.seats.length;
+  };
+  for (const [shape, mirrored] of [['continent', false], ['round', true]]) {
+    const close = spread('close', shape, mirrored);
+    const medium = spread('medium', shape, mirrored);
+    const far = spread('far', shape, mirrored);
+    assert.ok(close < medium && medium < far, `${shape} ${mirrored}: ${close} ${medium} ${far}`);
+  }
+  assert.throws(() => generateWorld({ style: 'scatter', players: 2, mapSize: 'compact', seed: 1, startingTerritories: 4, startingGarrison: 10, homeDistance: 'nope' }), /unknown home distance/);
+});
+
+test('wormholes: fixed-time links between distant neutral castles, trails untouched', () => {
+  for (const c of TRAIL_CASES.slice(0, 4)) {
+    const base = trailLayout(c);
+    const worm = trailLayout({ ...c, wormholes: 'common' });
+    const links = worm.edges.filter((e) => e.kind === 'wormhole');
+    assert.ok(links.length >= 1, `has wormholes ${JSON.stringify(c)}`);
+    assert.ok(base.edges.every((e) => e.kind !== 'wormhole'));
+    assert.deepEqual(worm.edges.filter((e) => e.kind !== 'wormhole'), base.edges);
+    assert.deepEqual(trailLayout({ ...c, wormholes: 'common' }).edges, worm.edges);
+    const ends = links.flatMap((e) => [e.a, e.b]);
+    assert.equal(new Set(ends).size, ends.length, 'each castle has at most one wormhole');
+    const spacing = SPACING * (worm.world_scale || 1);
+    const startTotal = c.players * 4;
+    for (const e of links) {
+      assert.ok(e.a < e.b);
+      assert.ok(e.a >= startTotal && !worm.territories[e.a].crossing && !worm.territories[e.b].crossing, 'neutral, non-crossing ends');
+      assert.ok(e.length >= 4 * spacing - 1);
+      assert.ok(Math.abs(e.length * e.move_cost_mult - 24 * 17.5 * (worm.world_scale || 1)) < 1, 'takes 24 ticks at base speed');
+      assert.equal(e.path.length, 2);
+    }
+    assert.ok(isConnected(worm));
+  }
+  assert.ok(trailLayout({ ...TRAIL_CASES[0], wormholes: 'rare' }).edges.filter((e) => e.kind === 'wormhole').length <= trailLayout({ ...TRAIL_CASES[0], wormholes: 'common' }).edges.filter((e) => e.kind === 'wormhole').length);
+  assert.throws(() => generateWorld({ style: 'scatter', players: 2, mapSize: 'compact', seed: 1, startingTerritories: 4, startingGarrison: 10, wormholes: 'nope' }), /unknown wormholes/);
+});
+
+test('trails: legacy free travel layouts are unchanged when trails are off', () => {
+  const a = generateWorld({ style: 'scatter', players: 4, mapSize: 'standard', seed: 5, startingTerritories: 4, startingGarrison: 10, scale: 3, freeTravel: true });
+  assert.ok(!a.trails);
+  assert.ok(a.edges.every((e) => !e.path));
+  assert.ok(a.territories.every((t) => !t.crossing));
 });

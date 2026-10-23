@@ -4,138 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Siege & Sigil</title>
-  <style>
-    :root {
-      --bg: #0a0a0f;
-      --panel: #14141c;
-      --panel2: #1b1b26;
-      --line: #2e2c3a;
-      --text: #c9b99a;
-      --dim: #7d7466;
-      --gold: #d4a94a;
-      --gold2: #f0cf7d;
-      --red: #c0453a;
-      --green: #5a9a5e;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: radial-gradient(ellipse at top, #15121f 0%, var(--bg) 60%);
-      color: var(--text);
-      font-family: Georgia, 'Times New Roman', serif;
-      min-height: 100vh;
-    }
-    h1, h2, h3 { font-weight: normal; letter-spacing: 0.08em; margin: 0; color: var(--gold2); }
-    button, input, select { font: inherit; color: inherit; }
-    input, select {
-      background: var(--panel2);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 9px 11px;
-      width: 100%;
-    }
-    input:focus, select:focus { outline: 1px solid var(--gold); border-color: var(--gold); }
-    label { display: block; font-size: 0.8rem; color: var(--dim); margin: 12px 0 4px; letter-spacing: 0.04em; }
-    button {
-      background: var(--panel2);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 8px 14px;
-      cursor: pointer;
-    }
-    button:hover:not(:disabled) { border-color: var(--gold); }
-    button:disabled { opacity: 0.45; cursor: default; }
-    button.primary { background: #3a2f12; border-color: var(--gold); color: var(--gold2); }
-    button.primary:hover:not(:disabled) { background: #4d3e17; }
-    button.danger { border-color: #6b2e28; color: #e08b82; }
-    button.link { background: none; border: none; padding: 0; color: var(--gold); text-decoration: underline; }
-    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px 48px; }
-    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 22px; gap: 12px; flex-wrap: wrap; }
-    .topbar .who { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: 0.9rem; }
-    .brand { font-size: 1.5rem; }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; margin-bottom: 20px; }
-    .panel > h2 { font-size: 1.1rem; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .auth { max-width: 380px; margin: 12vh auto 0; text-align: center; }
-    .auth h1 { font-size: 2.4rem; margin-bottom: 4px; }
-    .auth .sub { color: var(--dim); margin-bottom: 24px; font-size: 0.9rem; }
-    .auth .panel { text-align: left; }
-    .tabs { display: flex; gap: 0; margin-bottom: 8px; }
-    .tabs button { flex: 1; border-radius: 0; background: none; border: none; border-bottom: 2px solid var(--line); padding: 10px; color: var(--dim); }
-    .tabs button.on { border-bottom-color: var(--gold); color: var(--gold2); }
-    .msg { margin-top: 12px; font-size: 0.85rem; color: var(--gold2); }
-    .row { display: flex; gap: 10px; align-items: center; }
-    .row.wrap2 { flex-wrap: wrap; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
-    .list > * { border-top: 1px solid var(--line); padding: 12px 0; }
-    .list > *:first-child { border-top: none; }
-    .game { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-    .game .name { color: var(--gold2); font-size: 1.02rem; }
-    .game .meta { color: var(--dim); font-size: 0.82rem; margin-top: 3px; }
-    .empty { color: var(--dim); font-style: italic; padding: 8px 0; }
-    .chip { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; border: 1px solid #000; }
-    .dots { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: middle; }
-    .tag { font-size: 0.72rem; border: 1px solid var(--line); border-radius: 10px; padding: 1px 8px; color: var(--dim); margin-left: 6px; }
-    .tag.gold { border-color: var(--gold); color: var(--gold); }
-    .tag.green { border-color: var(--green); color: var(--green); }
-    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
-    .slot { background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 12px; min-height: 64px; display: flex; align-items: center; gap: 10px; }
-    .slot.empty { opacity: 0.5; font-style: italic; color: var(--dim); }
-    .slot .nm { color: var(--gold2); }
-    .slot .fn { color: var(--dim); font-size: 0.8rem; }
-    .factions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 6px; }
-    .fac { display: flex; align-items: center; gap: 8px; padding: 8px 10px; text-align: left; }
-    .fac.on { border-color: var(--gold); background: #2a2210; }
-    .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 16px; font-size: 0.88rem; }
-    .kv b { display: block; color: var(--dim); font-weight: normal; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; }
-    .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 12px; overflow-y: auto; z-index: 10; }
-    .modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 6px; padding: 20px; width: 100%; max-width: 640px; }
-    .grp { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; margin-top: 10px; }
-    .grp summary { cursor: pointer; color: var(--gold2); letter-spacing: 0.06em; padding: 4px 0; }
-    .tip { color: var(--dim); font-size: 0.76rem; margin-top: 4px; }
-    .techrow { display: grid; grid-template-columns: 1fr 70px 150px; gap: 8px; align-items: center; margin-top: 6px; font-size: 0.85rem; }
-    .modal h2 { margin-bottom: 8px; }
-    .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-    .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.9rem; color: var(--text); }
-    .check input { width: auto; }
-    #toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 20; width: min(92vw, 460px); }
-    .toast { background: #2a1512; border: 1px solid var(--red); padding: 10px 14px; border-radius: 4px; font-size: 0.9rem; }
-    .toast.ok { background: #14231a; border-color: var(--green); }
-    .maproot { display: flex; flex-direction: column; height: 100vh; }
-    .hud { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 0.88rem; }
-    .hud b { color: var(--gold2); font-weight: normal; letter-spacing: 0.06em; }
-    .hud .grow { flex: 1; }
-    .hud label { margin: 0; display: flex; align-items: center; gap: 6px; color: var(--text); }
-    .hud label input { width: auto; }
-    .mapbody { flex: 1; display: flex; min-height: 0; }
-    .mapwrap { flex: 1; min-width: 0; background: #07070b; position: relative; }
-    .mapwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; user-select: none; }
-    .mapwrap text { font-family: Georgia, serif; pointer-events: none; fill: #d9ccb0; }
-    .side { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 14px; font-size: 0.88rem; }
-    .side h3 { font-size: 1.02rem; margin-bottom: 6px; }
-    .side .sec { margin-top: 16px; }
-    .side .sec > b { display: block; color: var(--dim); font-weight: normal; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
-    .side .line { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid #20202b; }
-    .side .line span:first-child { color: var(--dim); }
-    .cmdrow { width: 100%; text-align: left; margin-top: 6px; display: flex; gap: 8px; align-items: center; }
-    @media (max-width: 760px) { .mapbody { flex-direction: column; } .side { width: auto; max-height: 42vh; border-left: none; border-top: 1px solid var(--line); } }
-    .chatlist { max-height: 46vh; overflow-y: auto; padding: 4px 0; }
-    .chatline { padding: 3px 0; word-break: break-word; }
-    .chatline small { color: var(--dim); margin-left: 6px; }
-    .threadrow { width: 100%; text-align: left; margin-top: 6px; display: block; }
-    .threadrow small { display: block; color: var(--dim); margin-top: 2px; }
-    .composer { display: flex; gap: 8px; margin-top: 10px; }
-    .composer input { flex: 1; }
-    .loading { text-align: center; color: var(--dim); margin-top: 30vh; letter-spacing: 0.2em; }
-    @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
-    @media (pointer: coarse) { button:not(.link), select, input:not([type="checkbox"]) { min-height: 44px; } .hud { gap: 8px 12px; } }
-    .legend { position: absolute; left: 10px; bottom: 10px; background: rgba(10,10,15,0.85); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font-size: 0.75rem; line-height: 1.7; pointer-events: none; }
-    .ldot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #fff; background: #0c0e18; margin-right: 8px; vertical-align: -2px; }
-    .zoomonly { display: none; }
-    svg.zoomed .zoomonly { display: inline; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cinzel+Decorative:wght@700;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('ss-theme'); } catch (e) {}
+      if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
-  <div id="app"><div class="loading">SIEGE &amp; SIGIL</div></div>
+  <div id="stage"></div>
+  <div id="app"><div class="loading">Siege &amp; Sigil</div></div>
   <div id="toasts"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
   <script>
@@ -157,7 +41,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, wormholes';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -207,6 +91,7 @@
 
     function toast(message, ok) {
       const t = h('div', { class: 'toast' + (ok ? ' ok' : '') }, message);
+      if (ok) Sfx.ok(); else Sfx.bad();
       document.getElementById('toasts').append(t);
       setTimeout(() => t.remove(), 5500);
     }
@@ -229,27 +114,332 @@
 
     function mount(node) {
       const app = document.getElementById('app');
+      document.body.classList.toggle('in-map', state.view === 'map');
       app.replaceChildren(node);
     }
 
+
+    const Sfx = (() => {
+      let ac = null;
+      let master = null;
+      let pad = null;
+      let on = true;
+      let music = true;
+      try { on = localStorage.getItem('ss-sound') !== '0'; music = localStorage.getItem('ss-music') !== '0'; } catch {}
+      const ensure = () => {
+        if (ac) { if (ac.state === 'suspended') ac.resume(); return ac; }
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ac = new AC();
+        master = ac.createGain();
+        master.gain.value = on ? 0.9 : 0;
+        const comp = ac.createDynamicsCompressor();
+        master.connect(comp);
+        comp.connect(ac.destination);
+        return ac;
+      };
+      const tone = (freq, dur, o = {}) => {
+        if (!on || !ensure()) return;
+        const t0 = ac.currentTime + (o.at || 0);
+        const osc = ac.createOscillator();
+        const g = ac.createGain();
+        const f = ac.createBiquadFilter();
+        osc.type = o.type || 'sine';
+        osc.frequency.setValueAtTime(freq, t0);
+        if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t0 + dur);
+        f.type = 'lowpass';
+        f.frequency.value = o.cut || 6000;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(o.vol || 0.2, t0 + (o.attack || 0.006));
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        osc.connect(f); f.connect(g); g.connect(master);
+        osc.start(t0); osc.stop(t0 + dur + 0.05);
+      };
+      const noise = (dur, o = {}) => {
+        if (!on || !ensure()) return;
+        const t0 = ac.currentTime + (o.at || 0);
+        const buf = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * dur)), ac.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+        const src = ac.createBufferSource();
+        src.buffer = buf;
+        const f = ac.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = o.freq || 2000;
+        const g = ac.createGain();
+        g.gain.value = o.vol || 0.1;
+        src.connect(f); f.connect(g); g.connect(master);
+        src.start(t0);
+      };
+      const startMusic = () => {
+        if (pad || !music || !ensure()) return;
+        const out = ac.createGain();
+        out.gain.value = 0.0001;
+        out.gain.exponentialRampToValueAtTime(0.05, ac.currentTime + 6);
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 520;
+        const lfo = ac.createOscillator();
+        const lfoG = ac.createGain();
+        lfo.frequency.value = 0.06;
+        lfoG.gain.value = 220;
+        lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
+        const roots = [110, 98, 123.47, 87.31];
+        const oscs = [];
+        [1, 1.5, 2, 3].forEach((m, i) => {
+          [-5, 5].forEach((det) => {
+            const o = ac.createOscillator();
+            o.type = i < 2 ? 'sawtooth' : 'triangle';
+            o.frequency.value = roots[0] * m;
+            o.detune.value = det;
+            const g = ac.createGain();
+            g.gain.value = i < 2 ? 0.5 : 0.25;
+            o.connect(g); g.connect(lp); o.start();
+            oscs.push({ o, m });
+          });
+        });
+        lp.connect(out); out.connect(master);
+        let step = 0;
+        const timer = setInterval(() => {
+          step = (step + 1) % roots.length;
+          oscs.forEach(({ o, m }) => o.frequency.setTargetAtTime(roots[step] * m, ac.currentTime, 3));
+        }, 14000);
+        pad = { out, timer, oscs };
+      };
+      const stopMusic = () => {
+        if (!pad) return;
+        clearInterval(pad.timer);
+        const p = pad;
+        pad = null;
+        p.out.gain.setTargetAtTime(0.0001, ac.currentTime, 0.6);
+        setTimeout(() => p.oscs.forEach(({ o }) => { try { o.stop(); } catch {} }), 2500);
+      };
+      return {
+        get on() { return on; },
+        get music() { return music; },
+        click: () => { tone(900, 0.05, { type: 'triangle', vol: 0.07 }); noise(0.03, { freq: 3500, vol: 0.05 }); },
+        ok: () => { tone(523.25, 0.18, { type: 'triangle', vol: 0.12 }); tone(783.99, 0.28, { type: 'triangle', vol: 0.1, at: 0.08 }); },
+        bad: () => { tone(150, 0.28, { type: 'sawtooth', vol: 0.13, slide: 90, cut: 700 }); },
+        bell: () => { [1, 2.4, 3.9].forEach((m, i) => tone(329.63 * m, 2.2 - i * 0.5, { vol: 0.14 / (i + 1), attack: 0.004 })); },
+        horn: () => { tone(98, 1.5, { type: 'sawtooth', vol: 0.16, attack: 0.3, cut: 500 }); tone(147, 1.5, { type: 'sawtooth', vol: 0.1, attack: 0.35, cut: 500 }); },
+        toggle: () => {
+          on = !on;
+          try { localStorage.setItem('ss-sound', on ? '1' : '0'); } catch {}
+          ensure();
+          if (master) master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, 0.1);
+          if (on) { startMusic(); tone(660, 0.12, { type: 'triangle', vol: 0.1 }); } else stopMusic();
+          return on;
+        },
+        wake: () => { if (on) startMusic(); },
+      };
+    })();
+    document.addEventListener('pointerdown', (e) => { if (e.target.closest && e.target.closest('button') && !e.target.closest('button:disabled')) Sfx.click(); Sfx.wake(); }, { capture: true });
+
+    const stageFx = { land: null, embers: null, raf: 0, parts: [] };
+
+    function buildLand(light) {
+      const W = 960;
+      const H = 600;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H; cv.className = 'land';
+      const ctx = cv.getContext('2d');
+      const hash = (x, y) => { let n = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) ^ 0x5bd1e995; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967295; };
+      const vnoise = (x, y) => {
+        const xi = Math.floor(x); const yi = Math.floor(y); const xf = x - xi; const yf = y - yi;
+        const u = xf * xf * (3 - 2 * xf); const v = yf * yf * (3 - 2 * yf);
+        return hash(xi, yi) * (1 - u) * (1 - v) + hash(xi + 1, yi) * u * (1 - v) + hash(xi, yi + 1) * (1 - u) * v + hash(xi + 1, yi + 1) * u * v;
+      };
+      const fbm = (x, y) => { let a = 0.5; let t = 0; let f = 1; for (let i = 0; i < 6; i++) { t += a * vnoise(x * f, y * f); f *= 2.03; a *= 0.5; } return t; };
+      const hgt = new Float32Array(W * H);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const nx = x / W; const ny = y / H;
+          const dx = (nx - 0.5) * 1.5; const dy = ny - 0.52;
+          const rim = Math.min(1, (dx * dx + dy * dy) * 2.4);
+          hgt[y * W + x] = fbm(nx * 4.2 + 3.1, ny * 4.2 + 1.7) * 1.15 - rim * 0.34 + 0.06;
+        }
+      }
+      const sea = 0.5;
+      const img = ctx.createImageData(W, H);
+      const mix = (a, b, t) => a + (b - a) * t;
+      for (let y = 1; y < H - 1; y++) {
+        for (let x = 1; x < W - 1; x++) {
+          const i = y * W + x; const e = hgt[i];
+          const shade = ((hgt[i - 1] - hgt[i + 1]) * 0.9 + (hgt[i - W] - hgt[i + W]) * 0.9) * 9;
+          let r; let g; let b;
+          if (e < sea) {
+            const d = Math.min(1, (sea - e) * 6);
+            if (light) { r = mix(212, 186, d); g = mix(196, 172, d); b = mix(150, 128, d); } else { r = mix(34, 12, d); g = mix(70, 26, d); b = mix(84, 34, d); }
+          } else {
+            const t = Math.min(1, (e - sea) * 3.2);
+            if (light) { r = mix(228, 190, t); g = mix(212, 168, t); b = mix(166, 118, t); } else { r = mix(92, 178, t); g = mix(78, 148, t); b = mix(48, 98, t); }
+            const k = 1 + shade * (light ? 0.55 : 0.9);
+            r *= k; g *= k; b *= k;
+          }
+          const edge = Math.abs(e - sea);
+          if (edge < 0.007) { const c = light ? 0.55 : 1.6; r *= c; g *= c; b *= c; if (!light) { r += 40; g += 30; } }
+          else if (e < sea && edge < 0.03 && (Math.floor(e * 400) % 2 === 0)) { const c = light ? 0.94 : 1.1; r *= c; g *= c; b *= c; }
+          const p = i * 4;
+          img.data[p] = Math.max(0, Math.min(255, r)); img.data[p + 1] = Math.max(0, Math.min(255, g)); img.data[p + 2] = Math.max(0, Math.min(255, b)); img.data[p + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const sites = [];
+      for (let k = 0; k < 4000 && sites.length < 16; k++) {
+        const x = 40 + hash(k, 7) * (W - 80); const y = 40 + hash(k, 11) * (H - 80);
+        if (hgt[Math.floor(y) * W + Math.floor(x)] > sea + 0.05 && sites.every(([sx, sy]) => Math.hypot(sx - x, sy - y) > 110)) sites.push([x, y]);
+      }
+      ctx.lineWidth = 1.6; ctx.setLineDash([5, 6]); ctx.strokeStyle = light ? 'rgba(92,60,20,0.65)' : 'rgba(240,206,120,0.5)';
+      sites.forEach(([x, y], i) => { const [nx, ny] = sites[(i * 5 + 3) % sites.length]; if (Math.hypot(nx - x, ny - y) < 320) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + nx) / 2 + 20, (y + ny) / 2 - 24, nx, ny); ctx.stroke(); } });
+      ctx.setLineDash([]);
+      sites.forEach(([x, y]) => {
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, 22);
+        grad.addColorStop(0, light ? 'rgba(160,40,30,0.5)' : 'rgba(255,196,96,0.65)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad; ctx.fillRect(x - 24, y - 24, 48, 48);
+        ctx.fillStyle = light ? '#7a1f18' : '#f6dc98'; ctx.strokeStyle = light ? '#2b1d0e' : '#1a0f06'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, 4.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      });
+      return cv;
+    }
+
+    function stageEmbers(light) {
+      const el = stageFx.embers;
+      const ctx = el.getContext('2d');
+      const resize = () => { el.width = window.innerWidth; el.height = window.innerHeight; };
+      resize();
+      stageFx.parts = Array.from({ length: light ? 28 : 46 }, () => ({ x: Math.random() * el.width, y: Math.random() * el.height, r: 0.6 + Math.random() * 1.8, v: 0.12 + Math.random() * 0.4, a: Math.random() * Math.PI * 2, s: 0.003 + Math.random() * 0.01 }));
+      const frame = () => {
+        stageFx.raf = requestAnimationFrame(frame);
+        if (document.hidden || document.body.classList.contains('in-map')) return;
+        if (el.width !== window.innerWidth || el.height !== window.innerHeight) resize();
+        ctx.clearRect(0, 0, el.width, el.height);
+        const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+        stageFx.parts.forEach((p) => {
+          p.y -= p.v; p.a += p.s; p.x += Math.sin(p.a) * 0.35;
+          if (p.y < -10) { p.y = el.height + 10; p.x = Math.random() * el.width; }
+          const flick = 0.55 + 0.45 * Math.sin(p.a * 6);
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 5);
+          g.addColorStop(0, dark ? `rgba(255,190,90,${0.9 * flick})` : `rgba(110,80,30,${0.35 * flick})`);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 5, 0, Math.PI * 2); ctx.fill();
+        });
+      };
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) frame();
+    }
+
+    function initStage() {
+      const host = document.getElementById('stage');
+      if (!host) return;
+      const light = () => document.documentElement.getAttribute('data-theme') === 'light';
+      stageFx.embers = h('canvas', { class: 'embers' });
+      host.append(h('div', { class: 'mist' }), stageFx.embers);
+      stageFx.paint = () => {
+        const next = buildLand(light());
+        if (stageFx.land) stageFx.land.replaceWith(next); else host.prepend(next);
+        stageFx.land = next;
+      };
+      stageFx.paint();
+      stageEmbers(light());
+    }
+
+
     function modal(title, body, actions) {
       const overlay = h('div', { class: 'overlay' });
-      const close = () => overlay.remove();
+      const onKey = (e) => { if (e.key === 'Escape') close(); };
+      const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
       overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
-      overlay.append(h('div', { class: 'modal' }, h('h2', {}, title), body, h('div', { class: 'actions' }, actions(close))));
+      document.addEventListener('keydown', onKey);
+      overlay.append(h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, h('h2', {}, title), body, h('div', { class: 'actions' }, actions(close))));
       document.body.append(overlay);
+      const first = overlay.querySelector('input:not([type=checkbox]), select');
+      if (first) first.focus();
       return close;
     }
 
+    const FACTION_FALLBACK = {
+      brannoch: ['#B8742A', '#6B3A1A', 'Brannoch'], dravos: ['#26262B', '#E8662A', 'Dravos'], halcyr: ['#E8EEF2', '#4A8FC4', 'Halcyr'],
+      kaldran: ['#B3202A', '#E0A526', 'Kaldran'], mereth: ['#6A3FA0', '#E58AA8', 'Mereth'], ostrand: ['#1E8A8F', '#E3C98A', 'Ostrand'],
+      thornwick: ['#2F6B3A', '#D9D2B0', 'Thornwick'], veyra: ['#1F3A93', '#C0C8D4', 'Veyra'],
+    };
+
     function factionOf(slug) {
-      return state.factions.find((f) => f.slug === slug) || { slug, name: slug, color: '#555', color2: '#222' };
+      const found = state.factions.find((f) => f.slug === slug);
+      if (found) return found;
+      const fb = FACTION_FALLBACK[slug];
+      return fb ? { slug, name: fb[2], color: fb[0], color2: fb[1] } : { slug, name: slug || 'Unknown', color: '#555a73', color2: '#2b3156' };
     }
 
-    function dots(slug) {
+    const ARMS = {
+      kaldran: ['chief', 'tower'], veyra: ['pale', 'crescent'], dravos: ['bend', 'star'], halcyr: ['fess', 'sun'],
+      mereth: ['chevron', 'star'], ostrand: ['quarterly', 'wave'], thornwick: ['pale', 'tree'], brannoch: ['bend', 'spear'],
+    };
+    const SHIELD = 'M4 4H60V34C60 52 46 62 32 68C18 62 4 52 4 34Z';
+    const DIVISIONS = {
+      chief: 'M0 0H64V24H0Z', pale: 'M32 0H64V72H32Z', bend: 'M0 0H18L64 54V72H46L0 20Z', fess: 'M0 26H64V44H0Z',
+      chevron: 'M0 50L32 22L64 50V62L32 34L0 62Z', quarterly: 'M32 0H64V36H32ZM0 36H32V72H0Z', plain: '',
+    };
+    const STAR = Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? 5.4 : 13; const a = (Math.PI * i) / 5 - Math.PI / 2; return `${(32 + r * Math.cos(a)).toFixed(1)},${(38 + r * Math.sin(a)).toFixed(1)}`; }).join(' ');
+    let sigilSeq = 0;
+
+    function luminance(hex) {
+      const n = parseInt(hex.replace('#', ''), 16);
+      return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+    }
+
+    function sigil(slug, width = 40, opts = {}) {
       const f = factionOf(slug);
-      return h('span', { class: 'dots' },
-        h('span', { class: 'chip', style: `background:${f.color}` }),
-        h('span', { class: 'chip', style: `background:${f.color2}` }));
+      const [division, charge] = ARMS[slug] || ['plain', 'star'];
+      const id = `sg${++sigilSeq}`;
+      const ink = luminance(f.color) > 0.55 ? '#1a2040' : '#f2d58f';
+      const mark = { fill: ink, stroke: 'rgba(0,0,0,0.4)', 'stroke-width': 0.8, 'stroke-linejoin': 'round' };
+      const charges = {
+        tower: [sv('path', { ...mark, d: 'M22 28h4v4h4v-4h4v4h4v-4h4v8h-3v12H25V36h-3Z' })],
+        crescent: [sv('path', { ...mark, d: 'M38 24a13 13 0 1 0 0 28a10 10 0 1 1 0-28Z' })],
+        star: [sv('polygon', { ...mark, points: STAR })],
+        sun: [sv('circle', { ...mark, cx: 32, cy: 38, r: 6.5 }), ...Array.from({ length: 8 }, (_, i) => { const a = (Math.PI * i) / 4; return sv('line', { x1: 32 + 9.5 * Math.cos(a), y1: 38 + 9.5 * Math.sin(a), x2: 32 + 14 * Math.cos(a), y2: 38 + 14 * Math.sin(a), stroke: ink, 'stroke-width': 2.2, 'stroke-linecap': 'round' }); })],
+        wave: [0, 7, 14].map((dy) => sv('path', { d: `M18 ${30 + dy}q4-5 7 0t7 0 7 0 7 0`, fill: 'none', stroke: ink, 'stroke-width': 2.6, 'stroke-linecap': 'round' })),
+        tree: [sv('path', { ...mark, d: 'M32 24L42 40H35L44 50H20L29 40H22Z' }), sv('path', { ...mark, d: 'M30 50H34V57H30Z' })],
+        spear: [sv('path', { ...mark, d: 'M30 58V34h-4l6-12 6 12h-4v24Z' })],
+      };
+      return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'sigil' + (opts.draw ? ' draw' : ''), role: 'img', 'aria-label': `${f.name} arms` },
+        sv('defs', {}, sv('clipPath', { id }, sv('path', { d: SHIELD }))),
+        sv('path', { d: SHIELD, fill: f.color }),
+        DIVISIONS[division] ? sv('g', { 'clip-path': `url(#${id})` }, sv('path', { d: DIVISIONS[division], fill: f.color2 })) : null,
+        ...(charges[charge] || charges.star),
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--gilt-hi)', 'stroke-width': 2.6, 'stroke-linejoin': 'round', class: 'outline' }));
+    }
+
+    function openShield(width = 20) {
+      return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'pip open', 'aria-hidden': 'true' },
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--dim)', 'stroke-width': 4, 'stroke-dasharray': '8 6' }));
+    }
+
+    const ICONS = {
+      sun: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z',
+      moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z',
+      sound: 'M4 9v6h4l5 4V5L8 9H4ZM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
+      mute: 'M4 9v6h4l5 4V5L8 9H4ZM17 9l5 6M22 9l-5 6',
+    };
+    function icon(name) {
+      return sv('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }, sv('path', { d: ICONS[name] }));
+    }
+
+    function toggleTheme() {
+      const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('ss-theme', next); } catch {}
+      const btn = document.getElementById('themebtn');
+      if (btn) btn.replaceChildren(icon(next === 'light' ? 'moon' : 'sun'));
+      if (stageFx.paint) stageFx.paint();
+    }
+
+    function houseSlug() {
+      if (state.house) return state.house;
+      const slugs = Object.keys(FACTION_FALLBACK);
+      const name = state.profile ? state.profile.display_name : '';
+      let hsh = 0;
+      for (const ch of name) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+      return slugs[hsh % slugs.length];
     }
 
     function factionPicker(taken, initial, onPick) {
@@ -257,14 +447,16 @@
       const wrap = h('div', { class: 'factions' });
       const draw = () => {
         const buttons = [
-          h('button', { type: 'button', class: 'fac' + (chosen === null ? ' on' : ''), onclick: () => { chosen = null; onPick(null); draw(); } }, 'Random'),
+          h('button', { type: 'button', class: 'fac' + (chosen === null ? ' on' : ''), onclick: () => { chosen = null; onPick(null); draw(); } },
+            sv('svg', { viewBox: '0 0 64 72', width: 36, height: 41, 'aria-hidden': 'true' }, sv('path', { d: SHIELD, fill: 'var(--ink-3)', stroke: 'var(--dim)', 'stroke-width': 3 }), sv('text', { x: 32, y: 46, 'text-anchor': 'middle', 'font-size': 28, style: 'fill:var(--dim);font-family:var(--font-display)' }, '?')),
+            'Random', h('small', {}, 'Let fate choose')),
           ...state.factions.map((f) =>
             h('button', {
               type: 'button',
               class: 'fac' + (chosen === f.slug ? ' on' : ''),
               disabled: taken.includes(f.slug),
               onclick: () => { chosen = f.slug; onPick(f.slug); draw(); },
-            }, dots(f.slug), f.name)),
+            }, sigil(f.slug, 36), f.name, taken.includes(f.slug) ? h('small', {}, 'Taken') : null)),
         ];
         wrap.replaceChildren(...buttons);
       };
@@ -292,7 +484,7 @@
       const form = h('form', { novalidate: true });
 
       const draw = () => {
-        const submit = h('button', { type: 'submit', class: 'primary', style: 'width:100%;margin-top:18px' },
+        const submit = h('button', { type: 'submit', class: 'primary', style: 'width:100%;margin-top:20px' },
           { signin: 'Sign in', signup: 'Create account', reset: 'Send reset link', recovery: 'Set new password' }[tab]);
         const tabs = recovery ? null : h('div', { class: 'tabs' },
           h('button', { type: 'button', class: tab === 'signin' ? 'on' : '', onclick: () => { state.authTab = tab = 'signin'; draw(); } }, 'Sign in'),
@@ -343,25 +535,32 @@
       });
 
       draw();
-      mount(h('div', { class: 'wrap' }, h('div', { class: 'auth' },
-        h('h1', {}, 'Siege & Sigil'),
-        h('div', { class: 'sub' }, 'Castles. Commanders. Kingdoms at war.'),
-        h('div', { class: 'panel' }, form))));
+      const slugs = Object.keys(FACTION_FALLBACK);
+      const crest = slugs[Math.floor(Math.random() * slugs.length)];
+      mount(h('div', { class: 'wrap' }, h('div', { class: 'welcome' },
+        h('div', {},
+          h('div', { class: 'bigcrest' }, sigil(crest, 240, { draw: true })),
+          h('h1', {}, 'Siege & Sigil'),
+          h('p', { class: 'lede' }, 'Raise a house. Hold the castles.'),
+          h('div', { class: 'roster', 'aria-label': 'The eight houses' }, slugs.map((sl) => h('span', { title: factionOf(sl).name }, sigil(sl, 38))))),
+        h('div', { class: 'panel auth-card' }, form))));
     }
 
     function topbar() {
-      const nameEl = h('span', {}, state.profile ? state.profile.display_name : '');
+      const light = document.documentElement.getAttribute('data-theme') === 'light';
       return h('div', { class: 'topbar' },
-        h('div', { class: 'brand' }, h('h1', {}, 'Siege & Sigil')),
-        h('div', { class: 'who' },
-          nameEl,
-          h('button', { class: 'link', onclick: helpDialog }, 'how to play'),
-          h('button', { class: 'link', onclick: renameDialog }, 'rename'),
-          h('button', { onclick: () => sb.auth.signOut() }, DEV_GUEST ? 'New guest' : 'Sign out')));
+        h('button', { class: 'brandmark', onclick: showHome, 'aria-label': 'Siege and Sigil home' }, sigil(houseSlug(), 30), h('span', {}, 'Siege & Sigil')),
+        h('div', { class: 'topnav' },
+          h('span', { class: 'who' }, state.profile ? state.profile.display_name : ''),
+          h('button', { class: 'ghost', onclick: renameDialog }, 'Rename'),
+          h('button', { class: 'ghost', onclick: helpDialog }, 'How to play'),
+          h('button', { class: 'iconbtn', id: 'soundbtn', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.replaceChildren(icon(on ? 'sound' : 'mute')); }, title: 'Sound on or off', 'aria-label': 'Toggle sound' }, icon(Sfx.on ? 'sound' : 'mute')),
+          h('button', { class: 'iconbtn', id: 'themebtn', onclick: toggleTheme, title: 'Switch theme', 'aria-label': 'Switch between dark and light theme' }, icon(light ? 'moon' : 'sun')),
+          h('button', { class: 'ghost', onclick: () => sb.auth.signOut() }, DEV_GUEST ? 'New guest' : 'Sign out')));
     }
 
     const HELP = [
-      ['Goal', 'Hold the share of castles shown in the top bar ("Castles x / y to win"). The first player to reach it wins. Lose your last castle and you are eliminated.'],
+      ['Goal', 'Hold the share of castles shown in the "Road to victory" bar at the top. The first player to reach it wins. Lose your last castle and you are eliminated.'],
       ['Time', 'The game advances in ticks. Orders you give take effect as ticks pass; the countdown shows the next tick. Turn-based games advance when everyone ends their turn or the deadline passes.'],
       ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for research. Natural resources set the tier (1 to 20 is Tier 1, 21 to 40 Tier 2, 41 to 60 Tier 3) and make upgrades cheaper; the halo around a castle shows how rich it is. Build a road at two castles to march between them faster.'],
       ['Commanders', 'Commanders lead troops. Hire more, spend gold on their abilities and move troops between a commander and a castle. A commander left in a castle garrisons it.'],
@@ -376,8 +575,8 @@
 
     function helpDialog() {
       const body = h('div', { style: 'max-height:60vh;overflow-y:auto;padding-right:6px' },
-        ...HELP.map(([t, d]) => h('div', { style: 'margin-bottom:10px' }, h('b', { style: 'color:var(--gold2)' }, t), h('div', { style: 'color:var(--text)' }, d))));
-      modal('How to play', body, (close) => [h('button', { class: 'primary', onclick: close }, 'Got it')]);
+        ...HELP.map(([t, d]) => h('div', { class: 'helpitem' }, h('h4', {}, t), h('div', {}, d))));
+      modal('How to play', body, (close) => [h('button', { class: 'primary', onclick: close }, 'Understood')]);
     }
 
     async function summaryDialog(gameId) {
@@ -385,7 +584,7 @@
       if (error) return toast(error.message);
       const rows = data.players.map((p) => h('div', { class: 'game' },
         h('div', {},
-          h('div', { class: 'name' }, dots(p.faction), p.name, p.player_id === data.winner_player_id ? h('span', { class: 'tag gold' }, 'winner') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
+          h('div', { class: 'name' }, sigil(p.faction, 28), p.name, p.player_id === data.winner_player_id ? h('span', { class: 'tag gold' }, 'winner') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
           h('div', { class: 'meta' }, `${p.castles} castles · ${p.troops} troops · ${p.battles} battles${p.eliminated_at_tick != null ? ` · eliminated at tick ${p.eliminated_at_tick}` : ''}`))));
       modal(`${data.name}: final standings`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);margin-bottom:8px' }, `Ended at tick ${data.ticks}${data.reason ? ` (${data.reason})` : ''}`), h('div', { class: 'list', style: 'max-height:50vh;overflow-y:auto' }, ...rows)), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
     }
@@ -410,8 +609,12 @@
     }
 
     function describeGame(g) {
-      return [`${STYLES[g.map_style] || g.map_style} map`, SIZES[g.map_size] || g.map_size, SPEEDS[g.tick_speed] || g.tick_speed,
-        `${Math.round(g.victory_pct * 100)}% to win`, g.fog_dark ? 'dark fog' : g.fog_of_war ? 'fog of war' : 'no fog', g.fill_with_ai ? 'AI fills empty seats' : null].filter(Boolean).join(' · ');
+      return gameFacts(g).join(' · ');
+    }
+
+    function gameFacts(g) {
+      return [`${SIZES[g.map_size] || g.map_size} castles each`, SPEEDS[g.tick_speed] || g.tick_speed,
+        `${Math.round(g.victory_pct * 100)}% to win`, g.fog_dark ? 'Dark fog' : g.fog_of_war ? 'Fog of war' : 'No fog', g.fill_with_ai ? 'AI fills empty seats' : null].filter(Boolean);
     }
 
     async function showHome() {
@@ -421,8 +624,44 @@
       await Promise.all([loadFactions(), state.profile ? null : loadProfile()]);
 
       const openList = h('div', { class: 'list' });
-      const mineList = h('div', { class: 'list' });
+      const bannerGrid = h('div', { class: 'banners' });
       const boardList = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Loading'));
+      const crestHolder = h('div', { class: 'crest' });
+      const houseName = h('div', { class: 'houseof' });
+
+      const paintHouse = (draw) => {
+        const slug = houseSlug();
+        crestHolder.replaceChildren(sigil(slug, 150, { draw }));
+        houseName.textContent = `House ${factionOf(slug).name}`;
+      };
+
+      const statusText = (g) => ({ lobby: 'In the lobby', picking: 'Choose your start', active: `Tick ${g.current_tick}`, finished: 'Finished' }[g.status] || g.status);
+
+      const banner = (r) => {
+        const g = r.games;
+        const f = factionOf(r.faction_slug);
+        return h('button', { class: 'banner', style: `--tint:${f.color}`, onclick: () => openGame(g.id) },
+          h('div', { class: 'sig' }, sigil(r.faction_slug, 44)),
+          h('div', { class: 'bname' }, g.name),
+          h('div', { class: 'bmeta' }, `House ${f.name}`),
+          h('div', { class: 'bstate' }, statusText(g)));
+      };
+
+      const openRow = (g) => {
+        const taken = g.taken_factions || [];
+        const pips = h('div', { class: 'pips', 'aria-label': `${g.player_count} of ${g.max_players} seats taken` },
+          taken.map((sl) => sigil(sl, 20)),
+          Array.from({ length: Math.max(0, g.max_players - taken.length) }, () => openShield(20)));
+        return h('div', { class: 'lobby-strip' },
+          h('div', {},
+            h('div', { class: 'name game' }, g.name, g.joined ? h('span', { class: 'tag green' }, 'joined') : null, g.has_password ? h('span', { class: 'tag' }, 'password') : null),
+            h('div', { class: 'meta game', style: 'margin-top:0' }, `Hosted by ${g.host_name}`),
+            pips,
+            h('div', { class: 'facts' }, gameFacts(g).map((t) => h('span', { class: 'fact' }, t)))),
+          g.joined
+            ? h('button', { class: 'primary small', onclick: () => showRoom(g.id) }, 'Open')
+            : h('button', { class: 'primary small', disabled: g.player_count >= g.max_players, onclick: () => joinDialog(g) }, g.player_count >= g.max_players ? 'Full' : 'Join'));
+      };
 
       const refresh = async () => {
         if (state.view !== 'home') return;
@@ -434,51 +673,51 @@
 
         if (open.error) toast(open.error.message);
         else {
-          openList.replaceChildren(...(open.data.length ? open.data.map(openRow) : [h('div', { class: 'empty' }, 'No open games. Create one.')]));
+          openList.replaceChildren(...(open.data.length ? open.data.map(openRow) : [h('div', { class: 'empty' }, 'No open lobbies right now. Raise a campaign and others can join it.')]));
         }
 
         if (mine.error) toast(mine.error.message);
         else {
           const rows = (mine.data || []).filter((r) => r.games).sort((a, b) => b.games.id - a.games.id);
-          mineList.replaceChildren(...(rows.length ? rows.map(mineRow) : [h('div', { class: 'empty' }, 'You have not joined any games yet.')]));
+          if (rows.length && !state.house) { state.house = rows[0].faction_slug; paintHouse(false); }
+          bannerGrid.replaceChildren(...rows.map(banner), h('button', { class: 'banner new', onclick: createDialog },
+            h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), h('span', {}, rows.length ? 'Raise another campaign' : 'Raise your first campaign')));
         }
       };
 
-      const openRow = (g) => h('div', { class: 'game' },
-        h('div', {},
-          h('div', { class: 'name' }, g.name, g.joined ? h('span', { class: 'tag green' }, 'joined') : null),
-          h('div', { class: 'meta' }, `Host ${g.host_name} · ${g.player_count}/${g.max_players} players · ${describeGame(g)}`)),
-        h('div', { class: 'row' },
-          g.joined
-            ? h('button', { class: 'primary', onclick: () => showRoom(g.id) }, 'Open')
-            : h('button', { class: 'primary', disabled: g.player_count >= g.max_players, onclick: () => joinDialog(g) }, g.player_count >= g.max_players ? 'Full' : 'Join')));
-
-      const mineRow = (r) => {
-        const g = r.games;
-        const label = { lobby: 'in lobby', picking: 'choosing starts', active: 'in progress', finished: 'finished' }[g.status];
-        return h('div', { class: 'game' },
-          h('div', {},
-            h('div', { class: 'name' }, dots(r.faction_slug), g.name, h('span', { class: 'tag' + (g.status === 'active' ? ' gold' : '') }, label)),
-            h('div', { class: 'meta' }, `${factionOf(r.faction_slug).name} · ${g.status === 'lobby' ? 'waiting to start' : 'tick ' + g.current_tick}`)),
-          h('button', { class: 'primary', onclick: () => openGame(g.id) }, g.status === 'lobby' ? 'Open lobby' : g.status === 'picking' ? 'Choose start' : 'Open map'));
-      };
+      const profile = state.profile || {};
+      paintHouse(!state.homeDrawn);
+      state.homeDrawn = true;
 
       mount(h('div', { class: 'wrap' }, topbar(),
-        h('div', { class: 'panel' },
-          h('h2', {}, 'Open games', h('span', { class: 'row' },
-            h('button', { onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh'),
-            h('button', { class: 'primary', onclick: createDialog }, 'Create game'))),
-          openList),
-        h('div', { class: 'panel' }, h('h2', {}, 'Your games'), mineList),
-        h('div', { class: 'panel' }, h('h2', {}, 'Leaderboard'), boardList)));
+        h('div', { class: 'home' },
+          h('aside', { class: 'panel house' },
+            crestHolder,
+            h('h2', {}, profile.display_name || 'Lord'),
+            houseName,
+            h('div', { class: 'record' },
+              h('div', {}, h('b', {}, profile.total_games ?? 0), 'campaigns'),
+              h('div', {}, h('b', {}, profile.total_wins ?? 0), 'victories'),
+              h('div', {}, h('b', {}, profile.honor ?? 0), 'honor')),
+            h('div', { class: 'actions' },
+              h('button', { class: 'primary', onclick: createDialog }, 'Raise a campaign'),
+              h('button', { class: 'ghost', onclick: helpDialog }, 'How to play'))),
+          h('main', {},
+            h('div', { class: 'section-title' }, h('h2', {}, 'Your campaigns')),
+            bannerGrid,
+            h('div', { class: 'section-title' }, h('h2', {}, 'Open lobbies'), h('button', { class: 'ghost', onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh')),
+            h('div', { class: 'panel' }, openList),
+            h('div', { class: 'section-title' }, h('h2', {}, 'Roll of honor')),
+            h('div', { class: 'panel' }, boardList)))));
 
       sb.rpc('get_leaderboard', { p_limit: 15 }).then(({ data, error }) => {
         if (error) return toast(error.message);
         boardList.replaceChildren(...(data.length
-          ? data.map((r, i) => h('div', { class: 'game' },
-            h('div', {}, h('div', { class: 'name' }, `${i + 1}. ${r.display_name}`), h('div', { class: 'meta' }, `${r.total_wins} wins in ${r.total_games} games`)),
-            h('span', { class: 'tag gold' }, `${r.honor} honor${r.infamy ? ` · ${r.infamy} infamy` : ''}`)))
-          : [h('div', { class: 'empty' }, 'No finished games yet.')]));
+          ? data.map((r, i) => h('div', { class: 'honor' },
+            h('span', { class: 'rank' }, i + 1),
+            h('div', {}, h('div', { class: 'name', style: 'font-weight:700' }, r.display_name), h('div', { class: 'meta', style: 'color:var(--dim);font-size:.88rem' }, `${r.total_wins} wins in ${r.total_games} campaigns`)),
+            h('span', { class: 'tag gold' }, `${r.honor} honor${r.infamy ? `, ${r.infamy} infamy` : ''}`)))
+          : [h('div', { class: 'empty' }, 'No finished campaigns yet. The first victory will be recorded here.')]));
       });
 
       await refresh();
@@ -491,7 +730,7 @@
       let pick = null;
       const picker = factionPicker(g.taken_factions, null, (v) => { pick = v; });
       const pw = h('input', { type: 'password', placeholder: 'game password' });
-      modal(`Join ${g.name}`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);font-size:.85rem' }, `Host ${g.host_name} · ${describeGame(g)}`), h('label', {}, 'Faction'), picker, g.has_password ? h('div', {}, h('label', {}, 'Password'), pw) : null), (close) => [
+      modal(g.name, h('div', {}, h('div', { class: 'tip', style: 'margin:0 0 6px' }, `Hosted by ${g.host_name}`), h('div', { class: 'facts' }, gameFacts(g).map((t) => h('span', { class: 'fact' }, t))), h('label', {}, 'Choose your house'), picker, g.has_password ? h('div', {}, h('label', {}, 'Password'), pw) : null), (close) => [
         h('button', { onclick: close }, 'Cancel'),
         h('button', {
           class: 'primary',
@@ -501,7 +740,7 @@
             close();
             await showRoom(g.id);
           }),
-        }, 'Join game'),
+        }, 'Take your seat'),
       ]);
     }
 
@@ -515,31 +754,72 @@
     const RESEARCH_COSTS = { '0': 'No research', '0.5': 'Cheap', '1': 'Normal', '1.5': 'Expensive', '2.5': 'Very expensive', '4': 'Crazy expensive' };
     const DEV_COSTS = { '0.5': 'Cheap (half price)', '1': 'Standard', '2': 'Expensive (double)' };
 
+    const PRESET_INFO = {
+      continental: 'Continental: rivers, mountain ranges and passes',
+      highlands: 'Highlands: tall ranges, many passes, few rivers',
+      river_valley: 'River valley: many rivers, gentle hills',
+      forest: 'Great forest: dense woods, few ranges',
+      plains: 'Open plains: no rivers or mountains',
+    };
+    const HOME_INFO = { close: 'Close: houses start near the middle', medium: 'Medium', far: 'Far: houses start near the edges' };
+    const WORMHOLE_INFO = { none: 'No wormholes', rare: 'Rare wormholes', common: 'Common wormholes' };
+    const TRAVEL_INFO = {
+      trails: 'Castle trails: armies follow the trails between castles. Rivers and mountains block except at crossings and passes',
+      free: 'Free travel: march to any castle in range',
+    };
+
+    const SIZE_COUNT = { tiny: 8, compact: 12, small: 16, standard: 24, large: 36 };
+    const SHAPE_INFO = {
+      continent: ['Continent', 'One wild landmass with inland seas and ragged coasts.'],
+      round: ['Round and balanced', 'A near-circular island with even starts. The fair default.'],
+      ring: ['Ring around a sea', 'Land wraps a central sea, so armies march the long way round.'],
+      twin: ['Twin continents', 'Two landmasses joined by a couple of narrow bridges.'],
+      archipelago: ['Archipelago', 'Big islands joined by thin isthmuses. Many choke points.'],
+      rift: ['Rift', 'One landmass split by a long sea with only a few crossings.'],
+    };
+
+    function choice(options, initial, onChange) {
+      let value = initial;
+      const el = h('div', { class: 'choices' });
+      const draw = () => el.replaceChildren(...options.map(([key, title, desc]) => h('button', {
+        type: 'button', class: 'choice' + (key === value ? ' on' : ''), 'aria-pressed': key === value ? 'true' : 'false',
+        onclick: () => { value = key; draw(); onChange(); },
+      }, h('b', {}, title), desc ? h('span', {}, desc) : null)));
+      draw();
+      return { el, get value() { return value; }, set value(v) { value = v; draw(); } };
+    }
+
     function createDialog() {
+      clearCleanup();
+      state.view = 'create';
       let faction = null;
+      let stepIndex = 0;
       const field = (label, el, tip) => h('div', {}, h('label', {}, label), el, tip ? h('div', { class: 'tip' }, tip) : null);
       const check = (checked, text) => { const el = h('input', { type: 'checkbox', checked }); return { el, row: h('label', { class: 'check' }, el, text) }; };
-      const group = (title, open, ...kids) => h('details', { class: 'grp', open }, h('summary', {}, title), ...kids);
       const num = (min, max, value, step) => h('input', { type: 'number', min: String(min), max: String(max), value: String(value), step: step ? String(step) : null });
+      const update = () => paintBlazon();
 
-      const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s game` });
+      const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s campaign` });
       const password = h('input', { type: 'text', maxlength: '40', placeholder: 'none' });
       const players = num(2, 8, 4);
       const victory = num(10, 100, 50, 5);
       const decay = selectOf(Object.fromEntries(Array.from({ length: 17 }, (_, i) => [String(i), i === 0 ? 'Disabled' : `${i} castle${i === 1 ? '' : 's'} less per production`])), '0');
 
-      const shape = selectOf(SHAPES, 'continent');
+      const shape = choice(Object.entries(SHAPE_INFO).map(([k, [t, d]]) => [k, t, d]), 'continent', update);
       const scatter = selectOf({ random: 'Random scatter', twin_rings: 'Twin rings (symmetrical)' }, 'random');
       const mirror = check(false, 'Mirrored stars (2, 4 or 8 players): the map is mirrored on both axes for equal starts');
       const style = selectOf(STYLES, 'scatter');
-      const size = selectOf(SIZES, 'standard');
+      const size = choice([['tiny', 'Tiny', '8 castles per house'], ['compact', 'Compact', '12 per house'], ['small', 'Small', '16 per house'], ['standard', 'Standard', '24 per house'], ['large', 'Large', '36 per house']], 'standard', () => { syncHint(); update(); });
       const scaleSel = h('select', {}, h('option', { value: '1' }, 'Classic (1x)'), h('option', { value: '2' }, 'Wide (2x)'), h('option', { value: '3' }, 'Vast (3x)'), h('option', { value: '4' }, 'Immense (4x)'));
       scaleSel.value = '3';
-      const freeTravel = check(true, 'Free travel: march to any castle in range (rivers, mountains and sea block; cross at fords and passes)');
+      const travelSel = selectOf(TRAVEL_INFO, 'trails');
+      const mapPreset = selectOf(PRESET_INFO, 'continental');
+      const homeSel = selectOf(HOME_INFO, 'medium');
+      const wormSel = selectOf(WORMHOLE_INFO, 'none');
       const richness = selectOf({ sparse: 'Sparse (expensive to build on)', standard: 'Standard', plentiful: 'Plentiful (cheap to build on)' }, 'standard');
-      const fogSel = selectOf({ fog: 'Fog: whole map visible, enemy activity hidden', dark: 'Dark: map hidden until you explore it', off: 'No fog' }, 'fog');
+      const fog = choice([['fog', 'Fog', 'The whole map is visible. Enemy troops and upgrades are hidden outside your scan range.'], ['dark', 'Dark', 'The map is black until you explore it. Explored ground stays visible.'], ['off', 'No fog', 'Everything is visible to everyone.']], 'fog', update);
       const alliances = selectOf({ none: 'No alliances', '0': 'Alliances, no warning when ended', '24': 'Alliances, 24 tick warning', '48': 'Alliances, 48 tick warning' }, '24');
-      const startSel = selectOf({ random: 'Random start locations', choose: 'Players choose their start' }, 'random');
+      const startSel = choice([['random', 'Random starts', 'Each house is placed for you.'], ['choose', 'Houses choose', 'Everyone picks a starting location before play begins.']], 'random', update);
       const pickMins = num(1, 1440, 15);
       const roadsMode = selectOf({ cheap: 'Cheap roads', expensive: 'Expensive roads', disabled: 'Roads disabled' }, 'cheap');
       const randomRoads = selectOf({ none: 'No random roads', rare: 'Rare (10% of neutral castles)', common: 'Common (30%)' }, 'none');
@@ -547,7 +827,6 @@
       const starting = num(1, 10, 4);
       const hint = h('div', { class: 'tip' });
       const syncHint = () => { hint.textContent = `Up to ${MAX_START[size.value]} starting castles on a ${size.value} map.`; };
-      size.addEventListener('change', syncHint);
       syncHint();
       const gold = num(0, 5000, 300, 50);
       const garrison = num(0, 200, 10, 5);
@@ -561,13 +840,12 @@
       const devPrestige = selectOf(DEV_COSTS, '1');
       const tradeCost = selectOf({ '15': 'Cheap trades ($15 per level)', '25': 'Standard trades ($25 per level)', '50': 'Expensive trades ($50 per level)' }, '25');
       const tradeScan = check(false, 'Trade with scanned players only');
-
       const terraforming = check(true, 'Terraforming (Guildhall): upgrades raise a castle\'s natural resources');
       const experimentation = check(true, 'Experimentation (Library): random research each production');
       const expBonus = selectOf({ '1': 'Experiment bonus: 72 points', '2': '144 points', '3': '216 points', '4': '288 points' }, '1');
       const techRows = Object.keys(AREA_NAMES).map((area) => ({ area, level: num(1, 16, 1), cost: selectOf(RESEARCH_COSTS, '1') }));
 
-      const speed = selectOf(SPEEDS, 'normal');
+      const speed = choice(Object.entries(SPEEDS).map(([k, v]) => [k, v.replace(/ \(.*\)/, ''), v.includes('(') ? `Ticks every ${v.match(/\((.*)\)/)[1].replace(' ticks', '')}` : 'Advances when everyone ends their turn']), 'normal', update);
       const cycle = num(6, 72, 12);
       const limit = h('input', { type: 'number', min: '1', placeholder: 'none' });
       const truce = num(1, 500, 48);
@@ -582,140 +860,166 @@
       const fill = check(false, 'Fill empty seats with AI players');
       const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
       difficulty.value = '3';
-      const autoStart = check(false, 'Start the game automatically when every seat is taken');
+      const autoStart = check(false, 'Start the campaign automatically when every seat is taken');
       const picker = factionPicker([], null, (v) => { faction = v; });
 
-      const body = h('div', {},
-        group('Basics', true,
-          field('Game name', name),
-          h('div', { class: 'grid2' },
-            field('Players (2 to 8)', players),
-            field('Castles to win (% of all)', victory),
-            field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'),
-            field('Password', password, 'Optional. Players need it to join.'))),
-        group('Galaxy', false,
-          h('div', { class: 'grid2' },
-            field('Map shape', shape),
-            field('Star scatter', scatter),
-            field('Castle placement', style),
-            field('Castles per player', size),
-            field('Map scale', scaleSel),
-            field('Natural resources', richness),
-            field('Roads', roadsMode),
-            field('Random roads', randomRoads),
-            field('Start locations', startSel),
-            field('Time to choose (minutes)', pickMins)),
-          mirror.row, freeTravel.row,
-          field('Fog of war', fogSel),
-          field('Formal alliances', alliances)),
-        group('Players', false,
-          h('div', { class: 'grid2' },
-            field('Starting castles', starting, null),
-            field('Starting gold', gold),
-            field('Troops per starting castle', garrison),
-            field('Starting commanders', cmdStart),
-            field('Treasury level', tLevel),
-            field('Recruitment level', iLevel),
-            field('Prestige level', pLevel),
-            field('Commander hire cost', cmdCost),
-            field('Treasury upgrades', devTreasury),
-            field('Recruitment upgrades', devRecruit),
-            field('Prestige upgrades', devPrestige),
-            field('Technology trades', tradeCost)),
-          hint, tradeScan.row),
-        group('Technology', false,
-          terraforming.row, experimentation.row, field('Experimentation bonus', expBonus),
-          h('label', {}, 'Realm areas: start level and research cost'),
-          techRows.map((r) => h('div', { class: 'techrow' }, h('span', {}, TECH_NAMES[r.area]), r.level, r.cost))),
-        group('Time', false,
-          h('div', { class: 'grid2' },
-            field('Tick speed', speed),
-            field('Production cycle (ticks)', cycle),
-            field('Time limit (ticks)', limit),
-            field('Truce length (ticks)', truce),
-            field('Ticks per turn (turn-based)', perTurn),
-            field('Turn duration (turn-based)', turnDuration)),
-          fixedTurns.row, seasons.row, field('Season length (ticks, 12 to 240)', seasonLen), events.row, mercs.row),
-        group('Admin', false,
-          fill.row, field('AI difficulty (1 to 5)', difficulty), autoStart.row,
-          h('label', {}, 'Your faction'), picker));
+      const PRESETS = [
+        ['duel', 'Duel', 'Two houses on a compact round island. Fast ticks, over in a day or two.', () => { players.value = 2; size.value = 'compact'; shape.value = 'round'; speed.value = 'fast'; fog.value = 'fog'; fill.el.checked = false; startSel.value = 'random'; }],
+        ['skirmish', 'Skirmish', 'Four houses, a small map and AI to fill empty seats. A good first campaign.', () => { players.value = 4; size.value = 'small'; shape.value = 'continent'; speed.value = 'fast'; fog.value = 'fog'; fill.el.checked = true; startSel.value = 'random'; }],
+        ['grand', 'Grand campaign', 'Eight houses across a large continent at a steady pace. Plays out over days.', () => { players.value = 8; size.value = 'large'; shape.value = 'continent'; speed.value = 'normal'; fog.value = 'fog'; fill.el.checked = true; startSel.value = 'random'; }],
+        ['blind', 'Blind kingdoms', 'Dark fog on an archipelago, and every house chooses where to begin.', () => { players.value = 4; size.value = 'standard'; shape.value = 'archipelago'; speed.value = 'normal'; fog.value = 'dark'; fill.el.checked = true; startSel.value = 'choose'; }],
+      ];
+      let presetKey = null;
+      const presetEl = h('div', { class: 'presets' });
+      const paintPresets = () => presetEl.replaceChildren(...PRESETS.map(([key, title, desc, apply]) => h('button', {
+        type: 'button', class: 'preset' + (presetKey === key ? ' on' : ''),
+        onclick: () => { presetKey = key; apply(); syncHint(); paintPresets(); update(); },
+      }, h('b', {}, title), h('span', {}, desc))));
+      paintPresets();
 
-      modal('Create game', body, (close) => [
-        h('button', { onclick: close }, 'Cancel'),
-        h('button', {
-          class: 'primary',
-          onclick: (e) => run(e.currentTarget, async () => {
-            const startLevels = {};
-            const costMults = {};
-            techRows.forEach((r) => {
-              if (Number(r.level.value) > 1) startLevels[r.area] = Number(r.level.value);
-              if (r.cost.value !== '1') costMults[r.area] = Number(r.cost.value);
-            });
-            const settings = {
-              name: name.value.trim() || 'New Game',
-              max_players: Number(players.value),
-              victory_pct: Number(victory.value) / 100,
-              victory_decay: Number(decay.value),
-              map_shape: shape.value,
-              star_scatter: scatter.value,
-              start_selection: startSel.value,
-              pick_minutes: Number(pickMins.value),
-              mirrored: mirror.el.checked,
-              map_style: style.value,
-              map_size: size.value,
-              world_scale: Number(scaleSel.value),
-              free_travel: freeTravel.el.checked,
-              resource_richness: richness.value,
-              roads_mode: roadsMode.value,
-              random_roads: randomRoads.value,
-              fog_of_war: fogSel.value !== 'off',
-              fog_dark: fogSel.value === 'dark',
-              allow_alliances: alliances.value !== 'none',
-              grace_period_ticks: alliances.value === 'none' ? 24 : Number(alliances.value),
-              starting_territories: Number(starting.value),
-              starting_gold: Number(gold.value),
-              starting_garrison: Number(garrison.value),
-              starting_commanders: Number(cmdStart.value),
-              starting_treasury_level: Number(tLevel.value),
-              starting_industry_level: Number(iLevel.value),
-              starting_prestige_level: Number(pLevel.value),
-              commander_cost: Number(cmdCost.value),
-              treasury_cost_mult: Number(devTreasury.value),
-              recruitment_cost_mult: Number(devRecruit.value),
-              prestige_cost_mult: Number(devPrestige.value),
-              trade_cost: Number(tradeCost.value),
-              trade_requires_scan: tradeScan.el.checked,
-              terraforming_enabled: terraforming.el.checked,
-              experimentation_enabled: experimentation.el.checked,
-              experiment_bonus_mult: Number(expBonus.value),
-              area_start_levels: startLevels,
-              area_cost_mults: costMults,
-              tick_speed: speed.value,
-              production_cycle_ticks: Number(cycle.value),
-              truce_ticks: Number(truce.value),
-              turn_fixed: fixedTurns.el.checked,
-              seasons_enabled: seasons.el.checked,
-              season_length_ticks: Number(seasonLen.value),
-              events_enabled: events.el.checked,
-              mercenaries_enabled: mercs.el.checked,
-              fill_with_ai: fill.el.checked,
-              ai_difficulty: Number(difficulty.value),
-              auto_start: autoStart.el.checked,
-            };
-            if (password.value.trim()) settings.password = password.value.trim();
-            if (limit.value) settings.time_limit_ticks = Number(limit.value);
-            if (speed.value === 'turn_based') {
-              settings.ticks_per_turn = Number(perTurn.value);
-              settings.turn_timeout_minutes = Number(turnDuration.value);
-            }
-            if (faction) settings.faction_slug = faction;
-            const { data, error } = await sb.rpc('create_game', { p_settings: settings });
-            if (error) throw error;
-            close();
-            await showRoom(data);
-          }),
-        }, 'Create'),
-      ]);
+      const blazon = h('div', { class: 'panel blazon' });
+      function paintBlazon() {
+        const count = SIZE_COUNT[size.value] * Number(players.value || 0);
+        const fogText = { fog: 'Fog hides what is happening across the map', dark: 'The map is dark until you explore it', off: 'Nothing is hidden' }[fog.value];
+        const facts = [SHAPE_INFO[shape.value][0], `${SIZE_COUNT[size.value]} castles per house`, SPEEDS[speed.value.replace('turn_based', 'turn_based')] || speed.value];
+        if (startSel.value === 'choose') facts.push('Houses choose their start');
+        if (fill.el.checked) facts.push('AI fills empty seats');
+        if (password.value.trim()) facts.push('Password protected');
+        if (mirror.el.checked) facts.push('Mirrored lands');
+        blazon.replaceChildren(
+          h('h3', {}, 'Your campaign'),
+          h('p', {}, `${players.value} houses contest ${count} castles. ${fogText}. The first house to hold ${victory.value}% of them wins${Number(decay.value) ? ', and that bar falls every production' : ''}.`),
+          h('div', { class: 'facts' }, facts.map((t) => h('span', { class: 'fact' }, t))));
+      }
+
+      const sec = (...kids) => h('section', {}, ...kids);
+      const heading = (title, sub) => h('div', { class: 'sheet-head' }, h('h2', {}, title), sub ? h('p', {}, sub) : null);
+      const sections = [
+        ['Campaign', sec(heading('Start from a template', 'Pick a template to fill in sensible settings. Every choice can still be changed on the next steps.'), presetEl,
+          h('div', { class: 'grid2' }, field('Campaign name', name), field('Houses (2 to 8)', players)))],
+        ['Realm', sec(heading('Shape the realm', 'Where the castles sit and what lies between them.'),
+          h('label', {}, 'Land'), shape.el,
+          h('label', {}, 'Castles per house'), size.el,
+          h('div', { class: 'grid2' }, field('Star scatter', scatter), field('Castle placement', style), field('Map scale', scaleSel), field('Natural resources', richness), field('Roads', roadsMode), field('Random roads', randomRoads), field('Terrain', mapPreset), field('Travel', travelSel), field('Home distance', homeSel, 'Applies to round, continent, ring and mirrored maps.'), field('Wormholes', wormSel, 'Fixed 24 tick links between far castles. Castle trails only.')),
+          mirror.row)],
+        ['Rules', sec(heading('Set the rules', 'How the war is won and what each house can see.'),
+          h('label', {}, 'Fog of war'), fog.el,
+          h('div', { class: 'grid2' }, field('Castles to win (% of all)', victory), field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'), field('Formal alliances', alliances)),
+          h('label', {}, 'Starting locations'), startSel.el,
+          h('div', { class: 'grid2' }, field('Time to choose (minutes)', pickMins)),
+          seasons.row, field('Season length (ticks, 12 to 240)', seasonLen), events.row, mercs.row)],
+        ['Houses', sec(heading('Equip the houses', 'What every house begins with, and what upgrades cost.'),
+          h('div', { class: 'grid2' },
+            field('Starting castles', starting), field('Starting gold', gold), field('Troops per starting castle', garrison), field('Starting commanders', cmdStart),
+            field('Treasury level', tLevel), field('Recruitment level', iLevel), field('Prestige level', pLevel), field('Commander hire cost', cmdCost),
+            field('Treasury upgrades', devTreasury), field('Recruitment upgrades', devRecruit), field('Prestige upgrades', devPrestige), field('Technology trades', tradeCost)),
+          hint, tradeScan.row, terraforming.row, experimentation.row, field('Experimentation bonus', expBonus),
+          h('label', {}, 'Realm areas: start level and research cost'),
+          techRows.map((r) => h('div', { class: 'techrow' }, h('span', {}, TECH_NAMES[r.area]), r.level, r.cost)))],
+        ['Time', sec(heading('Set the pace', 'How fast the world moves.'),
+          h('label', {}, 'Tick speed'), speed.el,
+          h('div', { class: 'grid2' }, field('Production cycle (ticks)', cycle), field('Time limit (ticks)', limit), field('Truce length (ticks)', truce), field('Ticks per turn (turn-based)', perTurn), field('Turn duration (turn-based)', turnDuration)),
+          fixedTurns.row)],
+        ['Table', sec(heading('Seat the table', 'Who plays and how the campaign begins.'),
+          h('div', { class: 'grid2' }, field('Password', password, 'Optional. Players need it to join.'), field('AI difficulty (1 to 5)', difficulty)),
+          fill.row, autoStart.row, h('label', {}, 'Your house'), picker)],
+      ];
+
+      const body = h('div', { class: 'stepbody' }, sections.map(([, el]) => el));
+      const rail = h('nav', { class: 'rail', 'aria-label': 'Setup steps' });
+      const foot = h('div', { class: 'sheet-foot' });
+      const draw = () => {
+        sections.forEach(([, el], i) => el.classList.toggle('on', i === stepIndex));
+        rail.replaceChildren(...sections.map(([title], i) => h('button', { type: 'button', class: i === stepIndex ? 'on' : '', 'aria-current': i === stepIndex ? 'step' : null, onclick: () => { stepIndex = i; draw(); } },
+          h('span', { class: 'ico' }, String(i + 1)), title)));
+        const last = stepIndex === sections.length - 1;
+        foot.replaceChildren(
+          stepIndex > 0 ? h('button', { type: 'button', class: 'ghost', onclick: () => { stepIndex -= 1; draw(); } }, 'Back') : h('button', { type: 'button', class: 'ghost', onclick: showHome }, 'Cancel'),
+          last
+            ? h('button', { type: 'button', class: 'primary', onclick: (e) => submit(e.currentTarget) }, 'Raise campaign')
+            : h('button', { type: 'button', class: 'primary', onclick: () => { stepIndex += 1; draw(); window.scrollTo(0, 0); } }, 'Continue'));
+      };
+
+      const submit = (btn) => run(btn, async () => {
+        const startLevels = {};
+        const costMults = {};
+        techRows.forEach((r) => {
+          if (Number(r.level.value) > 1) startLevels[r.area] = Number(r.level.value);
+          if (r.cost.value !== '1') costMults[r.area] = Number(r.cost.value);
+        });
+        const settings = {
+          name: name.value.trim() || 'New campaign',
+          max_players: Number(players.value),
+          victory_pct: Number(victory.value) / 100,
+          victory_decay: Number(decay.value),
+          map_shape: shape.value,
+          star_scatter: scatter.value,
+          start_selection: startSel.value,
+          pick_minutes: Number(pickMins.value),
+          mirrored: mirror.el.checked,
+          map_style: style.value,
+          map_size: size.value,
+          world_scale: Number(scaleSel.value),
+          free_travel: travelSel.value === 'free',
+          travel_mode: travelSel.value,
+          map_preset: mapPreset.value,
+          home_distance: homeSel.value,
+          wormholes: wormSel.value,
+          resource_richness: richness.value,
+          roads_mode: roadsMode.value,
+          random_roads: randomRoads.value,
+          fog_of_war: fog.value !== 'off',
+          fog_dark: fog.value === 'dark',
+          allow_alliances: alliances.value !== 'none',
+          grace_period_ticks: alliances.value === 'none' ? 24 : Number(alliances.value),
+          starting_territories: Number(starting.value),
+          starting_gold: Number(gold.value),
+          starting_garrison: Number(garrison.value),
+          starting_commanders: Number(cmdStart.value),
+          starting_treasury_level: Number(tLevel.value),
+          starting_industry_level: Number(iLevel.value),
+          starting_prestige_level: Number(pLevel.value),
+          commander_cost: Number(cmdCost.value),
+          treasury_cost_mult: Number(devTreasury.value),
+          recruitment_cost_mult: Number(devRecruit.value),
+          prestige_cost_mult: Number(devPrestige.value),
+          trade_cost: Number(tradeCost.value),
+          trade_requires_scan: tradeScan.el.checked,
+          terraforming_enabled: terraforming.el.checked,
+          experimentation_enabled: experimentation.el.checked,
+          experiment_bonus_mult: Number(expBonus.value),
+          area_start_levels: startLevels,
+          area_cost_mults: costMults,
+          tick_speed: speed.value,
+          production_cycle_ticks: Number(cycle.value),
+          truce_ticks: Number(truce.value),
+          turn_fixed: fixedTurns.el.checked,
+          seasons_enabled: seasons.el.checked,
+          season_length_ticks: Number(seasonLen.value),
+          events_enabled: events.el.checked,
+          mercenaries_enabled: mercs.el.checked,
+          fill_with_ai: fill.el.checked,
+          ai_difficulty: Number(difficulty.value),
+          auto_start: autoStart.el.checked,
+        };
+        if (password.value.trim()) settings.password = password.value.trim();
+        if (limit.value) settings.time_limit_ticks = Number(limit.value);
+        if (speed.value === 'turn_based') {
+          settings.ticks_per_turn = Number(perTurn.value);
+          settings.turn_timeout_minutes = Number(turnDuration.value);
+        }
+        if (faction) settings.faction_slug = faction;
+        const { data, error } = await sb.rpc('create_game', { p_settings: settings });
+        if (error) throw error;
+        await showRoom(data);
+      });
+
+      body.addEventListener('input', update);
+      body.addEventListener('change', update);
+      draw();
+      paintBlazon();
+      mount(h('div', { class: 'wrap' }, topbar(),
+        h('div', { class: 'sheet' }, rail, h('div', { class: 'panel' }, body, foot), blazon)));
     }
 
     async function openGame(gameId) {
@@ -734,7 +1038,7 @@
 
       const container = h('div', { class: 'wrap' });
       mount(container);
-      const countdown = h('span', { style: 'color:var(--gold2)' });
+      const countdown = h('span', { class: 'tag gold', style: 'margin-left:0' });
       let deadline = null;
       const tickCountdown = () => {
         if (!deadline) return;
@@ -756,25 +1060,25 @@
           if (e2) throw e2;
           await draw();
         });
-        const svg = sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'width:100%;max-height:70vh;background:#05070c;border:1px solid var(--line);border-radius:4px' },
-          data.castles.map((c) => sv('circle', { cx: c.x, cy: c.y, r: W * 0.004 * (c.tier || 1), fill: '#4a4f5c', style: 'pointer-events:none' })),
+        const svg = sv('svg', { viewBox: `0 0 ${W} ${W}`, class: 'pickboard', style: 'width:100%;max-height:70vh' },
+          data.castles.map((c) => sv('circle', { cx: c.x, cy: c.y, r: W * 0.004 * (c.tier || 1), fill: '#8f98b8', opacity: '0.55', style: 'pointer-events:none' })),
           data.seats.map((x) => {
             const taken = x.player_id !== null && x.player_id !== undefined;
-            const col = taken ? factionOf(x.faction_slug).color : '#f0cf7d';
+            const col = taken ? factionOf(x.faction_slug).color : '#dbb259';
             const r = W * 0.024;
             return sv('g', { style: 'cursor:pointer', onclick: () => { if (!taken || x.player_id === data.me) pick(x.seat); } },
               sv('circle', { cx: x.x, cy: x.y, r: r * 1.6, fill: 'transparent' }),
-              sv('circle', { cx: x.x, cy: x.y, r, fill: '#0c0e18', stroke: col, 'stroke-width': r * 0.3, 'stroke-dasharray': taken ? null : `${r * 0.5} ${r * 0.4}` }),
+              sv('circle', { cx: x.x, cy: x.y, r, fill: '#0e1325', stroke: col, 'stroke-width': r * 0.3, 'stroke-dasharray': taken ? null : `${r * 0.5} ${r * 0.4}` }),
               sv('text', { x: x.x, y: x.y + r * 0.35, 'text-anchor': 'middle', 'font-size': r, style: 'fill:#fff;pointer-events:none' }, String(x.seat + 1)),
               sv('text', { x: x.x, y: x.y - r * 1.4, 'text-anchor': 'middle', 'font-size': r * 0.8, style: 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:' + r * 0.2 + 'px;pointer-events:none' }, taken ? x.display_name : 'free'));
           }));
         container.replaceChildren(topbar(),
           h('div', { class: 'row', style: 'margin-bottom:14px' }, h('button', { onclick: showHome }, 'Back to games')),
           h('div', { class: 'panel' },
-            h('h2', {}, 'Choose your starting location'),
-            h('div', { style: 'color:var(--dim);font-size:.88rem;margin:6px 0 10px' },
-              data.fog_dark ? 'The galaxy is dark: you can only see where each player could begin. ' : 'Pick the start that suits you. ',
-              'Click a free marker to claim it, or click yours again to keep it. Players who have not chosen when time runs out are assigned the remaining starts at random, and so are AI players.'),
+            h('h2', {}, 'Choose where your house begins'),
+            h('div', { class: 'tip', style: 'margin:6px 0 12px;max-width:70ch' },
+              data.fog_dark ? 'The realm is dark: you can only see where each house could begin. ' : 'Pick the start that suits you. ',
+              'Click a free marker to claim it, or click yours again to keep it. Houses that have not chosen when time runs out, and AI houses, are given the remaining starts at random.'),
             h('div', { class: 'row wrap2', style: 'margin-bottom:10px' }, countdown,
               h('span', { style: 'color:var(--text)' }, mine ? `You chose start ${mine.seat + 1} (${mine.name})` : 'You have not chosen yet')),
             svg));
@@ -825,35 +1129,16 @@
         const parts = [topbar(), h('div', { class: 'row', style: 'margin-bottom:14px' },
           h('button', { onclick: showHome }, 'Back to games'))];
 
-        parts.push(h('div', { class: 'panel' },
-          h('h2', {}, game.name, h('span', {}, h('span', { class: 'tag' + (game.status === 'active' ? ' gold' : '') }, { lobby: 'lobby', picking: 'choosing starts', active: 'in progress', finished: 'finished' }[game.status]))),
-          h('div', { class: 'kv' },
-            kv('Map', `${SHAPES[game.map_shape] || 'Continent'} · ${STYLES[game.map_style]} · ${SIZES[game.map_size]}`),
-            kv('Speed', SPEEDS[game.tick_speed] || game.tick_speed),
-            kv('Seats', `${players.length}/${game.max_players}`),
-            kv('Victory', `${Math.round(game.victory_pct * 100)}% of territories`),
-            kv('Fog of war', game.fog_dark ? 'Dark' : game.fog_of_war ? 'Fog' : 'Off'),
-            kv('Map scale', `${game.world_scale || 1}x${game.free_travel ? ', free travel' : ', roads'}`),
-            kv('Seasons', game.seasons_enabled ? `On (${game.season_length_ticks} ticks each)` : 'Off'),
-            kv('Random events', game.events_enabled ? 'On' : 'Off'),
-            kv('Mercenaries', game.mercenaries_enabled ? 'On' : 'Off'),
-            kv('Starting castles', game.starting_territories),
-            game.start_selection === 'choose' ? kv('Start locations', `Players choose (${game.pick_minutes} min)`) : null,
-            game.has_password ? kv('Password', 'Required') : null,
-            game.victory_decay ? kv('Victory decay', `${game.victory_decay} castles per production`) : null,
-            kv('Alliances', game.allow_alliances ? `Allowed, ${game.grace_period_ticks} tick warning` : 'Off'),
-            kv('Roads', `${game.roads_mode}${game.random_roads !== 'none' ? `, ${game.random_roads} random` : ''}`),
-            game.mirrored ? kv('Layout', 'Mirrored stars') : game.star_scatter === 'twin_rings' ? kv('Layout', 'Twin rings') : null,
-            game.auto_start ? kv('Auto start', 'When full') : null,
-            kv('AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'),
-            kv('Truce', `${game.truce_ticks} ticks`),
-            kv('Alliance break warning', `${game.grace_period_ticks} ticks`),
-            game.time_limit_ticks ? kv('Time limit', `tick ${game.time_limit_ticks}`) : null,
-            game.tick_speed === 'turn_based' ? kv('Turns', `${game.ticks_per_turn} ticks, ${game.turn_timeout_minutes} min timeout`) : null,
-            game.status !== 'lobby' ? kv('Tick', game.current_tick) : null)));
+        const statusText = { lobby: 'Gathering', picking: 'Choosing starts', active: 'In progress', finished: 'Finished' }[game.status];
+        const host = players.find((p) => p.user_id === game.created_by);
+        parts.push(h('div', { class: 'room-head' },
+          sigil(host ? host.faction_slug : 'kaldran', 64),
+          h('div', {}, h('h1', { style: 'margin:0' }, game.name), h('div', { class: 'tip' }, `Hosted by ${host ? host.display_name : 'unknown'}${game.has_password ? ' · password required' : ''}`)),
+          h('span', { class: 'tag' + (game.status === 'active' ? ' gold' : '') }, statusText)));
+        parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Articles of war'), articlesOfWar(game, players.length)));
 
         const slots = players.map((p) => h('div', { class: 'slot' },
-          dots(p.faction_slug),
+          sigil(p.faction_slug, 44),
           h('div', {},
             h('div', { class: 'nm' }, p.display_name, p.user_id === game.created_by ? h('span', { class: 'tag gold' }, 'host') : null, p.user_id === state.session.user.id ? h('span', { class: 'tag green' }, 'you') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
             h('div', { class: 'fn' }, factionOf(p.faction_slug).name + (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? ' · eliminated' : '')),
@@ -868,7 +1153,7 @@
             slots.push(h('div', { class: 'slot empty' }, game.fill_with_ai ? 'AI player at start' : 'Open seat'));
           }
         }
-        parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Players'), h('div', { class: 'slots' }, slots)));
+        parts.push(h('div', { class: 'panel' }, h('h2', {}, 'The table'), h('div', { class: 'slots' }, slots)));
 
         if (game.status === 'lobby' && me) {
           const count = 1 + game.starting_commanders;
@@ -978,8 +1263,6 @@
         if (focused) chatInput.focus();
       };
 
-      const kv = (k, v) => h('div', {}, h('b', {}, k), String(v));
-
       await draw();
 
       let debounce = null;
@@ -1043,7 +1326,16 @@
     }
 
     const TERRAIN_NAMES = { plains: 'Plains', forest: 'Forest', hills: 'Hills', mountain: 'Mountain fortress', coast: 'Coast' };
-    const EDGE_NAMES = { land: 'open ground', pass: 'mountain pass', river: 'ford', sea: 'sea lane' };
+    const EDGE_NAMES = { land: 'open ground', pass: 'mountain pass', river: 'river crossing', sea: 'sea lane', wormhole: 'wormhole' };
+    const ACTION_NAMES = { nothing: 'Do nothing', collect_all: 'Collect all', drop_all: 'Drop all', collect: 'Collect', drop: 'Drop', collect_all_but: 'Collect all but', drop_all_but: 'Drop all but', garrison: 'Garrison to' };
+    const ACTION_NEEDS_AMOUNT = new Set(['collect', 'drop', 'collect_all_but', 'drop_all_but', 'garrison']);
+    const orderControls = (st, onChange) => {
+      const act = h('select', { style: 'width:auto;padding:3px 6px', onchange: (e) => { st.action = e.target.value; onChange(); } }, Object.entries(ACTION_NAMES).map(([k, v]) => h('option', { value: k }, v)));
+      act.value = st.action || 'nothing';
+      const amt = ACTION_NEEDS_AMOUNT.has(st.action) ? h('input', { type: 'number', min: '0', value: String(st.amount || 0), style: 'width:70px', oninput: (e) => { st.amount = Math.max(0, Number(e.target.value) || 0); } }) : null;
+      const wait = h('input', { type: 'number', min: '0', max: '240', value: String(st.delay || 0), style: 'width:60px', title: 'Ticks to wait here before moving on', oninput: (e) => { st.delay = Math.min(240, Math.max(0, Number(e.target.value) || 0)); } });
+      return h('div', { class: 'row wrap2', style: 'margin:2px 0 8px 14px;align-items:center' }, act, amt, h('span', { style: 'color:var(--dim);font-size:.8rem' }, 'then wait'), wait, h('span', { style: 'color:var(--dim);font-size:.8rem' }, 'ticks'));
+    };
 
     function decodeArt(art) {
       const G = art.grid;
@@ -1128,6 +1420,14 @@
         }
       }
       ctx.putImageData(img, 0, 0);
+      const OUT = 2048;
+      const hi = document.createElement('canvas');
+      hi.width = OUT;
+      hi.height = OUT;
+      const cx = hi.getContext('2d');
+      cx.imageSmoothingEnabled = true;
+      cx.imageSmoothingQuality = 'high';
+      cx.drawImage(canvas, 0, 0, OUT, OUT);
 
       let seed = d.seed >>> 0;
       const rnd = () => {
@@ -1136,8 +1436,8 @@
         t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
-      const scale = W / mapW;
-      const clear = (x, y) => sites.every((s) => Math.hypot(s.x - x, s.y - y) > 26);
+      const scale = OUT / mapW;
+      const clear = (x, y) => sites.every((s) => Math.hypot(s.x - x, s.y - y) > 30);
       const peaks = [];
       const trees = [];
       for (let py = 6; py < W - 6; py += 8) {
@@ -1148,58 +1448,131 @@
           if (h < d.sea + 0.02) continue;
           const el = (h - d.sea) / (1 - d.sea);
           const m = M(x, y);
-          if (el > 0.4 && rnd() < 0.38 && clear(x, y)) peaks.push({ px: x * scale, py: y * scale, size: 13 + el * 20 + rnd() * 7, snow: el > 0.58 });
-          else if (m > 0.6 && el < 0.45 && rnd() < 0.55 && clear(x, y)) trees.push({ px: x * scale, py: y * scale, r: 2.6 + rnd() * 1.6 });
+          if (el > 0.4 && rnd() < 0.3 && clear(x, y)) peaks.push({ px: x * scale, py: y * scale, size: (12 + el * 17 + rnd() * 6) * 2, snow: el > 0.58, j: rnd() });
+          else if (m > 0.55 && el < 0.45 && rnd() < 0.6 && clear(x, y)) trees.push({ px: x * scale, py: y * scale, r: (2.4 + rnd() * 1.6) * 2, kind: rnd(), tone: rnd() });
         }
       }
       trees.sort((a, b) => a.py - b.py);
       for (const t of trees) {
-        ctx.fillStyle = 'rgba(14,44,26,0.35)';
-        ctx.beginPath();
-        ctx.ellipse(t.px + 1.2, t.py + t.r * 0.9, t.r * 1.1, t.r * 0.5, 0, 0, 7);
-        ctx.fill();
-        ctx.fillStyle = '#2b6a3b';
-        ctx.beginPath();
-        ctx.arc(t.px, t.py, t.r, 0, 7);
-        ctx.fill();
-        ctx.fillStyle = 'rgba(150,200,110,0.55)';
-        ctx.beginPath();
-        ctx.arc(t.px - t.r * 0.3, t.py - t.r * 0.3, t.r * 0.5, 0, 7);
-        ctx.fill();
+        const g = 34 + t.tone * 30;
+        cx.fillStyle = 'rgba(10,34,18,0.38)';
+        cx.beginPath();
+        cx.ellipse(t.px + t.r * 0.5, t.py + t.r * 0.35, t.r * 1.2, t.r * 0.5, 0, 0, 7);
+        cx.fill();
+        if (t.kind < 0.65) {
+          const hgt = t.r * 3.4;
+          cx.fillStyle = '#3b2a18';
+          cx.fillRect(t.px - t.r * 0.14, t.py - t.r * 0.4, t.r * 0.28, t.r * 0.6);
+          for (let i = 0; i < 3; i++) {
+            const yb = t.py - t.r * 0.3 - i * hgt * 0.26;
+            const w = t.r * (1.15 - i * 0.28);
+            cx.fillStyle = `rgb(${20 + i * 6},${g + 30 + i * 14},${40 + i * 6})`;
+            cx.beginPath();
+            cx.moveTo(t.px - w, yb);
+            cx.lineTo(t.px, yb - hgt * 0.5);
+            cx.lineTo(t.px + w, yb);
+            cx.fill();
+            cx.fillStyle = 'rgba(0,0,0,0.22)';
+            cx.beginPath();
+            cx.moveTo(t.px, yb - hgt * 0.5);
+            cx.lineTo(t.px + w, yb);
+            cx.lineTo(t.px + w * 0.1, yb);
+            cx.fill();
+          }
+        } else {
+          [[-0.55, 0.2, 0.8], [0.55, 0.25, 0.75], [0, -0.45, 0.95]].forEach(([ox, oy, k]) => {
+            cx.fillStyle = `rgb(${46 + t.tone * 30},${g + 56},${44})`;
+            cx.beginPath();
+            cx.arc(t.px + ox * t.r, t.py + oy * t.r - t.r * 0.5, t.r * k, 0, 7);
+            cx.fill();
+            cx.fillStyle = 'rgba(190,230,130,0.35)';
+            cx.beginPath();
+            cx.arc(t.px + ox * t.r - t.r * 0.25, t.py + oy * t.r - t.r * 0.8, t.r * k * 0.5, 0, 7);
+            cx.fill();
+          });
+        }
       }
       peaks.sort((a, b) => a.py - b.py);
       for (const p of peaks) {
         const w = p.size;
-        const ht = p.size * 0.9;
-        ctx.fillStyle = 'rgba(0,0,0,0.22)';
-        ctx.beginPath();
-        ctx.ellipse(p.px + w * 0.15, p.py + 1, w * 0.62, w * 0.18, 0, 0, 7);
-        ctx.fill();
-        ctx.fillStyle = '#b3aba0';
-        ctx.beginPath();
-        ctx.moveTo(p.px - w / 2, p.py);
-        ctx.lineTo(p.px, p.py - ht);
-        ctx.lineTo(p.px + w * 0.05, p.py);
-        ctx.fill();
-        ctx.fillStyle = '#6f675e';
-        ctx.beginPath();
-        ctx.moveTo(p.px + w * 0.05, p.py);
-        ctx.lineTo(p.px, p.py - ht);
-        ctx.lineTo(p.px + w / 2, p.py);
-        ctx.fill();
+        const ht = p.size * 1.05;
+        const j = p.j;
+        cx.fillStyle = 'rgba(0,0,0,0.25)';
+        cx.beginPath();
+        cx.ellipse(p.px + w * 0.22, p.py + 2, w * 0.7, w * 0.17, 0, 0, 7);
+        cx.fill();
+        const lx = p.px - w * 0.5;
+        const rx = p.px + w * 0.5;
+        const apex = p.px + (j - 0.5) * w * 0.12;
+        const lit = cx.createLinearGradient(lx, p.py - ht, apex, p.py);
+        lit.addColorStop(0, '#d8cfbc');
+        lit.addColorStop(1, '#a39a88');
+        const dark = cx.createLinearGradient(apex, p.py - ht, rx, p.py);
+        dark.addColorStop(0, '#80766a');
+        dark.addColorStop(1, '#524a42');
+        cx.fillStyle = lit;
+        cx.beginPath();
+        cx.moveTo(lx, p.py);
+        cx.lineTo(lx + w * 0.16, p.py - ht * 0.42);
+        cx.lineTo(apex - w * 0.08, p.py - ht * 0.62);
+        cx.lineTo(apex, p.py - ht);
+        cx.lineTo(apex + w * 0.04, p.py - ht * 0.3);
+        cx.lineTo(apex + w * 0.05, p.py);
+        cx.closePath();
+        cx.fill();
+        cx.fillStyle = dark;
+        cx.beginPath();
+        cx.moveTo(apex, p.py - ht);
+        cx.lineTo(apex + w * 0.12, p.py - ht * 0.58);
+        cx.lineTo(rx - w * 0.14, p.py - ht * 0.36);
+        cx.lineTo(rx, p.py);
+        cx.lineTo(apex + w * 0.05, p.py);
+        cx.lineTo(apex + w * 0.04, p.py - ht * 0.3);
+        cx.closePath();
+        cx.fill();
+        cx.strokeStyle = 'rgba(30,22,14,0.35)';
+        cx.lineWidth = 1.2;
+        cx.beginPath();
+        cx.moveTo(apex, p.py - ht);
+        cx.lineTo(apex + w * 0.04, p.py - ht * 0.3);
+        cx.lineTo(apex + w * 0.05, p.py);
+        cx.stroke();
+        cx.strokeStyle = 'rgba(255,255,255,0.12)';
+        cx.beginPath();
+        cx.moveTo(apex - w * 0.02, p.py - ht * 0.9);
+        cx.lineTo(lx + w * 0.2, p.py - ht * 0.3);
+        cx.stroke();
         if (p.snow) {
-          ctx.fillStyle = '#f4f6f8';
-          ctx.beginPath();
-          ctx.moveTo(p.px - w * 0.14, p.py - ht * 0.68);
-          ctx.lineTo(p.px, p.py - ht);
-          ctx.lineTo(p.px + w * 0.14, p.py - ht * 0.68);
-          ctx.lineTo(p.px + w * 0.04, p.py - ht * 0.6);
-          ctx.fill();
+          cx.fillStyle = '#f6f8fa';
+          cx.beginPath();
+          cx.moveTo(apex - w * 0.2, p.py - ht * 0.66);
+          cx.lineTo(apex - w * 0.06, p.py - ht * 0.6);
+          cx.lineTo(apex - w * 0.02, p.py - ht * 0.7);
+          cx.lineTo(apex, p.py - ht);
+          cx.lineTo(apex + w * 0.06, p.py - ht * 0.74);
+          cx.lineTo(apex + w * 0.14, p.py - ht * 0.62);
+          cx.lineTo(apex + w * 0.2, p.py - ht * 0.58);
+          cx.lineTo(apex + w * 0.04, p.py - ht * 0.5);
+          cx.closePath();
+          cx.fill();
+          cx.fillStyle = 'rgba(110,130,160,0.35)';
+          cx.beginPath();
+          cx.moveTo(apex, p.py - ht);
+          cx.lineTo(apex + w * 0.06, p.py - ht * 0.74);
+          cx.lineTo(apex + w * 0.2, p.py - ht * 0.58);
+          cx.lineTo(apex + w * 0.04, p.py - ht * 0.5);
+          cx.closePath();
+          cx.fill();
         }
       }
+      const vg = cx.createRadialGradient(OUT / 2, OUT / 2, OUT * 0.3, OUT / 2, OUT / 2, OUT * 0.75);
+      vg.addColorStop(0, 'rgba(255,236,190,0.05)');
+      vg.addColorStop(1, 'rgba(20,12,4,0.22)');
+      cx.fillStyle = vg;
+      cx.fillRect(0, 0, OUT, OUT);
 
       return {
-        url: canvas.toDataURL(),
+        url: hi.toDataURL(),
         mapW,
         rivers: d.rivers,
       };
@@ -1224,38 +1597,225 @@
       return canvas.toDataURL();
     }
 
-    function castleSprite(tier, terrain, ownerColor) {
-      const w = tier >= 3 ? 44 : tier === 2 ? 34 : 26;
-      const stone = '#d6cdb8';
-      const shade = '#9a9180';
-      const line = '#2a2418';
+    function castleSprite(tier, terrain, ownerColor, ownerColor2) {
+      const W = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
+      const ln = '#2a2216';
+      const faces = { front: '#d8ceb4', side: '#a99d84', top: '#ece4cd', dark: '#7d725d' };
       const parts = [];
-      parts.push(sv('ellipse', { cx: 3, cy: 9, rx: w * 0.66, ry: 5, fill: 'rgba(0,0,0,0.3)' }));
-      if (terrain === 'mountain') {
-        parts.push(sv('path', { d: `M${-w * 0.75},10 L${-w * 0.35},-3 L${-w * 0.05},3 L${w * 0.3},-6 L${w * 0.75},10 Z`, fill: '#857d72', stroke: line, 'stroke-width': 1 }));
-      }
-      const wallTop = -4;
-      parts.push(sv('rect', { x: -w / 2, y: wallTop, width: w, height: 13, fill: stone, stroke: line, 'stroke-width': 1.1 }));
-      parts.push(sv('rect', { x: -w / 2, y: wallTop, width: w * 0.28, height: 13, fill: shade, opacity: 0.55 }));
-      const teeth = Math.round(w / 6);
-      for (let i = 0; i < teeth; i++) {
-        parts.push(sv('rect', { x: -w / 2 + (i * w) / teeth + 0.5, y: wallTop - 2.6, width: w / teeth - 1.3, height: 2.8, fill: stone, stroke: line, 'stroke-width': 0.7 }));
-      }
-      const keepH = tier >= 3 ? 20 : 15;
-      parts.push(sv('rect', { x: -w * 0.17, y: wallTop - keepH + 4, width: w * 0.34, height: keepH, fill: stone, stroke: line, 'stroke-width': 1.1 }));
-      parts.push(sv('rect', { x: -w * 0.17, y: wallTop - keepH + 4, width: w * 0.1, height: keepH, fill: shade, opacity: 0.55 }));
-      if (tier >= 2) {
-        for (const sx of [-1, 1]) {
-          const tx = sx * w * 0.5;
-          parts.push(sv('rect', { x: tx - 3.4, y: wallTop - 7, width: 6.8, height: 20, fill: stone, stroke: line, 'stroke-width': 1 }));
-          parts.push(sv('path', { d: `M${tx - 4.6},${wallTop - 7} L${tx},${wallTop - 14} L${tx + 4.6},${wallTop - 7} Z`, fill: ownerColor, stroke: line, 'stroke-width': 0.9 }));
+      const poly = (pts, fill, extra) => sv('polygon', { points: pts.map((p) => p.join(',')).join(' '), fill, stroke: ln, 'stroke-width': 0.9, 'stroke-linejoin': 'round', ...extra });
+      const box = (x, y, w, hh, d, f) => {
+        const c = f || faces;
+        const out = [
+          poly([[x + w, y], [x + w + d, y - d * 0.5], [x + w + d, y - d * 0.5 - hh], [x + w, y - hh]], c.side),
+          sv('rect', { x, y: y - hh, width: w, height: hh, fill: c.front, stroke: ln, 'stroke-width': 0.9 }),
+          poly([[x, y - hh], [x + w, y - hh], [x + w + d, y - hh - d * 0.5], [x + d, y - hh - d * 0.5]], c.top),
+        ];
+        for (let yy = y - hh + 4; yy < y - 1; yy += 4.5) out.push(sv('line', { x1: x, y1: yy, x2: x + w, y2: yy, stroke: ln, 'stroke-opacity': 0.12, 'stroke-width': 0.6 }));
+        return out;
+      };
+      const teeth = (x, y, w, n) => Array.from({ length: n }, (_, i) => sv('rect', { x: x + (i * w) / n + 0.4, y: y - 2.8, width: w / n - 1.2, height: 3, fill: faces.front, stroke: ln, 'stroke-width': 0.6 }));
+      const round = (cx, y, r, hh, roof) => [
+        sv('rect', { x: cx - r, y: y - hh, width: r * 2, height: hh, fill: 'url(#gStone)', stroke: ln, 'stroke-width': 0.9 }),
+        sv('ellipse', { cx, cy: y, rx: r, ry: r * 0.42, fill: faces.dark, stroke: ln, 'stroke-width': 0.9 }),
+        sv('rect', { x: cx - r * 0.16, y: y - hh * 0.62, width: r * 0.32, height: hh * 0.2, rx: 0.5, fill: '#2a2216' }),
+        ...(roof
+          ? [sv('path', { d: `M${cx - r - 1.5},${y - hh} L${cx},${y - hh - r * 1.9} L${cx + r + 1.5},${y - hh} Z`, fill: ownerColor, stroke: ln, 'stroke-width': 0.9, 'stroke-linejoin': 'round' }),
+            sv('path', { d: `M${cx},${y - hh - r * 1.9} L${cx + r + 1.5},${y - hh} L${cx + 1},${y - hh} Z`, fill: 'rgba(0,0,0,0.28)' })]
+          : [sv('ellipse', { cx, cy: y - hh, rx: r, ry: r * 0.42, fill: faces.top, stroke: ln, 'stroke-width': 0.9 })]),
+      ];
+      const pole = (x, y, hgt) => [
+        sv('line', { x1: x, y1: y, x2: x, y2: y - hgt, stroke: ln, 'stroke-width': 1.3, 'stroke-linecap': 'round' }),
+        sv('g', { transform: `translate(${x},${y - hgt})` }, sv('g', { class: 'flag' },
+          sv('path', { d: 'M0.6 0H13L10.5 3.6L13 7.2H0.6Z', fill: ownerColor, stroke: ln, 'stroke-width': 0.8, 'stroke-linejoin': 'round' }),
+          sv('path', { d: 'M0.6 2.8H11.4L10.8 3.6L11.4 4.4H0.6Z', fill: ownerColor2, opacity: 0.95 }))),
+      ];
+      if (terrain === 'mountain') parts.push(poly([[-W * 0.7, 3], [-W * 0.38, -W * 0.22], [-W * 0.1, -W * 0.06], [W * 0.22, -W * 0.3], [W * 0.62, 3]], '#8a8274'), poly([[W * 0.22, -W * 0.3], [W * 0.62, 3], [W * 0.15, 3]], 'rgba(0,0,0,0.25)', { stroke: 'none' }));
+      if (tier === 1) {
+        parts.push(...box(-W * 0.5, 2, W * 0.8, W * 0.2, W * 0.2));
+        parts.push(...teeth(-W * 0.5, 2 - W * 0.2, W * 0.8, 5));
+        parts.push(...round(W * 0.02, -2, W * 0.2, W * 0.62, true));
+        parts.push(...pole(W * 0.02, -2 - W * 0.62 - W * 0.38, 15));
+      } else {
+        const wl = W * 0.96;
+        const x0 = -wl / 2;
+        const wh = W * 0.27;
+        parts.push(...box(-W * 0.2, -W * 0.12, W * 0.4, W * 0.62, W * 0.16));
+        parts.push(sv('polygon', { points: `${-W * 0.23},${-W * 0.74} ${W * 0.23},${-W * 0.74} ${W * 0.24 + W * 0.16},${-W * 0.74 - W * 0.08} ${W * 0.01},${-W * 0.74 - W * 0.36}`, fill: ownerColor, stroke: ln, 'stroke-width': 0.9, 'stroke-linejoin': 'round' }));
+        parts.push(sv('polygon', { points: `${W * 0.24 + W * 0.16},${-W * 0.74 - W * 0.08} ${W * 0.01},${-W * 0.74 - W * 0.36} ${W * 0.23},${-W * 0.74}`, fill: 'rgba(0,0,0,0.28)' }));
+        if (tier >= 3) {
+          parts.push(...round(-W * 0.4, -W * 0.12, W * 0.09, W * 0.52, true));
+          parts.push(...round(W * 0.36, -W * 0.14, W * 0.09, W * 0.5, true));
         }
+        parts.push(...box(x0, 3, wl, wh, W * 0.2));
+        parts.push(...teeth(x0, 3 - wh, wl, Math.round(wl / 6)));
+        parts.push(sv('path', { d: `M${-W * 0.07},3 V${3 - wh * 0.55} a${W * 0.07},${W * 0.07} 0 0 1 ${W * 0.14},0 V3 Z`, fill: '#241b0f', stroke: ln, 'stroke-width': 0.7 }));
+        parts.push(...round(x0, 3, W * 0.1, wh * 1.7, true));
+        parts.push(...round(x0 + wl, 3, W * 0.1, wh * 1.7, true));
+        parts.push(...pole(W * 0.01, -W * 0.74 - W * 0.36 + 2, tier >= 3 ? 20 : 17));
       }
-      parts.push(sv('path', { d: `M-3.2,9 L-3.2,4 A3.2,3.2 0 0 1 3.2,4 L3.2,9 Z`, fill: '#2a2418' }));
-      const poleTop = wallTop - keepH + 4 - 9;
-      parts.push(sv('line', { x1: 0, y1: wallTop - keepH + 4, x2: 0, y2: poleTop, stroke: line, 'stroke-width': 1.2 }));
-      parts.push(sv('path', { d: `M0,${poleTop} L11,${poleTop + 3.2} L0,${poleTop + 6.4} Z`, fill: ownerColor, stroke: line, 'stroke-width': 0.9 }));
       return sv('g', {}, ...parts);
+    }
+
+    function plateCastle(o) {
+      const { t, tier, owner, seen, mine, showTroops, selected, sieged, here, reach, colors, pick, nameLabel, onCmd, cmdSel } = o;
+      const W = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
+      const ownerCol = owner ? colors.c : '#8e8a82';
+      const tagY = Math.round(W * 0.2) + 10;
+      const troop = showTroops ? String(t.troops) : '?';
+      const nameW = nameLabel.length * 8.4;
+      const tw = 24 + nameW + (troop.length * 9 + 14);
+      const x0 = -tw / 2;
+      const ring = (extra) => sv('ellipse', { cx: 0, cy: 4, rx: W * 0.98, ry: W * 0.34, fill: 'none', style: 'pointer-events:none', ...extra });
+      return sv('g', { class: 'castle', opacity: (seen ? 1 : 0.72) * (reach ? 1 : 0.4) },
+        sv('circle', { cx: 0, cy: -W * 0.3, r: W * 0.85, fill: 'transparent', style: 'cursor:pointer', onclick: pick }),
+        sv('ellipse', { cx: 0, cy: 4, rx: W * 1.05, ry: W * 0.4, fill: 'url(#gDirt)', style: 'pointer-events:none' }),
+        sv('ellipse', { cx: W * 0.22, cy: 5, rx: W * 0.78, ry: W * 0.22, fill: 'url(#gShadow)', style: 'pointer-events:none' }),
+        owner ? ring({ stroke: ownerCol, 'stroke-width': 2.4, 'stroke-opacity': 0.75 }) : ring({ stroke: '#b9b09a', 'stroke-width': 1.4, 'stroke-opacity': 0.4, 'stroke-dasharray': '5 6' }),
+        mine ? ring({ stroke: '#f5dc94', 'stroke-width': 1.2, 'stroke-opacity': 0.9, rx: W * 1.06, ry: W * 0.38 }) : null,
+        selected ? ring({ class: 'selring', stroke: '#f5dc94', 'stroke-width': 2.6, 'stroke-dasharray': '9 7', rx: W * 1.16, ry: W * 0.43 }) : null,
+        sieged ? ring({ class: 'selring', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '6 5', rx: W * 1.26, ry: W * 0.48 }) : null,
+        sv('g', { style: 'cursor:pointer;pointer-events:none' }, castleSprite(tier, t.terrain, ownerCol, owner ? colors.c2 : '#5a574f')),
+        sv('g', { style: 'pointer-events:none' },
+          sv('rect', { x: x0, y: tagY, width: tw, height: 21, rx: 3, fill: 'rgba(16,11,6,0.78)', stroke: mine ? 'rgba(245,220,148,0.9)' : 'rgba(214,171,82,0.5)', 'stroke-width': 1.1 }),
+          sv('path', { d: `M${x0 + 5} ${tagY + 4}h12v9q0 5 -6 7q-6 -2 -6 -7Z`, fill: ownerCol, stroke: '#0e0905', 'stroke-width': 1 }),
+          owner ? sv('path', { d: `M${x0 + 5} ${tagY + 8}h12v3h-12Z`, fill: colors.c2, opacity: 0.9 }) : null,
+          sv('text', { x: x0 + 23, y: tagY + 15, 'font-size': 12.5, style: 'fill:#efe3c4;font-family:Cinzel,serif;font-weight:600;letter-spacing:.03em' }, nameLabel),
+          sv('text', { x: x0 + tw - 8, y: tagY + 15.5, 'text-anchor': 'end', 'font-size': 13, style: `fill:${showTroops ? '#f5dc94' : '#9a8a64'};font-family:Cinzel,serif;font-weight:700` }, troop)),
+        showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'zoomonly', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
+        here.map((c, i) => sv('circle', {
+          cx: (i - (here.length - 1) / 2) * 16, cy: tagY + 31, r: c.role === 'king' ? 7 : 5.8, fill: colors.cmd(c.owner_player_id),
+          stroke: cmdSel(c) ? '#fff' : (c.role === 'king' ? '#f5dc94' : '#000'), 'stroke-width': c.role === 'king' ? 2 : 1.4, style: 'cursor:pointer',
+          onclick: (e) => { e.stopPropagation(); onCmd(c); },
+        })));
+    }
+
+    const PREFS = (() => {
+      let v = {};
+      try { v = JSON.parse(localStorage.getItem('ss-prefs')) || {}; } catch {}
+      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right' };
+      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side })); } catch {} };
+      return prefs;
+    })();
+
+    function articlesOfWar(game, seats) {
+      const art = (title, ...rows) => h('div', { class: 'article' }, h('h4', {}, title), h('div', {}, rows.filter(Boolean).map(([k, v]) => h('div', {}, h('b', {}, k + ': '), String(v)))));
+      return h('div', { class: 'articles' },
+          art('The realm',
+            ['Land', `${SHAPES[game.map_shape] || 'Continent'}, ${STYLES[game.map_style]}, ${SIZES[game.map_size]}`],
+            ['Scale', `${game.world_scale || 1}x${game.travel_mode === 'trails' ? ', castle trails' : game.free_travel ? ', free travel' : ', roads'}`],
+            ['Terrain', (PRESET_INFO[game.map_preset] || 'Continental').split(':')[0]],
+            game.home_distance && game.home_distance !== 'medium' ? ['Home distance', (HOME_INFO[game.home_distance] || '').split(':')[0]] : null,
+            game.wormholes && game.wormholes !== 'none' ? ['Wormholes', (WORMHOLE_INFO[game.wormholes] || '').split(' ')[0]] : null,
+            ['Roads', `${game.roads_mode}${game.random_roads !== 'none' ? `, ${game.random_roads} random` : ''}`],
+            game.mirrored ? ['Layout', 'Mirrored stars'] : game.star_scatter === 'twin_rings' ? ['Layout', 'Twin rings'] : null),
+          art('Victory and sight',
+            ['Victory', `${Math.round(game.victory_pct * 100)}% of castles`],
+            game.victory_decay ? ['Decay', `${game.victory_decay} castles per production`] : null,
+            ['Fog', game.fog_dark ? 'Dark' : game.fog_of_war ? 'Fog' : 'Off'],
+            game.start_selection === 'choose' ? ['Starts', `Houses choose (${game.pick_minutes} min)`] : null,
+            game.time_limit_ticks ? ['Time limit', `tick ${game.time_limit_ticks}`] : null),
+          art('Time',
+            ['Speed', SPEEDS[game.tick_speed] || game.tick_speed],
+            game.tick_speed === 'turn_based' ? ['Turns', `${game.ticks_per_turn} ticks, ${game.turn_timeout_minutes} min timeout`] : null,
+            ['Truce', `${game.truce_ticks} ticks`],
+            ['Seasons', game.seasons_enabled ? `On (${game.season_length_ticks} ticks each)` : 'Off'],
+            game.status !== 'lobby' ? ['Tick', game.current_tick] : null),
+          art('Houses',
+            ['Seats', `${seats}/${game.max_players}`],
+            ['Starting castles', game.starting_territories],
+            ['Alliances', game.allow_alliances ? `Allowed, ${game.grace_period_ticks} tick warning` : 'Off'],
+            ['Random events', game.events_enabled ? 'On' : 'Off'],
+            ['Mercenaries', game.mercenaries_enabled ? 'On' : 'Off'],
+            ['AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'],
+            game.auto_start ? ['Auto start', 'When full'] : null));
+    }
+
+    function resolveFight(mode, a, d, firstSide) {
+      const aT = Math.max(0, Math.floor(a.troops));
+      const dT = Math.max(0, Math.floor(d.troops));
+      const aDmg = Math.max(1, Math.floor(a.damage));
+      const dDmg = Math.max(1, Math.floor(d.damage)) + (mode === 'castle' ? 1 : 0);
+      if (mode === 'castle' && dT === 0) return { winner: 'attacker', left: aT, note: 'An undefended castle always falls.' };
+      if (aT === 0 && dT === 0) return { winner: null, left: 0, note: 'Neither side has troops.' };
+      if (aT === 0) return { winner: 'defender', left: dT, note: 'The attacker has no troops.' };
+      if (dT === 0) return { winner: 'attacker', left: aT, note: 'The defender has no troops.' };
+      const defFirst = mode === 'castle' || firstSide === 'defender';
+      const F = defFirst ? { side: 'defender', t: dT, dmg: dDmg } : { side: 'attacker', t: aT, dmg: aDmg };
+      const S = defFirst ? { side: 'attacker', t: aT, dmg: aDmg } : { side: 'defender', t: dT, dmg: dDmg };
+      const rS = Math.ceil(S.t / F.dmg);
+      const rF = Math.ceil(F.t / S.dmg);
+      if (rS <= rF) return { winner: F.side, left: F.t - (rS - 1) * S.dmg, note: `${F.side} strikes first and needs ${rS} round${rS === 1 ? '' : 's'}; ${S.side} needs ${rF}.` };
+      return { winner: S.side, left: S.t - rF * F.dmg, note: `${F.side} strikes first and needs ${rS} round${rS === 1 ? '' : 's'}; ${S.side} needs ${rF}.` };
+    }
+
+    function battleCalcDialog() {
+      const num = (value, min) => h('input', { type: 'number', min: String(min), value: String(value), style: 'width:100%' });
+      const mode = selectOf({ castle: 'Assault on a castle (defender strikes first, +1 damage)', field: 'Open field (no defender bonus)' }, 'castle');
+      const first = selectOf({ attacker: 'Attacker strikes first', defender: 'Defender strikes first' }, 'attacker');
+      const aT = num(30, 0);
+      const aD = num(1, 1);
+      const dT = num(20, 0);
+      const dD = num(1, 1);
+      const firstRow = h('div', {}, h('label', {}, 'Initiative (Watchtowers plus Tactics)'), first);
+      const result = h('div', { class: 'sec' });
+      const calc = () => {
+        firstRow.style.display = mode.value === 'field' ? '' : 'none';
+        const r = resolveFight(mode.value, { troops: Number(aT.value), damage: Number(aD.value) }, { troops: Number(dT.value), damage: Number(dD.value) }, first.value);
+        result.replaceChildren(h('b', {}, r.winner ? `${r.winner[0].toUpperCase()}${r.winner.slice(1)} wins with ${r.left} troops left` : 'Both sides are empty'), h('div', { style: 'color:var(--dim);margin-top:4px' }, r.note));
+      };
+      [mode, first, aT, aD, dT, dD].forEach((el) => { el.addEventListener('input', calc); el.addEventListener('change', calc); });
+      calc();
+      modal('Battle calculator', h('div', {},
+        h('div', { class: 'tip', style: 'margin-bottom:8px' }, 'Damage per round is Armory plus the leader\'s Valor, at least 1. Enter your best guess for each side.'),
+        h('label', {}, 'Kind of battle'), mode,
+        h('div', { class: 'grid2' }, h('div', {}, h('label', {}, 'Attacker troops'), aT), h('div', {}, h('label', {}, 'Attacker damage per round'), aD), h('div', {}, h('label', {}, 'Defender troops'), dT), h('div', {}, h('label', {}, 'Defender damage per round'), dD)),
+        firstRow, result), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+    }
+
+    function optionsDialog() {
+      const action = selectOf(ACTION_NAMES, PREFS.action);
+      const side = selectOf({ right: 'Right of the map', left: 'Left of the map' }, PREFS.side);
+      const sound = h('input', { type: 'checkbox', checked: Sfx.on });
+      modal('Options', h('div', {},
+        h('label', {}, 'Default order at new route stops'), action,
+        h('div', { class: 'tip' }, 'Do nothing is the safe choice. Collect all empties a castle\'s garrison into the commander.'),
+        h('label', {}, 'Side panel'), side,
+        h('label', { class: 'check', style: 'margin-top:10px' }, sound, 'Sound effects')), (close) => [
+        h('button', { onclick: close }, 'Cancel'),
+        h('button', {
+          class: 'primary',
+          onclick: () => {
+            PREFS.action = action.value;
+            PREFS.side = side.value;
+            PREFS.save();
+            if (sound.checked !== Sfx.on) Sfx.toggle();
+            const body = document.querySelector('.mapbody');
+            if (body) body.classList.toggle('sideleft', PREFS.side === 'left');
+            close();
+          },
+        }, 'Save')]);
+    }
+
+    function lineChart(series, label) {
+      const W = 600;
+      const H = 260;
+      const pad = { l: 52, r: 14, t: 14, b: 30 };
+      const xs = series.flatMap((s) => s.points.map((q) => q[0]));
+      const ys = series.flatMap((s) => s.points.map((q) => q[1]));
+      const x0 = Math.min(...xs);
+      const x1 = Math.max(...xs, x0 + 1);
+      const y1 = Math.max(...ys, 1);
+      const X = (x) => pad.l + ((x - x0) / (x1 - x0)) * (W - pad.l - pad.r);
+      const Y = (y) => H - pad.b - (y / y1) * (H - pad.t - pad.b);
+      const grid = [0, 0.25, 0.5, 0.75, 1].flatMap((f) => [
+        sv('line', { x1: pad.l, x2: W - pad.r, y1: Y(y1 * f), y2: Y(y1 * f), stroke: 'rgba(90,70,40,0.25)', 'stroke-width': 1 }),
+        sv('text', { x: pad.l - 6, y: Y(y1 * f) + 4, 'text-anchor': 'end', 'font-size': 16, style: 'fill:#4a3a22' }, String(Math.round(y1 * f))),
+      ]);
+      return sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': label },
+        ...grid,
+        sv('text', { x: pad.l, y: H - 6, 'font-size': 16, style: 'fill:#4a3a22' }, `tick ${x0}`),
+        sv('text', { x: W - pad.r, y: H - 6, 'text-anchor': 'end', 'font-size': 16, style: 'fill:#4a3a22' }, `tick ${x1}`),
+        ...series.map((s) => sv('polyline', { points: s.points.map((q) => `${X(q[0])},${Y(q[1])}`).join(' '), fill: 'none', stroke: s.color, 'stroke-width': 3.2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' })));
     }
 
     async function showMap(gameId) {
@@ -1265,7 +1825,7 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { council: [], worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
+      const ms = { council: [], worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, loop: false, originOrder: { action: 'nothing', amount: 0, delay: 0 }, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [] };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
       const mutedKey = `ss-muted-${gameId}-${uid}`;
       try { ms.muted = new Set(JSON.parse(localStorage.getItem(mutedKey)) || []); } catch { ms.muted = new Set(); }
@@ -1280,8 +1840,13 @@
       const sideEl = h('div', { class: 'side' });
       const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
       const L = { terrain: sv('g'), rivers: sv('g'), crossings: sv('g'), fog: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      svg.append(sv('defs', {},
+        sv('radialGradient', { id: 'gDirt' }, sv('stop', { offset: '0', 'stop-color': '#8a6a3c', 'stop-opacity': 0.62 }), sv('stop', { offset: '0.6', 'stop-color': '#6f5530', 'stop-opacity': 0.4 }), sv('stop', { offset: '1', 'stop-color': '#4a3a20', 'stop-opacity': 0 })),
+        sv('radialGradient', { id: 'gShadow' }, sv('stop', { offset: '0', 'stop-color': '#000', 'stop-opacity': 0.5 }), sv('stop', { offset: '1', 'stop-color': '#000', 'stop-opacity': 0 })),
+        sv('linearGradient', { id: 'gStone', x1: 0, x2: 1, y1: 0, y2: 0 }, sv('stop', { offset: '0', 'stop-color': '#e6dcc2' }), sv('stop', { offset: '0.55', 'stop-color': '#c4b89d' }), sv('stop', { offset: '1', 'stop-color': '#8d826c' }))));
       svg.append(...Object.values(L));
-      mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' }, h('div', { class: 'mapwrap' }, svg), sideEl)));
+      const wrap = h('div', { class: 'mapwrap' }, svg);
+      mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' + (PREFS.side === 'left' ? ' sideleft' : '') }, wrap, sideEl)));
 
       try {
         if (!localStorage.getItem('ss-help-seen')) {
@@ -1307,7 +1872,8 @@
 
       const S = () => (ms.game && ms.game.world_scale) || 1;
       const M = () => Math.pow(S(), 0.5);
-      const rangeOf = (stables) => (ms.game.free_travel ? (210 + 60 * stables) * S() : 90 + 60 * stables);
+      const rangeOf = (stables) => (trailsOn() ? (300 + 120 * stables) * S() : ms.game.free_travel ? (210 + 60 * stables) * S() : 90 + 60 * stables);
+      const trailsOn = () => ms.game.travel_mode === 'trails';
       const myStables = () => (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
       const reachableFrom = (tid) => {
         const range = rangeOf(myStables());
@@ -1320,10 +1886,77 @@
         return out;
       };
 
+      const adjacency = () => {
+        if (ms.adjFor === ms.edges) return ms.adj;
+        const adj = new Map();
+        ms.edges.forEach((e) => {
+          const w = e.length * e.move_cost_mult;
+          if (!adj.has(e.from_territory_id)) adj.set(e.from_territory_id, []);
+          if (!adj.has(e.to_territory_id)) adj.set(e.to_territory_id, []);
+          adj.get(e.from_territory_id).push({ to: e.to_territory_id, w });
+          adj.get(e.to_territory_id).push({ to: e.from_territory_id, w });
+        });
+        ms.adj = adj;
+        ms.adjFor = ms.edges;
+        return adj;
+      };
+      const trailReach = (fromId) => {
+        const adj = adjacency();
+        const range = rangeOf(myStables());
+        const cost = new Map([[fromId, 0]]);
+        const prev = new Map();
+        const done = new Set();
+        for (;;) {
+          let u = null;
+          let best = Infinity;
+          cost.forEach((c, id) => { if (!done.has(id) && c < best) { best = c; u = id; } });
+          if (u === null) break;
+          done.add(u);
+          const tu = ms.t.get(u);
+          if (u !== fromId && !(tu && isFriend(tu.owner_player_id))) continue;
+          (adj.get(u) || []).forEach(({ to, w }) => {
+            if (!done.has(to) && best + w < (cost.get(to) ?? Infinity)) { cost.set(to, best + w); prev.set(to, u); }
+          });
+        }
+        const out = new Map();
+        cost.forEach((c, id) => {
+          if (id === fromId) return;
+          const path = [id];
+          while (path[0] !== fromId) path.unshift(prev.get(path[0]));
+          if (path.length === 2 || c <= range) out.set(id, { cost: c, path });
+        });
+        return out;
+      };
+      const trailPoly = (ids) => {
+        const pts = [];
+        for (let i = 0; i < ids.length - 1; i++) {
+          const a = ids[i];
+          const b = ids[i + 1];
+          const e = ms.edges.find((x) => (x.from_territory_id === a && x.to_territory_id === b) || (x.from_territory_id === b && x.to_territory_id === a));
+          let seg = e && e.path ? e.path.map((q) => ({ x: q[0], y: q[1] })) : [ms.t.get(a), ms.t.get(b)];
+          if (e && e.path && e.from_territory_id !== a) seg = seg.slice().reverse();
+          pts.push(...(i ? seg.slice(1) : seg));
+        }
+        return pts;
+      };
+      const stopTicks = () => {
+        let ticks = 0;
+        return ms.stops.map((st) => {
+          if (st.cost && ms.speed) ticks += Math.ceil(st.cost / ms.speed);
+          const at = ticks;
+          ticks += st.delay || 0;
+          return at;
+        });
+      };
+      const tickText = (n) => {
+        const interval = TICK_MS[ms.game.tick_speed];
+        return interval ? `${n} ticks (about ${fmtDuration(n * interval)})` : `${n} ticks`;
+      };
+
       const tickF = () => {
         const g = ms.game;
         const interval = TICK_MS[g.tick_speed];
-        if (!interval || !g.last_tick_processed_at || g.status !== 'active') return g.current_tick;
+        if (!interval || !g.last_tick_processed_at || g.status !== 'active' || g.paused_at) return g.current_tick;
         return g.current_tick + Math.min(1, Math.max(0, (Date.now() - Date.parse(g.last_tick_processed_at)) / interval));
       };
 
@@ -1365,7 +1998,7 @@
         if (ms.marching && type === 't') return ms.stops.length ? addStop(id) : previewTo(id);
         ms.marching = false;
         ms.preview = null;
-        ms.stops = [];
+        ms.stops = []; ms.loop = false;
         ms.sel = type ? { type, id } : null;
         if (type) ms.tab = 'info';
         render();
@@ -1382,7 +2015,14 @@
         const last = ms.stops.length ? ms.stops[ms.stops.length - 1].id : c.current_territory_id;
         if (id === last) return;
         if (ms.stops.length >= 10) { toast('A route can have at most 10 stops'); return; }
-        ms.stops.push({ id, type: 'assault' });
+        const stop = { id, type: 'assault', action: PREFS.action, amount: 0, delay: 0 };
+        if (trailsOn()) {
+          const leg = trailReach(last).get(id);
+          if (!leg) { toast('Out of range from the previous stop'); return; }
+          stop.path = leg.path;
+          stop.cost = leg.cost;
+        }
+        ms.stops.push(stop);
         render();
         drawSide();
       };
@@ -1396,7 +2036,7 @@
         const { data, error } = await sb.rpc('preview_march', { p_game_id: gameId, p_commander_id: c.id, p_to_territory_id: id });
         if (!ms.preview || ms.preview.to !== id) return;
         if (error) ms.preview.error = error.message;
-        else ms.preview.plan = data;
+        else { ms.preview.plan = data; ms.speed = data.speed; }
         render();
         drawSide();
       };
@@ -1410,7 +2050,7 @@
         const sites = [...ms.t.values()];
         ms.terr = paintTerrain(ms.art, ms.game.map_w, sites);
         const W = ms.game.map_w;
-        L.terrain.replaceChildren(sv('image', { x: 0, y: 0, width: W, height: W, href: ms.terr.url, preserveAspectRatio: 'none', style: 'pointer-events:none;filter:brightness(0.8) saturate(0.85)' }));
+        L.terrain.replaceChildren(sv('image', { x: 0, y: 0, width: W, height: W, href: ms.terr.url, preserveAspectRatio: 'none', style: 'pointer-events:none;filter:brightness(0.92) saturate(0.92)' }));
         const d = (r) => 'M' + r.p.map((q) => `${q[0]} ${q[1]}`).join(' L');
         L.rivers.replaceChildren(...ms.terr.rivers.flatMap((r) => [
           sv('path', { d: d(r), fill: 'none', stroke: '#2f6aa3', 'stroke-width': (4 + r.w * 1.6) * M(), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9, style: 'pointer-events:none' }),
@@ -1455,16 +2095,23 @@
         try { localStorage.setItem(memKey, JSON.stringify(ms.mem)); } catch {}
 
         ms.reachable = null;
-        if (ms.game.free_travel && ms.marching && ms.sel && ms.sel.type === 'c') {
+        ms.reachFrom = null;
+        if ((ms.game.free_travel || trailsOn()) && ms.marching && ms.sel && ms.sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
-          if (c && c.current_territory_id) ms.reachable = new Set(reachableFrom(c.current_territory_id).keys());
+          if (trailsOn()) {
+            const from = ms.stops.length ? ms.stops[ms.stops.length - 1].id : c && c.current_territory_id;
+            if (from) {
+              ms.reachFrom = from;
+              ms.reachable = new Set(trailReach(from).keys());
+            }
+          } else if (c && c.current_territory_id) ms.reachable = new Set(reachableFrom(c.current_territory_id).keys());
         }
 
         const cells = [];
         const castles = [];
         ms.t.forEach((t) => {
           const seen = ms.vis.has(t.id);
-          const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
+          const owner = ms.replay ? (ms.replay.owners.get(t.id) ?? null) : seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
           const selected = ms.sel && ms.sel.type === 't' && ms.sel.id === t.id;
           const pick = (e) => {
             select('t', t.id);
@@ -1480,49 +2127,25 @@
 
           const tier = t.tier || 1;
           const plate = !!ms.terr;
-          const r = plate ? (tier >= 3 ? 34 : tier === 2 ? 28 : 23) : 8 + 3 * tier;
-          const cy0 = plate ? -6 : 0;
-          const rBot = plate ? cy0 + r - 2 : r;
-          const showTroops = seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war || ms.vis.has(t.id));
-          const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
+          const showTroops = !ms.replay && seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war || ms.vis.has(t.id));
+          const here = ms.replay ? [] : ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
           const sieged = ms.cmd.some((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tf));
-          const k = ms.terr ? M() : 1;
-          const reach = ms.reachable ? ms.reachable.has(t.id) || (ms.sel && ms.sel.type === 'c' && (ms.cmd.find((x) => x.id === ms.sel.id) || {}).current_territory_id === t.id) : true;
+          const k = ms.terr ? M() * 1.3 * (t.crossing_kind ? 0.82 : 1) : 1;
+          const reach = ms.reachable ? ms.reachable.has(t.id) || ms.reachFrom === t.id || (ms.sel && ms.sel.type === 'c' && (ms.cmd.find((x) => x.id === ms.sel.id) || {}).current_territory_id === t.id) : true;
           const mine = owner === ms.me.id;
-          const ringColor = owner ? color(owner) : (seen ? '#9aa3b2' : '#5b6270');
-          const textStyle = plate ? 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:4px;stroke-linejoin:round' : null;
-          const troopY = plate ? cy0 - r - 12 : -r - 5;
-          const g = sv('g', { transform: `translate(${t.x},${t.y}) scale(${k})`, opacity: (seen ? 1 : 0.7) * (reach ? 1 : 0.4) },
-            sieged ? sv('circle', { cx: 0, cy: cy0, r: r + 16, fill: 'none', stroke: '#e0685c', 'stroke-width': 4, 'stroke-dasharray': '6 5', style: 'pointer-events:none' }) : null,
-            plate ? sv('circle', { cx: 0, cy: cy0, r: r + 24, fill: 'transparent', stroke: selected ? '#f0cf7d' : 'none', 'stroke-width': 4, style: 'cursor:pointer', onclick: pick }) : null,
-            plate && t.natural_resources ? sv('circle', { cx: 0, cy: cy0, r: r + 8 + 0.35 * t.natural_resources, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.28, 'stroke-width': 2, style: 'pointer-events:none' }) : null,
-            plate ? sv('circle', { cx: 0, cy: cy0, r: r + 4, fill: 'none', stroke: '#f4efe0', 'stroke-opacity': 0.9, 'stroke-width': 2, style: 'pointer-events:none' }) : null,
-            plate && mine ? sv('circle', { cx: 0, cy: cy0, r: r + 11, fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3.5, style: 'pointer-events:none' }) : null,
-            plate ? sv('circle', { cx: 0, cy: cy0, r, fill: seen ? 'rgba(12,14,24,0.88)' : 'rgba(12,14,24,0.7)', stroke: ringColor, 'stroke-width': 7, 'stroke-dasharray': owner || seen ? null : '11 8', style: 'cursor:pointer', onclick: pick }) : null,
-            plate
-              ? sv('g', { transform: 'translate(0,2) scale(0.92)', style: 'cursor:pointer', onclick: pick }, castleSprite(tier, t.terrain, owner ? color(owner) : '#8a8a96'))
-              : sv('circle', { cx: 0, cy: 0, r, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }),
-            !ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? sv('text', { x: 0, y: 5, 'text-anchor': 'middle', 'font-size': 15, fill: '#000', style: 'fill:#000' }, '♛') : null,
-            showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'zoomonly', x: 0, y: troopY - 22, 'text-anchor': 'middle', 'font-size': 14, style: 'fill:#f0cf7d;paint-order:stroke;stroke:#000;stroke-width:4px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
-            sv('text', { x: 0, y: troopY, 'text-anchor': 'middle', 'font-size': plate ? 22 : 17, style: `${plate ? textStyle : 'fill:#fff'};font-weight:bold` }, showTroops ? t.troops : '?'),
-            sv('text', { x: 0, y: plate ? cy0 + r + 22 : rBot + 16, 'text-anchor': 'middle', 'font-size': plate ? 18 : 14, style: textStyle }, `${ms.terr && ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? '♛ ' : ''}${t.name}`),
-            here.map((c, i) => sv('circle', {
-              cx: (i - (here.length - 1) / 2) * 17,
-              cy: plate ? cy0 + r + 42 : rBot + 32,
-              r: c.role === 'king' ? 8 : 6.5,
-              fill: color(c.owner_player_id),
-              stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : (c.role === 'king' ? '#f0cf7d' : '#000'),
-              'stroke-width': c.role === 'king' ? 2.2 : 1.5,
-              style: 'cursor:pointer',
-              onclick: (e) => { e.stopPropagation(); select('c', c.id); },
-            })));
+          const isCap = ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id;
+          const nameLabel = `${isCap ? '♛ ' : ''}${t.name}`;
+          const g = plate
+            ? plateCastle({ t, tier, owner, seen, mine, showTroops, selected, sieged, here, reach, pick, nameLabel, colors: { c: color(owner), c2: color2(owner), cmd: color }, onCmd: (c) => select('c', c.id), cmdSel: (c) => !!ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id })
+            : sv('g', {}, sv('circle', { cx: 0, cy: 0, r: 8 + 3 * tier, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }), sv('text', { x: 0, y: -8 - 3 * tier - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'));
+          g.setAttribute('transform', `translate(${t.x},${t.y}) scale(${k},${k * tiltK()})`);
           castles.push(g);
         });
         L.cells.replaceChildren(...cells);
         L.castles.replaceChildren(...castles);
 
         const nearLimit = 150 * 1.7 * S();
-        L.edges.replaceChildren(...ms.edges.filter((e) => !ms.game.free_travel || e.length <= nearLimit).map((e) => {
+        L.edges.replaceChildren(...(trailsOn() ? [] : ms.edges).filter((e) => !ms.game.free_travel || e.length <= nearLimit).map((e) => {
           const A = ms.t.get(e.from_territory_id);
           const B = ms.t.get(e.to_territory_id);
           const road = A.has_road && B.has_road;
@@ -1538,6 +2161,27 @@
           return sv('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: road ? '#b8923a' : '#4a4860', 'stroke-width': road ? 2.6 : 1.2, 'stroke-opacity': seen ? 0.85 : 0.25, style: 'pointer-events:none' });
         }).filter(Boolean));
 
+        if (trailsOn()) {
+          L.edges.replaceChildren(...ms.edges.flatMap((e) => {
+            const A = ms.t.get(e.from_territory_id);
+            const B = ms.t.get(e.to_territory_id);
+            const pts = (e.path || [[A.x, A.y], [B.x, B.y]]).map((q) => `${q[0]},${q[1]}`).join(' ');
+            const road = A.has_road && B.has_road;
+            const o = ms.vis.has(A.id) || ms.vis.has(B.id) ? 1 : 0.3;
+            const base = { points: pts, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', style: 'pointer-events:none' };
+            if (e.kind === 'wormhole') {
+              return [
+                sv('polyline', { ...base, stroke: '#7a4ad8', 'stroke-width': 8 * M(), 'stroke-opacity': 0.18 * o }),
+                sv('polyline', { ...base, stroke: '#c9a8ff', 'stroke-width': 2.4 * M(), 'stroke-opacity': 0.95 * o, 'stroke-dasharray': `${1 * M()} ${6 * M()}` }),
+              ];
+            }
+            return [
+              sv('polyline', { ...base, stroke: '#2a1d0e', 'stroke-width': (road ? 5.4 : 4.2) * M(), 'stroke-opacity': 0.45 * o }),
+              sv('polyline', { ...base, stroke: road ? '#e0b64a' : e.kind === 'pass' ? '#cdb897' : '#e6d6a4', 'stroke-width': (road ? 3 : 2.1) * M(), 'stroke-opacity': 0.9 * o, 'stroke-dasharray': !road && e.kind === 'pass' ? `${3 * M()} ${4 * M()}` : null }),
+            ];
+          }));
+        }
+
         L.rings.replaceChildren(...(ms.rings && ms.game.fog_of_war
           ? ms.sources.map((s) => sv('circle', { cx: s.x, cy: s.y, r: s.r, fill: 'none', stroke: 'rgba(212,169,74,0.28)', 'stroke-dasharray': '5 5', style: 'pointer-events:none' }))
           : []));
@@ -1547,13 +2191,14 @@
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
           const pos = c && cmdPos(c, tf);
           const stables = (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
-          if (pos) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: rangeOf(stables), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${2 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
+          if (pos && trailsOn() && ms.reachable) ms.reachable.forEach((id) => { const q = ms.t.get(id); pv.push(sv('circle', { cx: q.x, cy: q.y, r: 24 * M(), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${3 * M()} ${5 * M()}`, style: 'pointer-events:none' })); });
+          if (pos && !trailsOn()) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: rangeOf(stables), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${2 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
         }
         if (ms.marching && ms.stops.length && ms.sel && ms.sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
           const pos = c && cmdPos(c, tf);
           if (pos) {
-            const pts = [pos, ...ms.stops.map((st) => ms.t.get(st.id))];
+            const pts = trailsOn() && c.current_territory_id ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [pos, ...ms.stops.map((st) => ms.t.get(st.id))];
             pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3 * M(), 'stroke-dasharray': `${8 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
             ms.stops.forEach((st, i) => {
               const q = ms.t.get(st.id);
@@ -1567,7 +2212,7 @@
           const ok = !ms.preview.plan || ms.preview.plan.in_range;
           const tone = ms.preview.error ? '#e0685c' : (ok ? '#7fd08a' : '#e0685c');
           if (ms.preview.plan) {
-            pv.push(sv('polyline', { points: ms.preview.plan.path.map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4 * M(), 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
+            pv.push(sv('polyline', { points: (trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id))).map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4 * M(), 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
           }
           pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 26 * M(), fill: 'none', stroke: tone, 'stroke-width': 3 * M(), style: 'pointer-events:none' }));
         }
@@ -1578,6 +2223,7 @@
       };
 
       const renderDyn = () => {
+        if (ms.replay) { L.dyn.replaceChildren(); return; }
         const tf = tickF();
         const out = [];
         ms.cmd.forEach((c) => {
@@ -1588,17 +2234,21 @@
           const friend = isFriend(c.owner_player_id);
           if (friend) {
             const pts = [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
-            out.push(sv('polyline', { points: pts.join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${3 * M()} ${5 * M()}`, style: 'pointer-events:none' }));
+            out.push(sv('polyline', { class: 'marchline', points: pts.join(' '), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3 * M(), 'stroke-linecap': 'round', 'stroke-dasharray': `${6 * M()} ${9 * M()}`, style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
           }
-          out.push(sv('circle', {
-            cx: pos.x, cy: pos.y, r: (c.role === 'king' ? 9 : 7.5) * M(),
-            fill: color(c.owner_player_id),
-            stroke: ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id ? '#fff' : '#f0cf7d',
-            'stroke-width': 2 * M(),
-            style: 'cursor:pointer',
-            onclick: (e) => { e.stopPropagation(); select('c', c.id); },
-          }));
-          out.push(sv('text', { x: pos.x, y: pos.y - 13 * M(), 'text-anchor': 'middle', 'font-size': 14 * M(), style: 'fill:#f0cf7d;paint-order:stroke;stroke:#000;stroke-width:' + 3 * M() + 'px' }, friend ? c.troops : ''));
+          const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
+          const label = friend ? String(c.troops) : '?';
+          const bw = Math.max(24, label.length * 9 + 12);
+          out.push(sv('g', { transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.1},${M() * 1.1 * tiltK()})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
+            sv('ellipse', { cx: 2, cy: 2, rx: 11, ry: 3.6, fill: 'rgba(0,0,0,0.4)' }),
+            sel ? sv('ellipse', { class: 'selring', cx: 0, cy: 1, rx: 17, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 2, 'stroke-dasharray': '6 5' }) : null,
+            sv('line', { x1: 0, y1: 0, x2: 0, y2: -30, stroke: '#2a1c0c', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
+            sv('circle', { cx: 0, cy: -31, r: 2.2, fill: '#f5dc94' }),
+            sv('g', { transform: 'translate(0,-29)' }, sv('g', { class: 'flag' },
+              sv('path', { d: 'M1 0H17L13.5 5L17 10H1Z', fill: color(c.owner_player_id), stroke: '#1a1008', 'stroke-width': 1, 'stroke-linejoin': 'round' }),
+              sv('path', { d: 'M1 3.6H15L14 5L15 6.4H1Z', fill: color2(c.owner_player_id), opacity: 0.95 }))),
+            sv('rect', { x: -bw / 2, y: 5, width: bw, height: 16, rx: 3, fill: 'rgba(16,11,6,0.85)', stroke: c.role === 'king' ? '#f5dc94' : 'rgba(214,171,82,0.6)', 'stroke-width': 1 }),
+            sv('text', { x: 0, y: 17, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;font-family:Cinzel,serif;font-weight:700' }, label)));
         });
         L.dyn.replaceChildren(...out);
       };
@@ -1612,6 +2262,7 @@
       const updateCountdown = () => {
         const g = ms.game;
         if (g.status !== 'active') { nextEl.textContent = ''; return; }
+        if (g.paused_at) { nextEl.textContent = 'paused by the host'; return; }
         const interval = TICK_MS[g.tick_speed];
         if (!interval) {
           const end = ms.turn && ms.turn.ends_at ? Date.parse(ms.turn.ends_at) - Date.now() : null;
@@ -1644,26 +2295,166 @@
         return `${SEASONS[idx]} (to tick ${(Math.floor(g.current_tick / len) + 1) * len})`;
       };
 
+      const DIP_NAMES = { allied: 'Allied', truce: 'Truce', proposed: 'Alliance offered', peace_proposed: 'Peace offered', neutral: 'At war' };
+
+      const empiresDialog = () => {
+        const g = ms.game;
+        const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
+        const rows = [...ms.players.values()].map((p) => {
+          const seen = [...ms.t.values()].filter((t) => t.owner_player_id === p.id && ms.vis.has(t.id)).reduce((sum, t) => sum + (t.troops || 0), 0);
+          return { p, n: castlesOf(p.id), troops: seen };
+        }).sort((x, y) => y.n - x.n);
+        const cols = 'display:grid;grid-template-columns:1.7fr .5fr 1.3fr .9fr .8fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(214,171,82,0.15)';
+        const head = h('div', { style: `${cols};color:var(--dim);font-size:.8rem` }, h('span', {}, 'House'), h('span', {}, 'Castles'), h('span', {}, `Toward ${winAt}`), h('span', {}, 'Relation'), h('span', {}, 'Troops seen'));
+        const list = rows.map(({ p, n, troops }) => h('div', { style: cols },
+          h('span', { style: 'display:flex;align-items:center;gap:8px' }, sigil(p.faction_slug, 26), p.display_name, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'tag', style: 'color:var(--gules-hi)' }, 'out') : null),
+          h('b', {}, String(n)),
+          h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: p.id === ms.me.id ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
+          h('span', {}, p.id === ms.me.id ? 'You' : DIP_NAMES[dipStatus(p.id)] || dipStatus(p.id)),
+          h('span', { style: 'color:var(--dim)' }, p.id === ms.me.id || isFriend(p.id) || troops ? String(troops) : '?')));
+        modal('Empires', h('div', {}, head, list,
+          h('div', { class: 'tip', style: 'margin-top:8px' }, `${winAt} of ${ms.t.size} castles wins the game${g.victory_decay ? `, and the target drops by ${g.victory_decay} each production` : ''}. Troop counts cover only castles you can see.`),
+          canAct() ? h('div', { style: 'margin-top:12px' }, h('button', {
+            class: 'danger',
+            onclick: (e) => {
+              if (confirm('Concede defeat? You are eliminated at once, your commanders die and your castles become unowned. This cannot be undone.')) {
+                run(e.currentTarget, async () => { const { error } = await sb.rpc('concede_defeat', { p_game_id: gameId }); if (error) throw error; toast('You have conceded', true); await load(); });
+              }
+            },
+          }, 'Concede defeat')) : null), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+      };
+
+      const INTEL_METRICS = {
+        castles: ['Castles', (r) => r.territories],
+        troops: ['Troops', (r) => r.garrison_troops + r.commander_troops],
+        gold: ['Gold', (r) => r.gold],
+        commanders: ['Commanders', (r) => r.commanders],
+        buildings: ['Infrastructure levels', (r) => r.treasury_levels + r.industry_levels + r.prestige_levels],
+      };
+
+      const intelDialog = async () => {
+        const { data, error } = await sb.from('intel_snapshots').select('tick, payload').eq('game_id', gameId).order('tick');
+        if (error) return toast(error.message);
+        const metric = selectOf(Object.fromEntries(Object.entries(INTEL_METRICS).map(([k, v]) => [k, v[0]])), 'castles');
+        const chart = h('div');
+        const draw = () => {
+          const fn = INTEL_METRICS[metric.value][1];
+          const series = [...ms.players.values()].map((p) => ({
+            name: p.display_name, color: color(p.id),
+            points: data.map((row) => { const r = row.payload.players.find((q) => q.player_id === p.id); return r ? [row.tick, fn(r)] : null; }).filter(Boolean),
+          })).filter((sr) => sr.points.length);
+          chart.replaceChildren(
+            series.length ? lineChart(series, INTEL_METRICS[metric.value][0]) : h('div', { class: 'empty' }, 'No data yet.'),
+            h('div', { class: 'row wrap2', style: 'margin-top:6px' }, series.map((sr) => h('span', { style: 'display:inline-flex;align-items:center;gap:6px;color:var(--dim)' }, h('i', { style: `width:14px;height:4px;border-radius:2px;background:${sr.color};display:inline-block` }), sr.name))));
+        };
+        metric.addEventListener('change', draw);
+        draw();
+        modal('Intel', data.length ? h('div', {}, h('label', {}, 'Measure'), metric, chart, h('div', { class: 'tip' }, 'One point per production cycle.'))
+          : h('div', { class: 'empty' }, 'Intel charts open when the game ends, or from the start in games without fog.'), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+      };
+
+      const hostDialog = () => {
+        const g = ms.game;
+        const solo = [...ms.players.values()].filter((p) => !p.is_ai).length === 1;
+        const paused = !!g.paused_at;
+        const jump = (n) => (e) => {
+          if (confirm(`Jump ${n} tick${n === 1 ? '' : 's'} ahead now? Production, movement and battles all run, and it cannot be undone.`)) {
+            act(e.currentTarget, async () => { const { data, error } = await sb.rpc('admin_jump_ticks', { p_game_id: gameId, p_ticks: n }); if (error) throw error; toast(`Now at tick ${data.tick}`, true); });
+          }
+        };
+        modal('Host tools', h('div', {},
+          h('div', { class: 'sec' }, h('b', {}, paused ? 'The game is paused' : 'Pause the game'),
+            h('div', { class: 'tip' }, 'Ticks stop for everyone. When you resume, the countdown carries on from where it stopped.'),
+            h('button', { onclick: (e) => act(e.currentTarget, async () => { const { error } = await sb.rpc('admin_set_paused', { p_game_id: gameId, p_paused: !paused }); if (error) throw error; toast(paused ? 'Game resumed' : 'Game paused', true); }) }, paused ? 'Resume' : 'Pause')),
+          h('div', { class: 'sec' }, h('b', {}, 'Jump ahead'),
+            h('div', { class: 'tip' }, solo ? 'Run ticks now to test movement, production and battles. This cannot be undone.' : 'Only available while you are the only human in the game.'),
+            h('div', { class: 'row wrap2' }, h('button', { disabled: !solo, onclick: jump(1) }, 'Jump 1 tick'), h('button', { disabled: !solo, onclick: jump(5) }, 'Jump 5 ticks')))),
+          (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+      };
+
+      const setReplayTick = (tick) => {
+        const rp = ms.replay;
+        rp.tick = tick;
+        rp.owners = new Map();
+        for (const row of rp.log) {
+          if (row.tick > tick) break;
+          rp.owners.set(row.territory_id, row.owner_player_id);
+        }
+      };
+
+      const stopReplay = () => {
+        if (ms.replay && ms.replay.timer) clearInterval(ms.replay.timer);
+        ms.replay = null;
+        const bar = wrap.querySelector('.replaybar');
+        if (bar) bar.remove();
+        render();
+      };
+
+      const startReplay = async () => {
+        const { data, error } = await sb.rpc('get_replay', { p_game_id: gameId });
+        if (error) return toast(error.message);
+        if (!data.length) return toast('This game has no replay. Replays are recorded for games started after replays were added.');
+        ms.replay = { log: data, tick: 0, owners: new Map(), timer: null };
+        const max = ms.game.current_tick;
+        const label = h('b', {});
+        const slider = h('input', { type: 'range', min: '0', max: String(max), value: '0', style: 'flex:1', 'aria-label': 'Replay tick' });
+        const sync = (tick) => { setReplayTick(tick); slider.value = String(tick); label.textContent = `Tick ${tick} of ${max}`; render(); };
+        const play = h('button', { onclick: () => {
+          const rp = ms.replay;
+          if (rp.timer) { clearInterval(rp.timer); rp.timer = null; play.textContent = 'Play'; return; }
+          if (rp.tick >= max) sync(0);
+          play.textContent = 'Pause';
+          rp.timer = setInterval(() => { if (!ms.replay) return; if (ms.replay.tick >= max) { clearInterval(ms.replay.timer); ms.replay.timer = null; play.textContent = 'Play'; return; } sync(ms.replay.tick + 1); }, 350);
+        } }, 'Play');
+        slider.addEventListener('input', () => sync(Number(slider.value)));
+        wrap.append(h('div', { class: 'replaybar', style: 'position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;gap:12px;padding:8px 12px;background:rgba(21,14,8,0.92);border:1px solid var(--gilt-lo);border-radius:4px;z-index:3' }, play, slider, label, h('button', { class: 'ghost', onclick: stopReplay }, 'Exit replay')));
+        sync(0);
+      };
+
+      const menuDialog = () => {
+        let closeMenu = () => {};
+        const item = (title, note, fn) => h('button', { class: 'cmdrow', onclick: () => { closeMenu(); fn(); } }, title, h('span', { style: 'color:var(--dim);margin-left:auto' }, note));
+        const g = ms.game;
+        closeMenu = modal('Menu', h('div', {},
+          item('Empires', 'standings and relations', empiresDialog),
+          item('Intel', 'charts over time', intelDialog),
+          item('Battle calculator', 'predict a fight', battleCalcDialog),
+          item('Game rules', 'the articles of war', () => modal(`${g.name}: rules`, articlesOfWar(g, ms.players.size), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')])),
+          g.status === 'finished' ? item('Replay', 'watch the castles change hands', startReplay) : null,
+          g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', 'pause or jump ticks', hostDialog) : null,
+          item('Options', 'default order, panel side, sound', optionsDialog),
+          item('How to play', 'help', helpDialog)), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+      };
+
       const drawHud = () => {
         const g = ms.game;
         const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
         const winner = ms.players.get(g.winner_player_id);
+        const mineN = castlesOf(ms.me.id);
+        const rival = Math.max(0, ...[...ms.players.keys()].filter((pid) => pid !== ms.me.id).map(castlesOf));
+        const pct = (n) => `${Math.min(100, (n / Math.max(1, winAt)) * 100)}%`;
+        const stat = (label, value) => h('div', { class: 'stat' }, h('span', {}, label), h('b', {}, String(value)));
         hud.replaceChildren(...[
-          h('button', { onclick: showHome }, 'Back to games'),
-          h('button', { onclick: helpDialog }, 'Help'),
-          g.status === 'finished' ? h('button', { class: 'primary', onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
-          h('b', {}, g.name),
-          h('span', {}, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`),
-          nextEl,
-          g.seasons_enabled && g.status === 'active' ? h('span', { style: 'color:var(--gold2)' }, seasonLabel(g)) : null,
-          g.time_limit_ticks && g.status === 'active' ? h('span', { style: 'color:var(--dim)' }, `Ends at tick ${g.time_limit_ticks}`) : null,
-          ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { style: 'color:#e08b82' }, 'You are eliminated') : null,
+          h('button', { class: 'ghost', onclick: showHome, title: 'Back to games' }, 'Games'),
+          h('div', { class: 'hud-id' }, sigil(ms.me.faction_slug, 34),
+            h('div', {}, h('b', {}, g.name), h('div', { class: 'sub' }, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`, ' ', nextEl))),
+          h('div', { class: 'meter', title: `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game.` },
+            h('div', { class: 'meter-label' }, h('span', {}, 'Road to victory'), h('b', {}, `${mineN} of ${winAt}`)),
+            h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))),
+          g.paused_at && g.status === 'active' ? h('span', { class: 'tag gold' }, 'Paused') : null,
+          g.seasons_enabled && g.status === 'active' ? h('span', { class: 'tag gold' }, seasonLabel(g)) : null,
+          g.time_limit_ticks && g.status === 'active' ? h('span', { class: 'tag' }, `Ends at tick ${g.time_limit_ticks}`) : null,
+          ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { class: 'tag', style: 'color:var(--gules-hi);border-color:var(--gules)' }, 'Eliminated') : null,
           turnControl(),
           h('span', { class: 'grow' }),
-          pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; ms.stops = []; render(); drawSide(); } }, `Proposals (${pendingProposals()})`) : null,
-          h('span', {}, `Gold ${ms.me.gold}`),
-          h('span', {}, `Castles ${castlesOf(ms.me.id)} / ${winAt} to win`),
-          g.fog_of_war ? h('label', {}, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null].filter(Boolean));
+          pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); } }, `Proposals (${pendingProposals()})`) : null,
+          g.status === 'finished' ? h('button', { class: 'primary', onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
+          stat('Treasury', ms.me.gold),
+          g.fog_of_war ? h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null,
+          h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.tilt, onchange: (e) => { ms.tilt = e.target.checked; try { localStorage.setItem('ss-tilt', ms.tilt ? '1' : '0'); } catch {} applyTilt(); render(); } }), 'Tilt'),
+          h('button', { class: 'ghost', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
+          h('button', { class: 'primary', onclick: menuDialog }, 'Menu'),
+          h('button', { class: 'ghost', onclick: helpDialog }, 'Help')].filter(Boolean));
         updateCountdown();
       };
 
@@ -1782,6 +2573,16 @@
         return h('div', { class: 'sec' }, out);
       };
 
+      const routeLines = (route, call, c) => h('div', { style: 'margin-bottom:8px' },
+        route.stops.map((st, i) => {
+          const nm = (ms.t.get(st.territory_id) || { name: '?' }).name;
+          const what = st.action && st.action !== 'nothing' ? ` · ${ACTION_NAMES[st.action]}${ACTION_NEEDS_AMOUNT.has(st.action) ? ' ' + st.amount : ''}` : '';
+          const wait = st.delay ? ` · wait ${st.delay}` : '';
+          return h('div', { style: `color:${i === route.next_stop_index ? 'var(--gold2)' : 'var(--dim)'}` }, `${i + 1}. ${nm}${what}${wait}`);
+        }),
+        route.looping ? h('div', { style: `color:${route.next_stop_index >= route.stops.length ? 'var(--gold2)' : 'var(--dim)'}` }, `Then back to ${(ms.t.get(route.origin_territory_id) || { name: '?' }).name} and repeat`) : null,
+        h('div', { style: 'margin-top:6px' }, h('button', { onclick: call('set_route_loop', { p_commander_id: c.id, p_loop: !route.looping }, route.looping ? 'Loop turned off' : 'Looping from the last stop') }, route.looping ? 'Stop looping' : 'Loop route')));
+
       const commanderActions = (c) => {
         if (c.owner_player_id !== ms.me.id || !canAct()) return null;
         const call = (fn, args, message) => (e) => act(e.currentTarget, async () => {
@@ -1802,9 +2603,7 @@
               h('div', { style: 'color:var(--gold2)' }, `Halting at ${ms.t.get(m.to_territory_id).name}.`));
           }
           return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
-            route && route.status === 'active' && route.stops.length > 1
-              ? h('div', { style: 'color:var(--dim);margin-bottom:8px' }, `Route: ${route.stops.map((st) => (ms.t.get(st.territory_id) || { name: '?' }).name).join(' > ')}`)
-              : null,
+            route && route.status === 'active' ? routeLines(route, call, c) : null,
             h('div', { class: 'row wrap2' },
               h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Will halt at the next stop') }, 'Halt at next stop'),
               h('button', { onclick: call('recall_route', { p_commander_id: c.id }, 'Recalling to origin') }, 'Recall')));
@@ -1813,6 +2612,12 @@
 
         const t = ms.t.get(c.current_territory_id);
         const out = [h('b', {}, 'Orders')];
+        const waiting = ms.routes.get(c.id);
+        if (waiting && waiting.status === 'active' && waiting.resume_tick != null) {
+          out.push(h('div', { style: 'color:var(--gold2);margin-bottom:6px' }, `Waiting at ${t.name} until tick ${waiting.resume_tick}, then continues its route.`),
+            routeLines(waiting, call, c),
+            h('div', { style: 'margin-bottom:10px' }, h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Route cancelled') }, 'Cancel route')));
+        }
         if (c.status === 'sieging') {
           out.push(h('div', { style: 'color:var(--gold2);margin-bottom:8px' }, `Besieging ${t.name}. The garrison starves each tick.`),
             h('div', { style: 'margin-bottom:10px' }, assaultButton(t)));
@@ -1855,7 +2660,7 @@
 
         out.push(h('div', { style: 'color:var(--gold2);margin-bottom:8px' }, ms.stops.length ? 'Click a castle to add the next stop.' : 'Click a castle on the map to choose the destination.'));
         const pv = ms.preview;
-        if (pv && pv.error) out.push(h('div', { style: 'color:#e08b82;margin-bottom:8px' }, pv.error));
+        if (pv && pv.error) out.push(h('div', { style: 'color:var(--gules-hi);margin-bottom:8px' }, pv.error));
         if (pv && !pv.plan && !pv.error) out.push(h('div', { class: 'empty' }, 'Planning route...'));
         if (pv && pv.plan) {
           const plan = pv.plan;
@@ -1886,16 +2691,19 @@
                 if (error) throw error;
                 ms.marching = false;
                 ms.preview = null;
-                ms.stops = [];
+                ms.stops = []; ms.loop = false;
                 toast(`Marching. Arrives at tick ${data.arrival_tick}`, true);
               }),
             }, 'March'),
             h('button', {
               disabled: !plan.in_range,
-              onclick: () => { ms.stops = [{ id: pv.to, type: pv.type }]; ms.preview = null; render(); drawSide(); },
+              onclick: () => { ms.stops = [{ id: pv.to, type: pv.type, action: PREFS.action, amount: 0, delay: 0, path: plan.path, cost: plan.raw_length }]; ms.loop = false; ms.preview = null; render(); drawSide(); },
             }, 'Start a route here')));
         }
         if (ms.stops.length) {
+          const when = stopTicks();
+          const origin = ms.t.get(c.current_territory_id);
+          const loopBlocked = ms.loop && ms.stops[ms.stops.length - 1].id === c.current_territory_id;
           out.push(h('div', { class: 'sec' }, h('b', {}, `Route (${ms.stops.length} of 10 stops)`),
             ms.stops.map((st, i) => {
               const dest = ms.t.get(st.id);
@@ -1903,27 +2711,38 @@
               const type = friendly ? null : h('select', { style: 'width:auto;padding:3px 6px', onchange: (e) => { st.type = e.target.value; } },
                 h('option', { value: 'assault' }, 'Assault'), h('option', { value: 'siege' }, 'Siege'));
               if (type) type.value = st.type;
-              return h('div', { class: 'line', style: 'align-items:center' },
-                h('span', { style: 'color:var(--text)' }, `${i + 1}. ${dest.name}`),
-                h('span', { class: 'row' }, type, h('button', { style: 'padding:2px 8px', onclick: () => { ms.stops.splice(i, 1); render(); drawSide(); } }, 'x')));
+              return h('div', {},
+                h('div', { class: 'line', style: 'align-items:center' },
+                  h('span', { style: 'color:var(--text)' }, `${i + 1}. ${dest.name}`),
+                  h('span', { class: 'row' }, ms.speed && st.cost ? h('span', { style: 'color:var(--dim);font-size:.8rem' }, `+${when[i]} ticks`) : null, type,
+                    h('button', { style: 'padding:2px 8px', onclick: () => { if (trailsOn()) ms.stops.splice(i); else ms.stops.splice(i, 1); render(); drawSide(); } }, 'x'))),
+                dest.owner_player_id === ms.me.id ? orderControls(st, drawSide) : null);
             }),
-            h('div', { style: 'color:var(--dim);font-size:.8rem;margin:6px 0' }, 'Click more castles to add stops. Only the first leg is checked now; later legs are planned when the commander reaches each stop, and the route ends if one is blocked.'),
+            ms.speed ? line('Reaches the last stop in', tickText(when[when.length - 1])) : null,
+            h('label', { class: 'check', style: 'margin:8px 0' }, h('input', { type: 'checkbox', checked: ms.loop, onchange: (e) => { ms.loop = e.target.checked; drawSide(); } }), `Loop: return to ${origin.name} and repeat`),
+            ms.loop ? h('div', {}, h('div', { style: 'color:var(--dim);font-size:.8rem' }, `On each return to ${origin.name}`), orderControls(ms.originOrder, drawSide)) : null,
+            loopBlocked ? h('div', { style: 'color:var(--gules-hi);margin:6px 0' }, 'A looping route must end somewhere other than where it starts.') : null,
+            h('div', { style: 'color:var(--dim);font-size:.8rem;margin:6px 0' }, trailsOn()
+              ? 'Click castles to add stops. Each stop must be within range of the one before it. Orders run when the commander arrives at a castle you own.'
+              : 'Click more castles to add stops. Only the first leg is checked now; later legs are planned when the commander reaches each stop, and the route ends if one is blocked.'),
             h('button', {
               class: 'primary',
+              disabled: loopBlocked,
               onclick: (e) => act(e.currentTarget, async () => {
                 const { data, error } = await sb.rpc('send_on_route', {
                   p_game_id: gameId, p_commander_id: c.id, p_march_type: 'assault',
-                  p_stops: ms.stops.map((st) => ({ territory_id: st.id, march_type: st.type })),
+                  p_stops: ms.stops.map((st) => ({ territory_id: st.id, march_type: st.type, action: st.action || 'nothing', amount: st.amount || 0, delay: st.delay || 0 })),
+                  p_options: { loop: ms.loop, origin_order: ms.originOrder },
                 });
                 if (error) throw error;
                 ms.marching = false;
                 ms.preview = null;
-                ms.stops = [];
+                ms.stops = []; ms.loop = false;
                 toast(`Route started with ${data.stops} stop${data.stops === 1 ? '' : 's'}. First leg arrives at tick ${data.arrival_tick}`, true);
               }),
             }, `Send route (${ms.stops.length} stop${ms.stops.length === 1 ? '' : 's'})`)));
         }
-        out.push(h('div', { style: 'margin-top:10px' }, h('button', { onclick: () => { ms.marching = false; ms.preview = null; ms.stops = []; render(); drawSide(); } }, 'Cancel')));
+        out.push(h('div', { style: 'margin-top:10px' }, h('button', { onclick: () => { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); } }, 'Cancel')));
         return h('div', { class: 'sec' }, out);
       };
 
@@ -2074,7 +2893,7 @@
           const humans = [...ms.players.values()].filter((p) => !p.is_ai && p.id !== ms.me.id);
           const boxes = humans.map((p) => h('label', { class: 'check', style: 'margin-top:6px' },
             h('input', { type: 'checkbox', checked: ms.compose.ids.has(p.id), onchange: (e) => { if (e.target.checked) ms.compose.ids.add(p.id); else ms.compose.ids.delete(p.id); } }),
-            dots(p.faction_slug), p.display_name));
+            sigil(p.faction_slug, 20), p.display_name));
           return [bar, h('b', {}, 'New message to'), humans.length ? boxes : h('div', { class: 'empty' }, 'No other human players in this game.'),
             composer(ms.threadInput, async () => {
               const text = ms.threadInput.value.trim();
@@ -2145,7 +2964,7 @@
       const battleRow = (b) => {
         const m = battleMeta(b);
         return h('button', { class: 'threadrow', onclick: () => openBattle(b.id) },
-          h('span', { style: `color:${m.won ? '#7fd08a' : '#e08b82'}` }, `${m.won ? 'Victory' : 'Defeat'} · ${KIND_LABELS[b.kind]} ${placeOf(b)}`),
+          h('span', { style: `color:${m.won ? '#7fd08a' : 'var(--gules-hi)'}` }, `${m.won ? 'Victory' : 'Defeat'} · ${KIND_LABELS[b.kind]} ${placeOf(b)}`),
           h('small', {}, `Tick ${b.tick} · against ${m.opponents}`));
       };
 
@@ -2173,7 +2992,7 @@
         show(pts.length - 1);
         return h('div', { class: 'sec' }, h('b', {}, 'Replay'),
           h('div', { style: 'color:var(--dim);margin-bottom:4px' }, `${ROLE_LABELS[sides[b.report.first].role]} strike first, then the sides alternate. Left value is ${ROLE_LABELS[sides[0].role]}.`),
-          sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', style: 'background:#0a0a0f;border:1px solid var(--line);border-radius:4px;touch-action:auto;cursor:default' }, trace(0), trace(1), cursor),
+          sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', style: 'background:var(--map-bg);border:1px solid var(--line);border-radius:4px;touch-action:auto;cursor:default' }, trace(0), trace(1), cursor),
           slider, label,
           b.report.rounds_truncated ? h('div', { style: 'color:var(--dim);margin-top:4px' }, 'Replay shortened to the first 400 strikes.') : null);
       };
@@ -2186,7 +3005,7 @@
           line('Commander', sidePlayers(sd).map(pname).join(', ') || 'Neutral garrison'),
           line('Troops', sd.garrison ? `${sd.troops} (${sd.garrison} in the garrison)` : sd.troops),
           line('Damage per strike', sd.damage),
-          sd.commanders.map((c) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+          sd.commanders.map((c) => h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
             h('div', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`, h('span', { style: 'color:var(--dim)' }, ` · ${c.school} · rank ${c.rank} · ${c.troops} troops`)),
             Object.keys(c.abilities).length ? h('div', { style: 'color:var(--dim);font-size:.8rem' }, abilityChips(c.abilities)) : null)));
         return [
@@ -2194,7 +3013,7 @@
           h('h3', {}, `${KIND_LABELS[b.kind]} ${placeOf(b)}`),
           h('div', { style: 'color:var(--dim)' }, `Tick ${b.tick}`),
           h('div', { class: 'sec' },
-            h('div', { style: `font-size:1.1rem;color:${m.won ? '#7fd08a' : '#e08b82'}` }, m.won ? 'Victory' : 'Defeat'),
+            h('div', { style: `font-size:1.1rem;color:${m.won ? '#7fd08a' : 'var(--gules-hi)'}` }, m.won ? 'Victory' : 'Defeat'),
             line('Survivors', `${r.survivors} (${ROLE_LABELS[r.sides[r.winner].role]})`),
             r.captured ? line('Castle', 'Captured') : null,
             r.salvage ? line('Salvage', `${r.salvage} gold`) : null,
@@ -2218,7 +3037,7 @@
 
       const sendGoldDialog = (p) => {
         const amount = h('input', { type: 'number', min: '1', max: String(ms.me.gold), value: String(Math.min(50, ms.me.gold) || 1) });
-        modal(`Send gold to ${p.display_name}`, h('div', {}, h('div', { style: 'color:var(--dim);font-size:.85rem' }, `You have ${ms.me.gold} gold. Gifts cannot be taken back.`), h('label', {}, 'Amount'), amount), (close) => [
+        modal(`Send gold to ${p.display_name}`, h('div', {}, h('div', { class: 'tip', style: 'margin:0 0 8px' }, `You have ${ms.me.gold} gold. Gifts cannot be taken back.`), h('label', {}, 'Amount'), amount), (close) => [
           h('button', { onclick: close }, 'Cancel'),
           h('button', {
             class: 'primary',
@@ -2249,7 +3068,7 @@
       const marriageDialog = (p) => {
         const lock = numInput(48, 12, 240);
         modal(`Marriage alliance with ${p.display_name}`, h('div', {},
-          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'Neither of you can break the alliance until the lock ends. They must accept.'),
+          h('div', { class: 'tip', style: 'margin:0 0 8px' }, 'Neither of you can break the alliance until the lock ends. They must accept.'),
           h('label', {}, 'Lock length (ticks, 12 to 240)'), lock), (close) => [
           h('button', { onclick: close }, 'Cancel'),
           h('button', { class: 'primary', onclick: (e) => offerCall('propose_marriage', { p_game_id: gameId, p_target_player_id: p.id, p_lock_ticks: Number(lock.value) }, `Marriage proposed to ${p.display_name}`)(e).then(close) }, 'Propose'),
@@ -2261,7 +3080,7 @@
         const get = numInput(10, 0, 1000);
         const cycles = numInput(5, 1, 20);
         modal(`Trade agreement with ${p.display_name}`, h('div', {},
-          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'Gold moves every production cycle. A payment you cannot cover cancels the deal and costs infamy. War cancels trade.'),
+          h('div', { class: 'tip', style: 'margin:0 0 8px' }, 'Gold moves every production cycle. A payment you cannot cover cancels the deal and costs infamy. War cancels trade.'),
           h('label', {}, 'You pay per cycle'), give, h('label', {}, 'They pay you per cycle'), get, h('label', {}, 'Cycles (1 to 20)'), cycles), (close) => [
           h('button', { onclick: close }, 'Cancel'),
           h('button', { class: 'primary', onclick: (e) => offerCall('propose_trade', { p_game_id: gameId, p_target_player_id: p.id, p_give: Number(give.value), p_get: Number(get.value), p_cycles: Number(cycles.value) }, `Trade proposed to ${p.display_name}`)(e).then(close) }, 'Propose'),
@@ -2273,7 +3092,7 @@
         if (!mine.length) { toast('You have no technology above level 1 to share.'); return; }
         const sel = h('select', {}, mine.map((a) => h('option', { value: a.area }, `${AREA_NAMES[a.area]} (level ${a.level})`)));
         modal(`Share technology with ${p.display_name}`, h('div', {},
-          h('div', { style: 'color:var(--dim);font-size:.85rem' }, `Raises their level by one if you are ahead of them, and you keep yours. You pay ${ms.game.trade_cost} gold per level you give, and any progress they had toward that level is lost.`),
+          h('div', { class: 'tip', style: 'margin:0 0 8px' }, `Raises their level by one if you are ahead of them, and you keep yours. You pay ${ms.game.trade_cost} gold per level you give, and any progress they had toward that level is lost.`),
           h('label', {}, 'Technology'), sel), (close) => [
           h('button', { onclick: close }, 'Cancel'),
           h('button', { class: 'primary', onclick: (e) => act(e.currentTarget, async () => {
@@ -2296,7 +3115,7 @@
         const give = pick(mine);
         const ask = pick(theirs);
         modal(`Peace terms for ${p.display_name}`, h('div', { style: 'max-height:60vh;overflow-y:auto' },
-          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'On acceptance the war becomes a truce. Capitals and castles holding commanders cannot be ceded.'),
+          h('div', { class: 'tip', style: 'margin:0 0 8px' }, 'On acceptance the war becomes a truce. Capitals and castles holding commanders cannot be ceded.'),
           h('label', {}, 'Who pays gold'), payer, h('label', {}, 'Lump sum now'), gold,
           h('label', {}, 'Tribute per cycle'), tribute, h('label', {}, 'Tribute cycles (0 to 20)'), cycles,
           h('label', {}, 'A castle you give up'), give, h('label', {}, 'A castle you ask for'), ask), (close) => [
@@ -2319,7 +3138,7 @@
         const b = sel();
         if (others[1]) b.value = String(others[1].id);
         modal('Offer mediation', h('div', {},
-          h('div', { style: 'color:var(--dim);font-size:.85rem' }, 'Pick two players at war. If both accept, they agree a truce.'), h('label', {}, 'First player'), a, h('label', {}, 'Second player'), b), (close) => [
+          h('div', { class: 'tip', style: 'margin:0 0 8px' }, 'Pick two players at war. If both accept, they agree a truce.'), h('label', {}, 'First player'), a, h('label', {}, 'Second player'), b), (close) => [
           h('button', { onclick: close }, 'Cancel'),
           h('button', { class: 'primary', onclick: (e) => offerCall('offer_mediation', { p_game_id: gameId, p_player_a: Number(a.value), p_player_b: Number(b.value) }, 'Mediation offered')(e).then(close) }, 'Offer'),
         ]);
@@ -2359,7 +3178,7 @@
               action = h('button', { class: 'primary', style: 'margin-top:4px', disabled: ms.me.gold < 150, onclick: order('recruit_councillor', { p_area: c.area }, 'A new councillor takes the seat') }, 'Recruit a replacement (150 gold)');
             }
             const state = c.status === 'seated' ? `at court, level ${c.level}` : c.status === 'afield' ? `in the field (seat level ${c.level}, restores to ${c.banked_level})` : `seat vacant (level ${c.level}, restores to ${c.banked_level || c.level})`;
-            return h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+            return h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
               h('div', {}, h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[c.area] || c.area}: ${c.status === 'dead' ? 'vacant' : c.name}`), h('span', { style: 'color:var(--dim);margin-left:8px' }, state)),
               action);
           }));
@@ -2368,7 +3187,7 @@
       const eventsSection = () => {
         if (!ms.worldEvents.length) return null;
         return h('div', { class: 'sec' }, h('b', {}, 'Events'),
-          ms.worldEvents.map((e) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+          ms.worldEvents.map((e) => h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
             h('div', {}, e.kind === 'plague' ? `Plague at ${e.territory}: lose 30% of its troops at tick ${e.expires_tick} unless you act` : `Unrest at ${e.territory}: lose half its troops and a level at tick ${e.expires_tick} unless you act`),
             h('button', { class: 'primary', style: 'margin-top:4px', disabled: ms.me.gold < e.cost, onclick: offerCall('respond_event', { p_game_id: gameId, p_event_id: e.id }, e.kind === 'plague' ? 'Quarantine ordered' : 'Order restored') }, e.kind === 'plague' ? `Quarantine (${e.cost} gold)` : `Quell unrest (${e.cost} gold)`))));
       };
@@ -2381,14 +3200,14 @@
         return h('div', { class: 'sec' }, h('b', {}, 'Prisoners'),
           held.map((c) => {
             const amount = numInput(c.ransom || 100, 0, 5000);
-            return h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+            return h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
               h('div', {}, `You hold ${c.name} of ${pname(c.owner_player_id)} (rank ${c.rank})${c.ransom ? `, ransom ${c.ransom}` : ', no ransom set'}`),
               h('div', { class: 'row wrap2', style: 'margin-top:4px' }, amount,
                 h('button', { onclick: (e) => call('set_ransom', { p_commander_id: c.id, p_amount: Number(amount.value) }, 'Ransom set')(e) }, 'Set ransom'),
                 h('button', { onclick: call('release_captive', { p_commander_id: c.id }, `${c.name} released`) }, 'Release'),
                 h('button', { class: 'danger', onclick: (e) => { if (confirm(`Execute ${c.name}? This costs infamy.`)) call('execute_captive', { p_commander_id: c.id }, `${c.name} executed`)(e); } }, 'Execute')));
           }),
-          mine.map((c) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+          mine.map((c) => h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
             h('div', {}, `${c.name} is held by ${pname(c.captured_by_player_id)}${c.ransom ? `, ransom ${c.ransom}` : ', no ransom named yet'}. Captives sometimes escape.`),
             c.ransom ? h('button', { class: 'primary', style: 'margin-top:4px', disabled: ms.me.gold < c.ransom, onclick: call('pay_ransom', { p_commander_id: c.id }, `${c.name} ransomed`) }, `Pay ${c.ransom} gold`) : null)));
       };
@@ -2398,12 +3217,12 @@
         const incoming = ms.offers.filter((o) => o.to_player_id === ms.me.id);
         const outgoing = ms.offers.filter((o) => o.from_player_id === ms.me.id);
         return h('div', { class: 'sec' }, h('b', {}, 'Offers and agreements'),
-          incoming.map((o) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+          incoming.map((o) => h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
             h('div', {}, `${pname(o.from_player_id)} offers ${describeOffer(o)} (expires tick ${o.expires_tick})`),
             h('div', { class: 'row', style: 'margin-top:4px' },
               h('button', { class: 'primary', onclick: offerCall('respond_offer', { p_offer_id: o.id, p_accept: true }, 'Offer accepted') }, 'Accept'),
               h('button', { onclick: offerCall('respond_offer', { p_offer_id: o.id, p_accept: false }, 'Offer declined') }, 'Decline')))),
-          outgoing.map((o) => h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b;color:var(--dim)' },
+          outgoing.map((o) => h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft);color:var(--dim)' },
             h('div', {}, `You offered ${pname(o.to_player_id)} ${describeOffer(o)}`),
             h('button', { style: 'margin-top:4px', onclick: offerCall('withdraw_offer', { p_offer_id: o.id }, 'Offer withdrawn') }, 'Withdraw'))),
           ms.deals.map((d) => h('div', { class: 'line' }, h('span', {}, `${d.kind === 'tribute' ? 'Tribute' : 'Trade'}: ${pname(d.payer_id)} pays ${pname(d.payee_id)} ${d.amount}`), h('span', {}, `${d.cycles_left} cycles left`))),
@@ -2452,7 +3271,7 @@
             lock ? null : h('button', { onclick: () => marriageDialog(p) }, 'Marriage alliance'), tradeBtn);
         }
         if (st === 'grace_period') return h('span', { style: 'color:var(--gold2)' }, `Alliance broken. War at tick ${r.grace_ends_tick}`);
-        return h('div', { class: 'row wrap2' }, h('span', { style: 'color:#e08b82' }, 'At war'), peaceBtn, h('button', { onclick: () => termsDialog(p) }, 'Peace terms'));
+        return h('div', { class: 'row wrap2' }, h('span', { style: 'color:var(--gules-hi)' }, 'At war'), peaceBtn, h('button', { onclick: () => termsDialog(p) }, 'Peace terms'));
       };
 
       const drawSide = () => {
@@ -2507,11 +3326,16 @@
           const fought = ms.battles.filter((b) => b.territory_id === t.id);
           if (fought.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Battles here'), fought.map(battleRow)));
           parts.push(siegeSection(t), buildSection(t));
+          if (t.crossing_kind) {
+            parts.push(h('div', { class: 'sec', style: 'color:var(--gold2)' }, t.crossing_kind === 'pass'
+              ? 'Mountain pass. Armies cross the range only through this castle, and a march stops here unless you or an ally hold it.'
+              : 'River crossing. Armies cross the river only through this castle, and a march stops here unless you or an ally hold it.'));
+          }
           const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
           const links = ms.edges.filter((e) => (e.from_territory_id === t.id || e.to_territory_id === t.id) && e.length <= reachRange)
             .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length, kind: e.kind, mult: e.move_cost_mult }))
             .sort((a, b) => a.len - b.len);
-          parts.push(h('div', { class: 'sec' }, h('b', {}, ms.game.free_travel ? 'Within your range' : 'Roads to'), links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${l.mult > 1.05 ? 'slow ×' + l.mult.toFixed(1) + ' · ' : ''}${Math.round(l.len)}`)))));
+          parts.push(h('div', { class: 'sec' }, h('b', {}, ms.game.free_travel ? 'Within your range' : trailsOn() ? 'Trails to' : 'Roads to'), links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${l.mult > 1.05 ? 'slow ×' + l.mult.toFixed(1) + ' · ' : ''}${Math.round(l.len)}`)))));
         } else if (sel && sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === sel.id);
           if (!c || !commanderSeen(c, tf)) {
@@ -2544,9 +3368,9 @@
           parts.push(h('div', { class: 'sec' }, h('b', {}, 'Standings'), pl.map(({ p, n }) => {
             const st = p.id === ms.me.id ? 'you' : dipStatus(p.id);
             const ctl = diplomacyControls(p);
-            return h('div', { style: 'padding:6px 0;border-bottom:1px solid #20202b' },
+            return h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
               h('div', { class: 'line', style: 'border:none' },
-                h('span', { style: 'color:var(--text)' }, dots(p.faction_slug), p.display_name, p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? h('span', { class: 'tag' }, 'out') : null),
+                h('span', { class: 'row', style: 'gap:8px;color:var(--text)' }, sigil(p.faction_slug, 22), p.display_name, p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? h('span', { class: 'tag' }, 'out') : null),
                 h('span', {}, `${n} · ${st === 'neutral' ? '' : st.replace('_', ' ')}`)),
               profileLine(p),
               p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id && !p.is_ai ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null, p.id !== ms.me.id && !p.is_ai && canAct() && !(p.eliminated_at_tick != null) ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null) : null);
@@ -2557,7 +3381,37 @@
         sideEl.replaceChildren(sideTabs(), ...parts.filter(Boolean));
       };
 
-      const toMap = (e) => new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+      const TILT = { deg: 34, persp: 1400, zoom: 1.22, origin: 0.55 };
+      try { ms.tilt = localStorage.getItem('ss-tilt') !== '0'; } catch { ms.tilt = true; }
+      const tiltK = () => (ms.tilt ? 1 / Math.cos((TILT.deg * Math.PI) / 180) : 1);
+      const applyTilt = () => {
+        wrap.style.perspective = ms.tilt ? `${TILT.persp}px` : '';
+        wrap.style.perspectiveOrigin = `50% ${TILT.origin * 100}%`;
+        svg.style.transformOrigin = `50% ${TILT.origin * 100}%`;
+        svg.style.transform = ms.tilt ? `rotateX(${TILT.deg}deg) scale(${TILT.zoom})` : '';
+        wrap.classList.toggle('tilted', ms.tilt);
+      };
+      const toMapWith = (view, e) => {
+        const box = wrap.getBoundingClientRect();
+        const W = box.width;
+        const H = box.height;
+        let lx = e.clientX - box.left;
+        let ly = e.clientY - box.top;
+        if (ms.tilt) {
+          const th = (TILT.deg * Math.PI) / 180;
+          const ox = W / 2;
+          const oy = TILT.origin * H;
+          const X = lx - ox;
+          const Y = ly - oy;
+          const u = (Y * TILT.persp) / (TILT.persp * Math.cos(th) + Y * Math.sin(th));
+          const sc = TILT.persp / (TILT.persp - u * Math.sin(th));
+          lx = ox + X / sc / TILT.zoom;
+          ly = oy + u / TILT.zoom;
+        }
+        const k = Math.min(W / view.w, H / view.h);
+        return { x: view.x + (lx - (W - view.w * k) / 2) / k, y: view.y + (ly - (H - view.h * k) / 2) / k };
+      };
+      const toMap = (e) => toMapWith(ms.view, e);
       const applyView = () => {
         svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
         svg.classList.toggle('zoomed', !!ms.full && ms.view.w < ms.full.w * 0.5);
@@ -2596,8 +3450,7 @@
 
       svg.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
-        const start = { x: e.clientX, y: e.clientY, view: { ...ms.view } };
-        const scale = svg.getScreenCTM().a;
+        const start = { x: e.clientX, y: e.clientY, view: { ...ms.view }, at: toMapWith(ms.view, e) };
         ms.dragged = false;
         const move = (ev) => {
           if (pinch) return;
@@ -2605,7 +3458,8 @@
           const dy = ev.clientY - start.y;
           if (Math.hypot(dx, dy) > 4) ms.dragged = true;
           if (!ms.dragged) return;
-          ms.view = { ...start.view, x: start.view.x - dx / scale, y: start.view.y - dy / scale };
+          const now = toMapWith(start.view, ev);
+          ms.view = { ...start.view, x: start.view.x + start.at.x - now.x, y: start.view.y + start.at.y - now.y };
           applyView();
         };
         const up = () => {
@@ -2621,6 +3475,7 @@
         if (e.target === svg) select(null);
       });
 
+      applyTilt();
       let firstLoad = true;
       const load = async () => {
         if (state.view !== 'map' || state.roomId !== gameId) return;
@@ -2650,6 +3505,8 @@
           : { data: [] };
         if (tm.error) { toast(tm.error.message); return; }
         if (state.view !== 'map' || state.roomId !== gameId) return;
+        const prevTick = ms.game ? ms.game.current_tick : null;
+        const prevBattle = ms.battles && ms.battles.length ? Math.max(...ms.battles.map((b) => b.id)) : null;
         ms.game = view.game;
         ms.players = new Map(view.players.map((p) => [p.id, p]));
         ms.me = ms.players.get(view.me);
@@ -2678,6 +3535,8 @@
         ms.moments = mo.data;
         ms.inbox = ib.data;
         ms.battles = br.data;
+        if (prevTick !== null && view.game.current_tick > prevTick) Sfx.bell();
+        if (prevBattle !== null && br.data.some((b) => b.id > prevBattle)) setTimeout(Sfx.horn, 700);
         if (view.game.tick_speed === 'turn_based' && view.game.status === 'active') {
           const ts = await sb.rpc('turn_status', { p_game_id: gameId });
           ms.turn = ts.data || null;
@@ -2747,7 +3606,7 @@
       const loadTimer = setInterval(load, 20000);
       const onKey = (e) => {
         if (e.key !== 'Escape' || document.activeElement instanceof HTMLInputElement) return;
-        if (ms.marching) { ms.marching = false; ms.preview = null; ms.stops = []; render(); drawSide(); }
+        if (ms.marching) { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); }
         else if (ms.sel) select(null);
       };
       window.addEventListener('keydown', onKey);
@@ -2774,6 +3633,8 @@
       await loadProfile();
       await showHome();
     }
+
+    initStage();
 
     sb.auth.onAuthStateChange((event, session) => {
       setTimeout(() => onSession(session, event), 0);
