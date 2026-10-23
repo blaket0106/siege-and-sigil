@@ -456,13 +456,15 @@
       if (stageFx.paint) stageFx.paint();
     }
 
-    function houseSlug() {
-      if (state.house) return state.house;
-      const slugs = Object.keys(FACTION_FALLBACK);
-      const name = state.profile ? state.profile.display_name : '';
-      let hsh = 0;
-      for (const ch of name) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
-      return slugs[hsh % slugs.length];
+    function emblem(width = 30, opts = {}) {
+      return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'sigil emblem' + (opts.draw ? ' draw' : ''), 'aria-hidden': 'true' },
+        sv('path', { d: SHIELD, fill: 'var(--ink-2)' }),
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--rule-soft)', 'stroke-width': 1, transform: 'translate(32 37) scale(0.84) translate(-32 -37)' }),
+        sv('g', { transform: 'translate(32 34.5)' },
+          sv('path', { d: 'M-9 -14h4v4h3v-4h4v4h3v-4h4v9h-2v18h-14v-18h-2Z', fill: 'var(--gilt-hi)' }),
+          sv('path', { d: 'M-2.6 13v-6.5a2.6 2.6 0 0 1 5.2 0V13Z', fill: 'var(--ink-2)' })),
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'rgba(0,0,0,0.55)', 'stroke-width': 4, 'stroke-linejoin': 'round' }),
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--gilt)', 'stroke-width': 2, 'stroke-linejoin': 'round', class: 'outline' }));
     }
 
     function factionPicker(taken, initial, onPick) {
@@ -519,7 +521,9 @@
         kids.push(submit);
         if (tab === 'signin') kids.push(h('div', { style: 'margin-top:14px;text-align:center' }, h('button', { type: 'button', class: 'link', onclick: () => { tab = 'reset'; draw(); } }, 'Forgot password?')));
         if (tab === 'reset') kids.push(h('div', { style: 'margin-top:14px;text-align:center' }, h('button', { type: 'button', class: 'link', onclick: () => { tab = 'signin'; draw(); } }, 'Back to sign in')));
+        if (tab === 'signup') kids.push(h('p', { class: 'consent' }, 'By creating an account you agree to the ', h('button', { type: 'button', class: 'link', onclick: () => legalDialog('terms') }, 'Terms of use'), ' and ', h('button', { type: 'button', class: 'link', onclick: () => legalDialog('privacy') }, 'Privacy policy'), '.'));
         kids.push(message);
+        if (tab !== 'signup') kids.push(legalLinks());
         form.replaceChildren(...kids.filter(Boolean));
         message.textContent = '';
       };
@@ -562,7 +566,7 @@
       let current = slugs[Math.floor(Math.random() * slugs.length)];
       const crestHost = h('div', { class: 'bigcrest' });
       const houseName = h('div', { class: 'housename' });
-      const buttons = slugs.map((sl) => h('button', { type: 'button', class: 'house', 'aria-label': factionOf(sl).name, onmouseenter: () => showCrest(sl), onfocus: () => showCrest(sl), onclick: () => showCrest(sl) }, sigil(sl, 40)));
+      const buttons = slugs.map((sl) => h('button', { type: 'button', class: 'housebtn', 'aria-label': factionOf(sl).name, onmouseenter: () => showCrest(sl), onfocus: () => showCrest(sl), onclick: () => showCrest(sl) }, sigil(sl, 40)));
       function showCrest(sl, first) {
         if (sl === current && !first) return;
         current = sl;
@@ -586,7 +590,7 @@
     function topbar() {
       const light = document.documentElement.getAttribute('data-theme') === 'light';
       return h('div', { class: 'topbar' },
-        h('button', { class: 'brandmark', onclick: showHome, 'aria-label': 'Siege and Sigil home' }, sigil(houseSlug(), 30), h('span', {}, 'Siege & Sigil')),
+        h('button', { class: 'brandmark', onclick: showHome, 'aria-label': 'Siege and Sigil home' }, emblem(30), h('span', {}, 'Siege & Sigil')),
         h('div', { class: 'topnav' },
           h('span', { class: 'who' }, state.profile ? state.profile.display_name : ''),
           h('button', { class: 'ghost', onclick: renameDialog }, 'Rename'),
@@ -596,24 +600,342 @@
           h('button', { class: 'ghost', onclick: () => sb.auth.signOut() }, DEV_GUEST ? 'New guest' : 'Sign out')));
     }
 
-    const HELP = [
-      ['Goal', 'Hold the share of castles shown in the "Road to victory" bar at the top. The first player to reach it wins. Lose your last castle and you are eliminated.'],
-      ['Time', 'The game advances in ticks. Orders you give take effect as ticks pass; the countdown shows the next tick. Turn-based games advance when everyone ends their turn or the deadline passes.'],
-      ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for research. Natural resources set the tier (1 to 20 is Tier 1, 21 to 40 Tier 2, 41 to 60 Tier 3) and make upgrades cheaper; the halo around a castle shows how rich it is. Build a road at two castles to march between them faster.'],
-      ['Commanders', 'Commanders lead troops. Hire more, spend gold on their abilities and move troops between a commander and a castle. A commander left in a castle garrisons it.'],
-      ['Marching', 'Select a commander and choose March, then click a destination. In castle-trail games armies walk the trails between castles, never across country. Castles within range glow; a castle that is not yours or an ally\'s stops a march and a battle is fought there, so rivers and mountain ranges can be crossed only through a river castle or a pass you hold. Add stops to build a route: at each castle you own you can collect, drop or garrison troops, wait some ticks, and loop the route to keep supplies flowing. In free-travel games you can march straight to any castle within your range (Stables extends it); the ground between decides the time: forest, hills and high ground slow a march, fords and passes slow it more; the sea, rivers and mountain ranges block a direct march, so cross at a ford (bridge icon) or a mountain pass and chain stops with a multi-stop route. Otherwise armies follow roads through friendly castles.'],
-      ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list. A defeated commander may be captured instead of killed: the captor can ransom, release or execute them, and captives sometimes escape. A commander who wins five battles earns a name and a bonus; losing a king or a named commander costs prestige and lowers production for a while.'],
-      ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see. In dark games the map itself is black until your castles or armies scan it; explored ground stays visible but only updates live inside your scan range.'],
-      ['Diplomacy', 'From the Standings list you can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war. Peace is a truce that blocks attacks for a set number of ticks; at war you can also send peace terms (gold, tribute or a castle). Allies can lock a marriage alliance that cannot be broken until it ends. A third player can offer mediation between two players at war. Breaking a pact or alliance, or attacking during a grace period, costs honor.'],
-      ['Council', 'Your seven realm areas are seats held by named councillors. Deploy one as a commander and that seat drops to level 1 until you recall them at one of your castles. If a councillor falls, you lose prestige, production dips for a while and the seat stays empty until you pay for a replacement.'],
-      ['Seasons, events and mercenaries', 'If the host turned them on: winter slows troop production (most in the north) and marches, autumn boosts gold. Random events can strike a castle; pay to respond or ignore them. Mercenary companies cost gold, arrive at once and disband after 48 ticks.'],
-      ['Chat and messages', 'Use the Chat tab for the game channel and the Inbox for messages and reports. The News tab lists recent events.'],
+    const MANUAL = [
+      { id: 'basics', title: 'The basics', blocks: [
+        ['p', 'Siege & Sigil is a game of castles and armies. You lead a house. Take castles, grow their income, and hold more of the realm than anyone else. There are no dice: every fight is arithmetic, so the player who plans better wins.'],
+        ['h', 'What wins the game'],
+        ['p', 'The first player to hold the share of castles shown in the "Road to victory" bar wins. The host sets it; half of all castles is the default. A player who loses every castle is eliminated. If only one player is left standing, that player wins.'],
+        ['h', 'How time works'],
+        ['p', 'The game runs in ticks. The host picks the speed: a tick is 2 hours, 1 hour, 30 minutes or 15 minutes, or the game is turn-based and moves forward when everyone ends their turn or the deadline passes. The game keeps running while you are away, so orders you give now are carried out as ticks pass.'],
+        ['h', 'Your first ten minutes'],
+        ['list', [
+          'Click your starting castle and look at its three upgrade tracks.',
+          'Spend your first gold on Treasury at your richest castle, then on Recruitment. Income first, army second.',
+          'Hire a commander from one of the three schools and move troops onto them.',
+          'Capture a weak neutral castle next to you. Neutral castles only have a small garrison.',
+          'Open Standings and meet your neighbours. A quiet border is worth more than one more army.',
+        ]],
+      ] },
+      { id: 'map', title: 'The map', blocks: [
+        ['p', 'The realm is a set of castles joined by routes. Everything that matters happens at castles or on the routes between them.'],
+        ['diagram', 'map'],
+        ['h', 'Trails and free travel'],
+        ['p', 'The host chooses how armies travel. In trail games armies walk the trails between castles and never cross country. In free-travel games an army can march straight to any castle within range, and the ground in between decides how long it takes: forest, hills and high ground slow a march.'],
+        ['h', 'Rivers and mountains'],
+        ['list', [
+          'Rivers and mountain ranges cannot be crossed on open ground.',
+          'A river castle sits on a crossing. Whoever holds it controls the crossing.',
+          'A pass castle sits in a gap in the mountains. Hold the pass and the range is closed to your enemies.',
+          'A march ends at the first castle that is not yours or an ally\'s, so you must take the crossing castle before you can go beyond it.',
+        ]],
+        ['h', 'Natural wealth'],
+        ['p', 'Each castle has natural resources, shown by the halo around it. Richer castles make upgrades cheaper, and tiers are Tier 1 (1 to 20), Tier 2 (21 to 40) and Tier 3 (41 to 60). Grab the rich ones first.'],
+      ] },
+      { id: 'economy', title: 'Castles and economy', blocks: [
+        ['p', 'Every castle has three upgrade tracks. Each track pays out in a different way.'],
+        ['table', { head: ['Track', 'What it gives', 'Base cost'], rows: [
+          ['Treasury', 'Gold every production cycle', '500'],
+          ['Recruitment', 'New troops at that castle', '1000'],
+          ['Prestige', 'Prestige that builds your realm areas', '4000'],
+        ] }],
+        ['h', 'How production works'],
+        ['list', [
+          'A production cycle is 12 ticks by default. Gold is paid in one lump at the end of each cycle.',
+          'Gold per cycle = total Treasury levels, times 10 plus 2 for every level of your Mint.',
+          'Troops arrive a little every tick. Over a cycle a castle produces its Recruitment level times (4 plus your Barracks level).',
+          'Prestige arrives every tick and goes to the realm area you are currently building.',
+        ]],
+        ['h', 'Upgrade costs'],
+        ['p', 'An upgrade costs base times (current level plus one), divided by the castle\'s resources. Natural resources and your Guildhall make upgrades cheaper, so the same gold goes further at a rich castle. Bulk upgrade spends a budget on the cheapest castles first.'],
+        ['h', 'Roads'],
+        ['p', 'Build a road at two castles and marches between them are three times faster. A road costs 10000 divided by the castle\'s resources, so build them at your rich castles and along your front line.'],
+        ['h', 'Capturing castles'],
+        ['p', 'A captured castle keeps its Recruitment, Prestige and roads but its Treasury is destroyed. You are paid 10 gold for each Treasury level destroyed. The castle starts with no garrison, so the army that took it must hold it.'],
+      ] },
+      { id: 'areas', title: 'Realm areas', blocks: [
+        ['p', 'Your realm has seven areas. They are not buildings on the map. They are levels that apply across all of your castles. You build one at a time, and prestige from all of your castles flows into the one you choose.'],
+        ['table', { head: ['Area', 'What it does'], rows: [
+          ['Armory', 'How many troops your army kills each round of a battle'],
+          ['Mint', 'Raises the gold you earn from Treasury'],
+          ['Barracks', 'Raises troop production'],
+          ['Guildhall', 'Makes every upgrade cheaper'],
+          ['Watchtowers', 'How far you can see, and who strikes first in open-field battles'],
+          ['Library', 'Adds a bonus of prestige to one of your other areas every cycle'],
+          ['Stables', 'How far an army can march in one order'],
+        ] }],
+        ['p', 'Armory decides battles, so most winning players raise it early. Mint and Guildhall pay for themselves in a long game. Stables matters most on big maps.'],
+      ] },
+      { id: 'commanders', title: 'Commanders', blocks: [
+        ['p', 'Commanders carry troops. They are cheap, and you will lose some. A commander who survives battles gets stronger and becomes worth protecting.'],
+        ['h', 'Hiring'],
+        ['p', 'Pick a school and pay the price. You get a generated name and one level in a random ability of that school.'],
+        ['table', { head: ['School', 'Abilities'], rows: [
+          ['Battleschool', 'Valor (more damage), Tactics (strike first in the field), Siegecraft (stronger sieges)'],
+          ['University', 'Muster (more troops), Steward (more gold), Scholar (more prestige)'],
+          ['Rangers', 'Pace (faster marches), Scout (see further), Plunder (more gold on capture)'],
+        ] }],
+        ['h', 'Growing stronger'],
+        ['p', 'Abilities level up on their own through use: Valor from winning battles, Muster from troops produced at the castle the commander leads, Pace from marching, and so on. Each ability tops out at level 3 and a commander tops out at rank 20, so no one commander can have everything.'],
+        ['h', 'Garrison commanders'],
+        ['p', 'Assign an idle commander to a castle to lead it. He leads its defense and his Muster, Steward and Scholar abilities apply there. He cannot march until you unassign him.'],
+        ['h', 'The king'],
+        ['p', 'Each house has one king, chosen from your commanders. The king\'s abilities become realm-wide bonuses and his battle abilities apply to any fight he is in. If he dies, those bonuses vanish instantly and it takes a few ticks to crown a new one. Keep him out of the front line.'],
+        ['note', 'A commander whose army is destroyed dies. So does every commander in a castle that falls.'],
+      ] },
+      { id: 'marching', title: 'Marching and routes', blocks: [
+        ['p', 'Select a commander and choose March, then click a destination. The map shows the path, the time to arrive and the cost.'],
+        ['h', 'Range'],
+        ['p', 'One order can cover only so much distance. Your Stables level sets that distance. A single hop to a neighbouring castle is always allowed. Castles you can reach glow on the map.'],
+        ['h', 'March types'],
+        ['list', [
+          'Assault: the army fights on arrival.',
+          'Siege: the army sets up outside the castle and starves it instead of fighting at once.',
+        ]],
+        ['h', 'Passing through castles'],
+        ['p', 'An army passes through castles that belong to you or an ally. It stops at the first castle that is not yours, and there it fights or begins a siege.'],
+        ['h', 'Routes'],
+        ['p', 'Add stops to build a route of up to 10 castles. At each castle you own you can set an action:'],
+        ['list', [
+          'Collect troops from the castle onto the commander.',
+          'Drop troops from the commander into the castle.',
+          'Garrison: leave the commander to lead the castle.',
+          'Wait for a number of ticks before moving on.',
+        ]],
+        ['p', 'Turn on Loop and the commander repeats the route forever. That is how you keep a front line supplied without checking in every hour.'],
+        ['h', 'Changing your mind'],
+        ['p', 'Abort makes the army finish its current stretch and stop at the next castle. Recall sends it back to where it started.'],
+      ] },
+      { id: 'battles', title: 'Battles', blocks: [
+        ['p', 'There are no dice. Each side destroys a fixed number of enemy troops every round and the battle runs until one side has none left.'],
+        ['h', 'Damage per round'],
+        ['p', 'Your damage each round is your Armory level plus the Valor of the commander leading your army. It is never less than 1.'],
+        ['h', 'Fighting at a castle'],
+        ['list', [
+          'The defender strikes first and gets +1 damage per round.',
+          'The attacker wins only if they outlast the defender: they must bring more troops than the defense can kill.',
+          'The winners keep what survives. Every commander on the losing side dies.',
+        ]],
+        ['h', 'A worked example'],
+        ['p', '30 troops attack a castle held by 20 troops. Both sides have Armory 2 and no Valor. The attacker kills 2 troops per round and the defender kills 3. The defender needs 10 rounds to destroy 30 troops. The attacker needs 10 rounds to destroy 20. The defender strikes first, so the defender wins with 2 troops left. Bring 33 troops and the attacker wins instead.'],
+        ['h', 'Fighting in the open'],
+        ['p', 'When two armies meet on the trail, both are attackers with no defender bonus. The side with the higher initiative (Watchtowers level plus the leader\'s Tactics) strikes first. The loser is destroyed.'],
+        ['h', 'Allies'],
+        ['p', 'Allied armies fight as one side using the best Armory among them, and the defending team gets the +1.'],
+      ] },
+      { id: 'sieges', title: 'Sieges', blocks: [
+        ['p', 'A siege starves a castle instead of storming it. It is slow, but you do not lose troops to the castle\'s +1 defense.'],
+        ['list', [
+          'Every tick the garrison loses about 3% of its troops, more if the besieger has Siegecraft.',
+          'Every production cycle the castle loses one level on one of its tracks.',
+          'The defender can sally out: the garrison fights the besiegers in the open with no castle bonus for anyone. A win destroys the besiegers and lifts the siege.',
+          'A friendly army that reaches the castle fights the besiegers in the open. A win lifts the siege.',
+          'The besieger can break off and assault at any time.',
+        ]],
+        ['note', 'A sieging army can be caught by a relief force. Keep the besiegers strong enough to beat what is coming.'],
+      ] },
+      { id: 'diplomacy', title: 'Diplomacy and honor', blocks: [
+        ['p', 'Open Standings and click a player. You can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war.'],
+        ['list', [
+          'Peace is a truce that blocks attacks for a set number of ticks.',
+          'At war you can send peace terms: gold, tribute or a castle.',
+          'Allies can lock a marriage alliance that cannot be broken until it ends.',
+          'A third player can offer to mediate between two players at war.',
+          'You can send gold to anyone.',
+        ]],
+        ['h', 'Honor'],
+        ['p', 'Honor is your reputation across games. Breaking a pact or alliance, or attacking during a grace period, costs honor. It is public on the Roll of Honor.'],
+      ] },
+      { id: 'fog', title: 'Fog of war', blocks: [
+        ['p', 'If the host turned fog on, you only see what your castles and armies can scan. A question mark means information you cannot see right now.'],
+        ['list', [
+          'Watchtowers extends the scan range of every castle you own.',
+          'The Scout ability extends it for a commander.',
+          'In dark games the map is black until something of yours scans it. Explored ground stays visible but only updates live inside your scan range.',
+        ]],
+      ] },
+      { id: 'hosting', title: 'Hosting a game', blocks: [
+        ['p', 'Anyone can raise a campaign. The setup has four steps: Realm, Rules, Players and Review. The Realm page shows a live preview of the land that the same settings will create.'],
+        ['h', 'Realm'],
+        ['list', [
+          'Land shape and size, and how many castles each house starts with.',
+          'Map style presets such as river valley, highlands, or a ring around a sea. They set how much water, high ground and mountain there is.',
+          'Travel: trails or free travel, and how far apart the capitals start.',
+          'Map scale from 1x to 6x. Larger maps mean longer marches and slower games.',
+        ]],
+        ['h', 'Rules'],
+        ['list', [
+          'Tick speed, victory share, fog of war, seasons, events and mercenaries.',
+          'Player names: shown, or hidden until the game ends. When hidden, everyone appears under their house name.',
+          'AI players fill any seats left open when the game starts.',
+        ]],
+        ['h', 'Host tools'],
+        ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. Finished games can be replayed from the Replay bar.'],
+      ] },
+      { id: 'tips', title: 'Strategy tips', blocks: [
+        ['list', [
+          'Economy first. A second Treasury level beats a second commander in the first few cycles.',
+          'Do not scatter troops. Armies fight as one pool, so one big army usually beats three small ones.',
+          'Attack with a margin. A castle defender gets +1 damage and strikes first, so match the numbers carefully before you march.',
+          'Take the pass or the river castle before you need it. Whoever holds the crossing decides who can reach whom.',
+          'Garrison your border castles. An empty castle falls to any army that reaches it.',
+          'Keep your king home. Losing him costs you every bonus he gave you.',
+          'Talk to the player on your other flank. Peace on one border lets you fight on the other.',
+          'Use looping routes to keep supplies moving instead of checking in every tick.',
+        ]],
+      ] },
     ];
 
-    function helpDialog() {
-      const body = h('div', { style: 'max-height:60vh;overflow-y:auto;padding-right:6px' },
-        ...HELP.map(([t, d]) => h('div', { class: 'helpitem' }, h('h4', {}, t), h('div', {}, d))));
-      modal('How to play', body, (close) => [h('button', { class: 'primary', onclick: close }, 'Understood')]);
+    const MANUAL_DIAGRAM = () => {
+      const castle = (x, y, fill, label) => [
+        sv('rect', { x: x - 9, y: y - 9, width: 18, height: 18, rx: 2, fill, stroke: 'var(--gilt-lo)', 'stroke-width': 1.5 }),
+        sv('path', { d: `M${x - 6} ${y - 6}h3v3h3v-3h3v3h3v-3h0v9h-12Z`, fill: 'var(--ink-1)', opacity: 0.7 }),
+        label ? sv('text', { x, y: y + 24, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--dim)' }, label) : null,
+      ];
+      return sv('svg', { viewBox: '0 0 520 190', class: 'mdiagram', role: 'img', 'aria-label': 'A trail map with a river castle, a mountain range and a pass castle' },
+        sv('rect', { x: 0, y: 0, width: 520, height: 190, fill: 'var(--recess)', rx: 3 }),
+        sv('path', { d: 'M170 0C150 40 190 70 170 100S150 150 170 190', fill: 'none', stroke: 'var(--azure)', 'stroke-width': 14, opacity: 0.55, 'stroke-linecap': 'round' }),
+        sv('path', { d: 'M360 0L376 22L352 46L380 70L356 96L384 120L360 190', fill: 'none', stroke: 'var(--faint)', 'stroke-width': 16, opacity: 0.55, 'stroke-linejoin': 'round' }),
+        sv('path', { d: 'M52 95H170M170 95H270M270 95H360M360 95H468M270 95L300 40M270 95L300 150', fill: 'none', stroke: 'var(--gilt-lo)', 'stroke-width': 2, 'stroke-dasharray': '2 5', 'stroke-linecap': 'round' }),
+        ...castle(52, 95, 'var(--gilt)', 'Your castle'),
+        ...castle(170, 95, 'var(--azure)', 'River castle'),
+        ...castle(270, 95, 'var(--gilt-lo)', 'Neutral castle'),
+        ...castle(300, 40, 'var(--gilt-lo)', null),
+        ...castle(300, 150, 'var(--gilt-lo)', null),
+        ...castle(360, 95, 'var(--purpure)', 'Pass castle'),
+        ...castle(468, 95, 'var(--gules)', 'Enemy castle'),
+        sv('text', { x: 140, y: 20, 'font-size': 11, fill: 'var(--azure)' }, 'River'),
+        sv('text', { x: 392, y: 20, 'font-size': 11, fill: 'var(--faint)' }, 'Mountains'));
+    };
+
+    const renderBlock = (block) => {
+      const [kind, v] = block;
+      if (kind === 'p') return h('p', {}, v);
+      if (kind === 'h') return h('h3', {}, v);
+      if (kind === 'note') return h('div', { class: 'mnote' }, v);
+      if (kind === 'list') return h('ul', {}, v.map((t) => h('li', {}, t)));
+      if (kind === 'diagram') return MANUAL_DIAGRAM();
+      if (kind === 'table') return h('table', {}, h('thead', {}, h('tr', {}, v.head.map((c) => h('th', {}, c)))), h('tbody', {}, v.rows.map((r) => h('tr', {}, r.map((c) => h('td', {}, c))))));
+      return null;
+    };
+
+    const LEGAL_CONTACT = 'blaket0106@gmail.com';
+    const LEGAL_UPDATED = 'October 23, 2026';
+    const LEGAL = {
+      terms: { title: 'Terms of use', blocks: [
+        ['p', `Last updated ${LEGAL_UPDATED}.`],
+        ['p', 'Siege & Sigil is a browser game made and run by an individual developer ("I", "me"). By creating an account or playing, you agree to these terms. If you do not agree, do not use the game.'],
+        ['h', 'Your account'],
+        ['list', [
+          'You must be at least 13 years old.',
+          'Give a real email address you control. You are responsible for your password and for what happens under your account.',
+          'One account per person. Do not use extra accounts to gain an advantage in a game.',
+        ]],
+        ['h', 'How to behave'],
+        ['p', 'Chat, display names and messages are visible to other players. Do not harass, threaten, impersonate or spam anyone, post unlawful or hateful content, or share other people\'s private information. Do not cheat, exploit bugs to gain an advantage, interfere with the service, or try to access other players\' accounts or data. Report problems to me instead of exploiting them.'],
+        ['h', 'Your content'],
+        ['p', 'You keep ownership of what you write. You give me permission to store it and show it to other players in the game as part of running the service.'],
+        ['h', 'Games and the service'],
+        ['list', [
+          'The game is provided as is. It may have bugs, change, be reset or be shut down at any time, and games in progress may be lost.',
+          'I may remove content, and suspend or delete accounts, that break these terms or harm other players.',
+          'Honor, rankings and statistics have no monetary value.',
+        ]],
+        ['h', 'Liability'],
+        ['p', 'To the extent the law allows, I provide the game without warranties of any kind and am not liable for indirect or consequential losses, or for loss of data, arising from your use of it. Nothing here limits rights you have that cannot be limited by law.'],
+        ['h', 'Changes and contact'],
+        ['p', `I may update these terms. When I do, the date above changes and continued play means you accept the new version. Questions or complaints: ${LEGAL_CONTACT}.`],
+      ] },
+      privacy: { title: 'Privacy policy', blocks: [
+        ['p', `Last updated ${LEGAL_UPDATED}.`],
+        ['p', 'This explains what Siege & Sigil collects and why. The game is run by an individual developer, who is the contact for everything below.'],
+        ['h', 'What I collect'],
+        ['table', { head: ['Information', 'Why'], rows: [
+          ['Email address and password', 'To create your account and let you sign in. The password is stored only in hashed form by the sign-in provider.'],
+          ['Display name', 'Shown to other players, unless the game hides names until it ends.'],
+          ['Game activity: orders, battles, chat messages, diplomacy, honor and statistics', 'To run the game, show it to the players in it, and keep rankings and replays.'],
+          ['Last activity time', 'To tell hosts and players who is active and handle absent players.'],
+        ] }],
+        ['h', 'What I do not do'],
+        ['list', [
+          'I do not sell your information.',
+          'I do not run advertising or tracking.',
+          'I do not use analytics services.',
+        ]],
+        ['h', 'Who handles your data'],
+        ['list', [
+          'Supabase stores accounts and game data and handles sign-in.',
+          'GitHub Pages serves the website. Web fonts and a 3D library are loaded from Google Fonts and jsDelivr, so those services see your IP address when the page loads.',
+          'These providers may keep ordinary server logs such as IP addresses.',
+        ]],
+        ['h', 'Stored in your browser'],
+        ['p', 'The game keeps your sign-in session and a few settings (theme, sound, map options, help seen, alliance groups) in your browser\'s local storage. It does not use advertising cookies.'],
+        ['h', 'Names in games'],
+        ['p', 'Other players in your game can see your display name and what you do in that game. In games with hidden names, players see your house name until the game ends.'],
+        ['h', 'Keeping and deleting your data'],
+        ['p', `I keep your account and game history while your account exists. To see, correct or delete your data, email ${LEGAL_CONTACT} from the address on your account and I will do it. Deleting an account removes your email and profile; game records may remain with your name removed.`],
+        ['h', 'Children'],
+        ['p', 'The game is not for children under 13. If you believe a child has signed up, tell me and I will delete the account.'],
+        ['h', 'Changes and contact'],
+        ['p', `If this policy changes, the date above changes. Questions: ${LEGAL_CONTACT}.`],
+      ] },
+    };
+
+    function legalDialog(kind) {
+      const doc = LEGAL[kind];
+      const body = h('div', { class: 'legalbody' }, ...doc.blocks.map(renderBlock));
+      modal(doc.title, body, (close) => [
+        h('button', { onclick: () => { close(); legalDialog(kind === 'terms' ? 'privacy' : 'terms'); } }, kind === 'terms' ? 'Privacy policy' : 'Terms of use'),
+        h('button', { class: 'primary', onclick: close }, 'Close')]);
+    }
+
+    const legalLinks = () => h('div', { class: 'legallinks' },
+      h('button', { type: 'button', class: 'link', onclick: () => legalDialog('terms') }, 'Terms of use'),
+      h('span', { 'aria-hidden': 'true' }, '·'),
+      h('button', { type: 'button', class: 'link', onclick: () => legalDialog('privacy') }, 'Privacy policy'));
+
+    function helpDialog(section) {
+      const startId = typeof section === 'string' ? section : MANUAL[0].id;
+      const overlay = h('div', { class: 'overlay' });
+      const onKey = (e) => { if (e.key === 'Escape') close(); };
+      const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
+      overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+      document.addEventListener('keydown', onKey);
+
+      const nav = h('nav', { class: 'mnav', 'aria-label': 'Sections' });
+      const pane = h('div', { class: 'mpane', tabindex: '-1' });
+      const search = h('input', { type: 'search', placeholder: 'Search the manual', 'aria-label': 'Search the manual' });
+      let current = startId;
+
+      const textOf = (sec) => `${sec.title} ${sec.blocks.map((b) => (typeof b[1] === 'string' ? b[1] : JSON.stringify(b[1])) ).join(' ')}`.toLowerCase();
+
+      const showSection = (id) => {
+        current = id;
+        const sec = MANUAL.find((s) => s.id === id) || MANUAL[0];
+        const i = MANUAL.indexOf(sec);
+        pane.replaceChildren(
+          h('h2', {}, sec.title),
+          ...sec.blocks.map(renderBlock),
+          h('div', { class: 'mfoot' },
+            i > 0 ? h('button', { class: 'ghost', onclick: () => showSection(MANUAL[i - 1].id) }, `Back: ${MANUAL[i - 1].title}`) : h('span'),
+            i < MANUAL.length - 1 ? h('button', { class: 'ghost', onclick: () => showSection(MANUAL[i + 1].id) }, `Next: ${MANUAL[i + 1].title}`) : h('span')));
+        pane.scrollTop = 0;
+        drawNav();
+      };
+
+      const drawNav = () => {
+        const q = search.value.trim().toLowerCase();
+        const shown = q ? MANUAL.filter((s) => textOf(s).includes(q)) : MANUAL;
+        const items = shown.map((s) => h('button', { type: 'button', class: 'mnavbtn' + (s.id === current ? ' on' : ''), onclick: () => showSection(s.id) }, s.title));
+        if (!shown.length) items.push(h('div', { class: 'tip' }, 'Nothing matches that search.'));
+        nav.replaceChildren(...items);
+      };
+      search.addEventListener('input', drawNav);
+
+      overlay.append(h('div', { class: 'modal manual', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Field manual' },
+        h('div', { class: 'mhead' }, h('h2', {}, 'Field manual'), search, h('button', { class: 'ghost', onclick: close }, 'Close')),
+        h('div', { class: 'mbody' }, nav, pane)));
+      document.body.append(overlay);
+      showSection(startId);
     }
 
     async function summaryDialog(gameId) {
@@ -664,13 +986,6 @@
       const bannerGrid = h('div', { class: 'banners' });
       const boardList = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Loading'));
       const crestHolder = h('div', { class: 'crest' });
-      const houseName = h('div', { class: 'houseof' });
-
-      const paintHouse = (draw) => {
-        const slug = houseSlug();
-        crestHolder.replaceChildren(sigil(slug, 150, { draw }));
-        houseName.textContent = `House ${factionOf(slug).name}`;
-      };
 
       const statusText = (g) => ({ lobby: 'In the lobby', picking: 'Choose your start', active: `Tick ${g.current_tick}`, finished: 'Finished' }[g.status] || g.status);
 
@@ -716,14 +1031,13 @@
         if (mine.error) toast(mine.error.message);
         else {
           const rows = (mine.data || []).filter((r) => r.games).sort((a, b) => b.games.id - a.games.id);
-          if (rows.length && !state.house) { state.house = rows[0].faction_slug; paintHouse(false); }
           bannerGrid.replaceChildren(...rows.map(banner), h('button', { class: 'banner new', onclick: createDialog },
             h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), h('span', {}, rows.length ? 'Raise another campaign' : 'Raise your first campaign')));
         }
       };
 
       const profile = state.profile || {};
-      paintHouse(!state.homeDrawn);
+      crestHolder.replaceChildren(emblem(150, { draw: !state.homeDrawn }));
       state.homeDrawn = true;
 
       mount(h('div', { class: 'wrap' }, topbar(),
@@ -731,7 +1045,6 @@
           h('aside', { class: 'panel house' },
             crestHolder,
             h('h2', {}, profile.display_name || 'Lord'),
-            houseName,
             h('div', { class: 'record' },
               h('div', {}, h('b', {}, profile.total_games ?? 0), 'campaigns'),
               h('div', {}, h('b', {}, profile.total_wins ?? 0), 'victories'),
@@ -745,7 +1058,8 @@
             h('div', { class: 'section-title' }, h('h2', {}, 'Open lobbies'), h('button', { class: 'ghost', onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh')),
             h('div', { class: 'panel' }, openList),
             h('div', { class: 'section-title' }, h('h2', {}, 'Roll of honor')),
-            h('div', { class: 'panel' }, boardList)))));
+            h('div', { class: 'panel' }, boardList),
+            legalLinks()))));
 
       sb.rpc('get_leaderboard', { p_limit: 15 }).then(({ data, error }) => {
         if (error) return toast(error.message);
