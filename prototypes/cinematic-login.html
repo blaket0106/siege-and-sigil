@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cinematic login prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+:root { --gilt: #d6ab52; --gilt-hi: #f5dc94; --gilt-lo: #8d6a28; --text: #ecdfc2; --dim: #b5a687; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #07090d; color: var(--text); font-family: 'EB Garamond', serif; }
+#stage { position: fixed; inset: 0; }
+#stage #ui, #stage #labels, #stage #load { display: none !important; }
+.grade { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(255, 150, 70, 0.16) 0%, rgba(255, 190, 120, 0) 38%, rgba(10, 40, 70, 0.28) 100%); mix-blend-mode: soft-light; }
+.vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 70% at 62% 48%, transparent 38%, rgba(2, 4, 8, 0.7) 100%), linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 18%, transparent 78%, rgba(0, 0, 0, 0.5)); }
+#grain { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.09; mix-blend-mode: overlay; image-rendering: pixelated; }
+
+.rail { position: fixed; left: 0; top: 0; bottom: 0; width: 360px; padding: 34px 34px 26px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: linear-gradient(180deg, rgba(6, 10, 18, 0.9) 0%, rgba(8, 12, 20, 0.82) 60%, rgba(6, 9, 15, 0.92) 100%); backdrop-filter: blur(6px);
+  border-right: 1px solid rgba(214, 171, 82, 0.55); box-shadow: 12px 0 50px rgba(0, 0, 0, 0.55), inset -1px 0 0 rgba(0, 0, 0, 0.8); }
+.rail::before { content: ''; position: absolute; top: 0; bottom: 0; right: 5px; width: 1px; background: linear-gradient(180deg, transparent, rgba(214, 171, 82, 0.35) 20%, rgba(214, 171, 82, 0.35) 80%, transparent); }
+.crest { width: 150px; margin-top: 6px; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.7)); transition: opacity 0.4s; }
+h1 { margin: 22px 0 0; font: 600 1.7rem/1.15 'Cinzel', serif; letter-spacing: 0.3em; padding-left: 0.3em; color: var(--gilt-hi); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7); }
+.rule { position: relative; width: 210px; height: 9px; margin: 16px auto 14px; background: linear-gradient(90deg, transparent, var(--gilt-lo)) left 0 top 4px / calc(50% - 14px) 1px no-repeat, linear-gradient(90deg, var(--gilt-lo), transparent) right 0 top 4px / calc(50% - 14px) 1px no-repeat; }
+.rule::after { content: ''; position: absolute; left: 50%; top: 1px; width: 7px; height: 7px; margin-left: -3.5px; background: var(--gilt); transform: rotate(45deg); }
+.lede { margin: 0; font-style: italic; font-size: 1.15rem; color: var(--dim); }
+.menu { margin-top: 30px; width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.menu button { position: relative; background: none; border: 0; padding: 11px 8px; color: var(--dim); font: 500 1.02rem 'Cinzel', serif; letter-spacing: 0.14em; cursor: pointer; transition: color 0.2s; }
+.menu button:hover { color: var(--text); }
+.menu button.on { color: var(--gilt-hi); background: linear-gradient(90deg, transparent, rgba(214, 171, 82, 0.14), transparent); }
+.menu button.on::before, .menu button.on::after { content: ''; position: absolute; top: 50%; width: 22px; height: 1px; background: var(--gilt); }
+.menu button.on::before { left: 14px; } .menu button.on::after { right: 14px; }
+form { width: 100%; margin-top: 10px; }
+label { display: block; text-align: left; margin: 16px 0 2px; font: 600 0.66rem 'Cinzel', serif; letter-spacing: 0.18em; color: var(--dim); }
+input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid rgba(214, 171, 82, 0.4); color: var(--text); font: 1.05rem 'EB Garamond', serif; padding: 8px 2px; outline: none; }
+input:focus { border-bottom-color: var(--gilt-hi); }
+.go { margin-top: 24px; width: 100%; padding: 13px; background: linear-gradient(180deg, #a63429, #6d1c16); border: 1px solid var(--gilt-lo); color: #fbefd6; font: 600 0.84rem 'Cinzel', serif; letter-spacing: 0.22em; cursor: pointer; }
+.go:hover { filter: brightness(1.15); }
+.houses { margin-top: auto; display: flex; gap: 2px; justify-content: center; }
+.houses button { background: none; border: 0; padding: 4px 3px; cursor: pointer; opacity: 0.65; transition: opacity 0.2s, transform 0.2s; }
+.houses button:hover, .houses button.on { opacity: 1; transform: translateY(-3px); }
+.hname { margin-top: 8px; min-height: 1.2em; font: 600 0.7rem 'Cinzel', serif; letter-spacing: 0.3em; color: var(--dim); }
+.legal { margin-top: 12px; font-size: 0.8rem; color: var(--dim); opacity: 0.75; }
+
+.lower { position: fixed; left: 400px; bottom: 34px; font-family: 'Cinzel', serif; letter-spacing: 0.22em; font-size: 0.78rem; color: rgba(245, 220, 148, 0.85); text-shadow: 0 2px 8px #000; opacity: 0; transition: opacity 1.6s; }
+.lower b { display: block; margin-top: 4px; font-weight: 600; font-size: 1.05rem; letter-spacing: 0.26em; color: #fbefd6; }
+.lower.on { opacity: 1; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #07090d; transition: opacity 1.4s; z-index: 5; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading div { font: 600 0.8rem 'Cinzel', serif; letter-spacing: 0.3em; color: var(--dim); }
+.hud { position: fixed; right: 14px; bottom: 12px; font: 0.8rem 'EB Garamond', serif; color: rgba(236, 223, 194, 0.55); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="grade"></div>
+<div class="vignette"></div>
+<canvas id="grain" width="320" height="180"></canvas>
+
+<aside class="rail">
+  <div class="crest" id="crest"></div>
+  <h1>Siege &amp; Sigil</h1>
+  <div class="rule"></div>
+  <p class="lede">Raise a house. Hold the castles.</p>
+  <div class="menu" id="menu">
+    <button class="on" data-t="in">Sign in</button>
+    <button data-t="up">Create account</button>
+    <button>Field manual</button>
+  </div>
+  <form id="form" onsubmit="return false">
+    <label>Email</label><input type="email" placeholder="you@example.com">
+    <label>Password</label><input type="password">
+    <button class="go">Sign in</button>
+  </form>
+  <div class="houses" id="houses"></div>
+  <div class="hname" id="hname"></div>
+  <div class="legal">Terms of use · Privacy policy</div>
+</aside>
+<div class="lower" id="lower"></div>
+<div id="loading"><div id="loadmsg">Raising the realm</div></div>
+<div class="hud" id="hud"></div>
+
+<script type="module">
+import { generateWorld } from '../supabase/functions/start-game/generator.js';
+import { createMap3D } from '../map3d.js';
+
+const Q = new URLSearchParams(location.search);
+if (Q.get('rail') === '0') document.querySelector('.rail').style.display = 'none';
+if (Q.get('rail') === '0') document.getElementById('lower').style.left = '40px';
+const HOUSES = {
+  kaldran: { name: 'Kaldran', c1: '#B3202A', c2: '#E0A526', div: 'chief', ch: 'tower' },
+  veyra: { name: 'Veyra', c1: '#1F3A93', c2: '#C0C8D4', div: 'pale', ch: 'crescent' },
+  dravos: { name: 'Dravos', c1: '#26262B', c2: '#E8662A', div: 'bend', ch: 'star' },
+  halcyr: { name: 'Halcyr', c1: '#E8EEF2', c2: '#4A8FC4', div: 'fess', ch: 'sun' },
+  mereth: { name: 'Mereth', c1: '#6A3FA0', c2: '#E58AA8', div: 'chevron', ch: 'star' },
+  ostrand: { name: 'Ostrand', c1: '#1E8A8F', c2: '#E3C98A', div: 'quarterly', ch: 'wave' },
+  thornwick: { name: 'Thornwick', c1: '#2F6B3A', c2: '#D9D2B0', div: 'pale', ch: 'tree' },
+  brannoch: { name: 'Brannoch', c1: '#B8742A', c2: '#6B3A1A', div: 'bend', ch: 'spear' },
+};
+
+let uid = 0;
+function heraldic(slug) {
+  const H = HOUSES[slug];
+  const id = `h${++uid}`;
+  const SH = 'M8 10Q50 2 92 10V56C92 88 72 108 50 118C28 108 8 88 8 56Z';
+  const DIV = {
+    chief: 'M0 0H100V34H0Z', pale: 'M50 0H100V120H50Z', bend: 'M0 0H26L100 78V120H70L0 30Z', fess: 'M0 42H100V70H0Z',
+    chevron: 'M0 86L50 44L100 86V104L50 62L0 104Z', quarterly: 'M50 0H100V60H50ZM0 60H50V120H0Z',
+  };
+  const star = Array.from({ length: 16 }, (_, i) => { const r = i % 2 ? 6.5 : 15.5; const a = (Math.PI * i) / 8 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(' ');
+  const rays = Array.from({ length: 12 }, (_, i) => { const a = (Math.PI * i) / 6; const wavy = i % 2; return `<path d="M${(9 * Math.cos(a)).toFixed(1)} ${(9 * Math.sin(a)).toFixed(1)}L${((wavy ? 13 : 16.5) * Math.cos(a)).toFixed(1)} ${((wavy ? 13 : 16.5) * Math.sin(a)).toFixed(1)}" stroke="url(#${id}g)" stroke-width="${wavy ? 2.2 : 2.8}" stroke-linecap="round"/>`; }).join('');
+  const CH = {
+    tower: `<path d="M-9.5 -15h4.2v4.2h3.2v-4.2h4.2v4.2h3.2v-4.2h4.2v9.5h-2.2v19.5h-14.6v-19.5h-2.2Z"/><path d="M-2.8 14v-7a2.8 2.8 0 0 1 5.6 0v7Z" fill="rgba(0,0,0,.55)"/><rect x="-5.6" y="-3" width="2" height="4" fill="rgba(0,0,0,.45)"/><rect x="3.6" y="-3" width="2" height="4" fill="rgba(0,0,0,.45)"/>`,
+    crescent: '<path d="M7.8 -12.5A15 15 0 1 0 7.8 12.5A12.6 12.6 0 0 1 7.8 -12.5Z" transform="translate(3.6 0)"/>',
+    star: `<polygon points="${star}" transform="translate(0 0.4)"/>`,
+    sun: `${rays}<circle r="7" fill="url(#${id}g)"/><circle r="7" fill="none" stroke="rgba(0,0,0,.25)" stroke-width=".8"/>`,
+    wave: [-8, 0, 8].map((dy) => `<path d="M-15 ${dy}q3.75-5.5 7.5 0t7.5 0 7.5 0 7.5 0" fill="none" stroke="url(#${id}g)" stroke-width="3.1" stroke-linecap="round"/>`).join(''),
+    tree: '<path d="M0 -16L11 1.5H5L13 12H-13L-5 1.5H-11Z"/><path d="M-2.4 12H2.4V17.5H-2.4Z"/>',
+    spear: '<path d="M0 -16L6.4 -3H2.8V16H-2.8V-3H-6.4Z"/><path d="M-4.5 4H4.5V6H-4.5Z"/>',
+  };
+  const charge = H.ch === 'sun' || H.ch === 'wave' ? CH[H.ch] : `<g fill="url(#${id}g)">${CH[H.ch]}</g>`;
+  const dy = { tower: 0.5, crescent: 0, star: 1, sun: 0, wave: 0, tree: -0.5, spear: 0 }[H.ch] || 0;
+  const cy = { chief: 66, fess: 56, pale: 56, bend: 56, chevron: 56, quarterly: 56 }[H.div];
+  return `<svg viewBox="0 0 100 124" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${H.name} arms" style="display:block;width:100%;height:auto;overflow:visible">
+  <defs>
+    <linearGradient id="${id}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1f4f6"/><stop offset=".35" stop-color="#8d959d"/><stop offset=".6" stop-color="#3a4148"/><stop offset="1" stop-color="#a9b1b8"/></linearGradient>
+    <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3bd"/><stop offset=".4" stop-color="#e2b84e"/><stop offset=".75" stop-color="#9a6e22"/><stop offset="1" stop-color="#f0cf7a"/></linearGradient>
+    <radialGradient id="${id}s" cx=".3" cy=".22" r=".95"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <clipPath id="${id}c"><path d="${SH}"/></clipPath>
+    <filter id="${id}n" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .9 -.25"/></filter>
+    <filter id="${id}f" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.3" result="b"/>
+      <feSpecularLighting in="b" surfaceScale="4" specularConstant="1" specularExponent="26" lighting-color="#fff" result="sp"><feDistantLight azimuth="225" elevation="46"/></feSpecularLighting>
+      <feComposite in="sp" in2="SourceAlpha" operator="in" result="sh"/>
+      <feComposite in="SourceGraphic" in2="sh" operator="arithmetic" k1="0" k2="1" k3=".9" k4="0" result="lit"/>
+      <feDropShadow in="lit" dx=".6" dy="1.6" stdDeviation="1.1" flood-color="#000" flood-opacity=".65"/>
+    </filter>
+    <filter id="${id}d" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000" flood-opacity=".6"/></filter>
+  </defs>
+  <g filter="url(#${id}d)">
+    <path d="${SH}" fill="${H.c1}"/>
+    <g clip-path="url(#${id}c)">
+      <path d="${DIV[H.div]}" fill="${H.c2}"/>
+      <rect width="100" height="124" filter="url(#${id}n)" opacity=".28" style="mix-blend-mode:multiply"/>
+      <path d="${SH}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1.2" transform="translate(50 62) scale(.84) translate(-50 -62)"/>
+      <g transform="translate(50 ${cy + dy}) scale(1.28)" filter="url(#${id}f)">${charge}</g>
+      <path d="${SH}" fill="url(#${id}s)"/>
+    </g>
+    <path d="${SH}" fill="none" stroke="url(#${id}r)" stroke-width="6.2" stroke-linejoin="round"/>
+    <path d="${SH}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width=".8" transform="translate(50 62) scale(.945) translate(-50 -62)"/>
+    <path d="${SH}" fill="none" stroke="url(#${id}g)" stroke-width="1.3" transform="translate(50 62) scale(.915) translate(-50 -62)"/>
+    <circle cx="19" cy="17" r="2.2" fill="url(#${id}r)" stroke="rgba(0,0,0,.6)" stroke-width=".5"/><circle cx="81" cy="17" r="2.2" fill="url(#${id}r)" stroke="rgba(0,0,0,.6)" stroke-width=".5"/>
+  </g></svg>`;
+}
+
+const crestEl = document.getElementById('crest');
+const housesEl = document.getElementById('houses');
+const hname = document.getElementById('hname');
+let current = Q.get('house') || 'kaldran';
+const btns = Object.keys(HOUSES).map((s) => {
+  const b = document.createElement('button');
+  b.innerHTML = `<div style="width:38px">${heraldic(s)}</div>`;
+  b.title = HOUSES[s].name;
+  b.onmouseenter = b.onclick = () => show(s);
+  housesEl.append(b);
+  return [s, b];
+});
+function show(s) {
+  current = s;
+  crestEl.innerHTML = heraldic(s);
+  hname.textContent = `HOUSE ${HOUSES[s].name.toUpperCase()}`;
+  btns.forEach(([k, b]) => b.classList.toggle('on', k === s));
+}
+show(current);
+
+document.querySelectorAll('#menu button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('#menu button').forEach((x) => x.classList.toggle('on', x === b));
+  if (b.dataset.t) document.querySelector('.go').textContent = b.dataset.t === 'up' ? 'Create account' : 'Sign in';
+}));
+
+const grain = document.getElementById('grain');
+const gx = grain.getContext('2d');
+const gimg = gx.createImageData(grain.width, grain.height);
+setInterval(() => { for (let i = 0; i < gimg.data.length; i += 4) { const v = 90 + Math.random() * 120; gimg.data[i] = gimg.data[i + 1] = gimg.data[i + 2] = v; gimg.data[i + 3] = 255; } gx.putImageData(gimg, 0, 0); }, 90);
+
+async function build() {
+  const presets = ['highlands', 'river_valley', 'continental'];
+  let layout = null;
+  let seed = Number(Q.get('seed')) || Math.floor(Math.random() * 2 ** 30);
+  for (let tries = 0; tries < 12 && !layout; tries++, seed += 7919) {
+    try {
+      layout = generateWorld({ seed, players: 3, mapSize: 'compact', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: 2.6, freeTravel: false, shape: 'continent', richness: 'standard', randomRoads: 'none', starScatter: 'random', mirrored: false, trails: true, preset: Q.get('preset') || presets[seed % 3], homeDistance: 'medium' });
+    } catch { layout = null; }
+  }
+  if (!layout) throw new Error('no map');
+  const seats = ['kaldran', 'veyra', 'thornwick'];
+  const sites = layout.territories.map((t, i) => ({ id: i, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false }));
+  const edges = layout.edges.map((e) => ({ a: e.a, b: e.b, kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path }));
+  let path = null;
+  const sun = { el: Number(Q.get('sun') ?? 7), az: Number(Q.get('az') ?? 248) };
+  const FOV = Number(Q.get('fov') || 48);
+  const speed = Number(Q.get('speed') || 95);
+  const ALT = Number(Q.get('alt') || 380);
+  const PITCH = (Number(Q.get('pitch') || 14) * Math.PI) / 180;
+  const START = Number(Q.get('start') || 0);
+  let api = null;
+  let ready = false;
+  let camY = 0;
+  const THREE = await import('three');
+  const lower = document.getElementById('lower');
+  let lastLabel = '';
+  const hud = document.getElementById('hud');
+  api = await createMap3D(document.getElementById('stage'), {
+    map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: false,
+    colors: (pid) => { const H = HOUSES[seats[pid]]; return [H.c1, H.c2]; },
+    sun, horizon: Number(Q.get('hz') ? parseInt(Q.get('hz'), 16) : 0xe9b48a), fogMul: Number(Q.get('fog') || 3.2), exposure: Number(Q.get('exp') || 1.05),
+    onProgress: (m) => { document.getElementById('loadmsg').textContent = m.toUpperCase(); },
+    onFrame: (t, dt, cam, controls) => {
+      if (!ready) return;
+      if (!path) return;
+      controls.enabled = false; controls.maxPolarAngle = Math.PI * 0.62; controls.minDistance = 1;
+      if (Math.abs(cam.fov - FOV) > 0.01) { cam.fov = FOV; cam.updateProjectionMatrix(); }
+      const u = ((t * speed + START * path.len) / path.len) % 1;
+      const p = path.curve.getPointAt(u);
+      const q = path.curve.getPointAt((u + 0.018) % 1);
+      const dx = q.x - p.x, dz = q.z - p.z, dl = Math.hypot(dx, dz) || 1;
+      const sx = -dz / dl, sz = dx / dl;
+      const off = 340 + 110 * Math.sin(t * 0.07);
+      const px = p.x + sx * off, pz = p.z + sz * off;
+      const q2 = path.curve.getPointAt((u + 0.06) % 1);
+      const lx = q2.x + sx * off * 0.3, lz = q2.z + sz * off * 0.3;
+      const ground = Math.max(api.groundAt(px, pz), api.groundAt((px + lx) / 2, (pz + lz) / 2), api.groundAt(lx, lz) - 40);
+      const want = ground + ALT + 90 * Math.sin(t * 0.11);
+      camY += (want - camY) * Math.min(1, dt * 1.6);
+      const ly = camY - Math.hypot(lx - px, lz - pz) * Math.tan(PITCH);
+      cam.position.set(px, camY, pz);
+      cam.up.set(0, 1, 0);
+      cam.lookAt(lx, ly, lz);
+      cam.rotateZ(-0.05 * Math.sin(t * 0.13));
+      controls.target.set(lx, Math.max(api.groundAt(lx, lz), 20), lz);
+      hud.textContent = `seed ${seed} · sun ${sun.el}° · fov ${FOV} · speed ${speed}`;
+      let near = null; let nd = 1e9;
+      for (const s of path.sites) { const d = Math.hypot(s.x - px, s.z - pz); if (d < nd) { nd = d; near = s; } }
+      if (near && nd < 1500 && near.name !== lastLabel) {
+        lastLabel = near.name;
+        const owner = sites[near.id].owner;
+        lower.innerHTML = `${owner != null ? 'LANDS OF HOUSE ' + HOUSES[seats[owner]].name.toUpperCase() : 'FREE HOLDING'}<b>${near.name.toUpperCase()}</b>`;
+        lower.classList.add('on');
+      } else if (nd >= 1800 && lastLabel) { lastLabel = ''; lower.classList.remove('on'); }
+    },
+  });
+  api.update(layout.territories.map((t, i) => ({ id: i, owner: t.owner_seat, troops: t.owner_seat != null ? 10 + (i % 7) * 3 : 12, mine: false })));
+  const all = api.sites().filter((s) => !sites[s.id].crossing_kind);
+  const pickPts = [];
+  let cur = all[Math.floor(all.length * 0.37)];
+  const left = new Set(all);
+  const want = Math.min(11, all.length);
+  while (pickPts.length < want && left.size) {
+    pickPts.push(cur);
+    left.delete(cur);
+    let best = null; let bd = 1e9;
+    for (const s of left) { const d = Math.hypot(s.x - cur.x, s.z - cur.z); if (d < bd) { bd = d; best = s; } }
+    if (!best) break;
+    cur = best;
+  }
+  const curve = new THREE.CatmullRomCurve3(pickPts.map((s) => new THREE.Vector3(s.x, 0, s.z)), true, 'centripetal');
+  path = { curve, len: curve.getLength(), sites: all };
+  camY = api.groundAt(pickPts[0].x, pickPts[0].z) + 300;
+  ready = true;
+  document.getElementById('loading').classList.add('done');
+}
+build().catch((e) => { document.getElementById('loadmsg').textContent = 'COULD NOT START: ' + e.message; console.error(e); });
+</script>
+</body>
+</html>

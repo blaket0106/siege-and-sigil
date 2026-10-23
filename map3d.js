@@ -112,16 +112,16 @@ const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, power
 renderer.setPixelRatio(Math.min(devicePixelRatio, LO ? 1 : 1.5));
 renderer.setSize(host.clientWidth, host.clientHeight);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .95;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = spec.exposure != null ? spec.exposure : .95;
 wrap.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const HORIZON = new THREE.Color(0xb4cfdc);
+const HORIZON = new THREE.Color(spec.horizon != null ? spec.horizon : 0xb4cfdc);
 scene.fog = new THREE.FogExp2(HORIZON, 0.000068);
 const cam = new THREE.PerspectiveCamera(36, host.clientWidth / host.clientHeight, 40, 120000);
 const uTime = { value: 0 };
 
 { const hz = new THREE.Mesh(new THREE.CylinderGeometry(52000, 52000, 4200, 48, 1, true), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.BackSide, vertexShader: 'varying float vY; void main(){ vY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }', fragmentShader: 'varying float vY; void main(){ float tt = (vY + 2100.) / 4200.; gl_FragColor = vec4(vec3(.71, .81, .86), (1. - smoothstep(0., .5, tt)) * .95); }' })); hz.position.set(W / 2, 1600, W / 2); hz.renderOrder = -2; scene.add(hz); }
-const sunDir = new THREE.Vector3(); { const el = THREE.MathUtils.degToRad(24), az = THREE.MathUtils.degToRad(235); sunDir.setFromSphericalCoords(1, Math.PI / 2 - el, az); }
+const sunDir = new THREE.Vector3(); { const el = THREE.MathUtils.degToRad(spec.sun && spec.sun.el != null ? spec.sun.el : 24), az = THREE.MathUtils.degToRad(spec.sun && spec.sun.az != null ? spec.sun.az : 235); sunDir.setFromSphericalCoords(1, Math.PI / 2 - el, az); }
 const sky = new Sky(); sky.scale.setScalar(80000);
 { const c = document.createElement('canvas'); c.width = 4; c.height = 512; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, '#2f5f98'); gr.addColorStop(.45, '#6f9cc6'); gr.addColorStop(.58, '#a9c8dc'); gr.addColorStop(.7, '#b4cfdc'); gr.addColorStop(1, '#b4cfdc'); g.fillStyle = gr; g.fillRect(0, 0, 4, 512); const bt = new THREE.CanvasTexture(c); bt.colorSpace = THREE.SRGBColorSpace; scene.background = bt; }
 Object.assign(sky.material.uniforms, { turbidity: { value: 1.6 }, rayleigh: { value: 3.2 }, mieCoefficient: { value: .003 }, mieDirectionalG: { value: .82 } }); sky.material.uniforms.sunPosition.value.copy(sunDir);
@@ -741,6 +741,7 @@ function frame() {
   if (!running) return; requestAnimationFrame(frame); const dt = clock.getDelta(), t = clock.elapsedTime; uTime.value = t; lakeN.offset.set(t * .012, t * .008); flowTex.offset.y = -t * .35;
   if (tween) { tween.t = Math.min(1, tween.t + .035); const k = tween.t * tween.t * (3 - 2 * tween.t), p = tween.from + (tween.to - tween.from) * k; setView(Math.max(.0001, p), tween.d); if (tween.t >= 1) { if (tween.lock) { controls.minPolarAngle = controls.maxPolarAngle = .0001; } tween = null; } }
   controls.update();
+  if (spec.onFrame) spec.onFrame(t, dt, cam, controls);
   (scene.userData.ships || []).forEach((s) => { const nx = s.b.position.x + Math.sin(s.a) * s.sp, nz = s.b.position.z + Math.cos(s.a) * s.sp; if (H(nx, nz) < SEA * .75) { s.b.position.x = nx; s.b.position.z = nz; } else s.a += 1.2 + Math.random(); s.b.rotation.y = s.a - Math.PI / 2; s.b.position.y = 1.2 + Math.sin(t * 1.6 + s.a * 5) * 1.1; s.b.rotation.z = Math.sin(t * 1.3 + s.a) * .04; });
   const tg = controls.target; { const mv = tg.distanceTo(lastShadowT); if (mv > 90 || frameNo < 3) { renderer.shadowMap.needsUpdate = true; lastShadowT.copy(tg); } frameNo++; }
   sun.position.set(tg.x + sunDir.x * 6000, tg.y + sunDir.y * 6000, tg.z + sunDir.z * 6000); sun.target.position.copy(tg);
@@ -753,7 +754,7 @@ function frame() {
   { const dd1 = cam.position.distanceTo(controls.target), op = Math.min(.9, Math.max(0, (dd1 - 5000) / 3500)); stratMat.opacity = op; STRAT.forEach((m) => { m.visible = op > .01; }); }
   { const dd0 = cam.position.distanceTo(controls.target), gx = controls.target.x, gz = controls.target.z, cs = W / 8, lim = 3000 + dd0 * .5; CHUNKS.forEach((im) => { const c = im.boundingSphere && im.boundingSphere.center; if (!c) return; const d = Math.hypot(c.x - gx, c.z - gz); im.visible = im.userData.tree ? (im.userData.far ? (dd0 >= 8500 || d > lim - cs * .6) : (dd0 < 8500 && d < lim + cs)) : d < 4200 + cs; }); }
   if (scene.userData.clouds) scene.userData.clouds.visible = cam.position.y < 3400;
-  { const dd0 = cam.position.distanceTo(controls.target); scene.fog.density = .000068 * Math.pow(Math.min(1, 3600 / dd0), 2.2); }
+  { const dd0 = cam.position.distanceTo(controls.target); scene.fog.density = .000068 * (spec.fogMul || 1) * (spec.fogMul ? 1 : Math.pow(Math.min(1, 3600 / dd0), 2.2)); }
   const flat = controls.getPolarAngle() < .35, dist = cam.position.distanceTo(controls.target), far = dist > 5200;
   const pl = (el, p) => { v.copy(p).project(cam); if (v.z > 1) { el.style.display = 'none'; return; } el.style.display = ''; el.style.transform = `translate(${(v.x * .5 + .5) * host.clientWidth}px,${(-v.y * .5 + .5) * host.clientHeight}px) translate(-10px,-100%)`; };
   { const boxes = [], hit = (b) => boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]); const big = far || flat;
@@ -782,6 +783,9 @@ const api = {
   select(id) { const i = id == null ? -1 : siteIdx.get(id); if (i === undefined || i < 0) { sel = -1; ring.visible = false; castles.forEach((c) => c.el.classList.remove('sel')); } else selectRing(i); },
   focus(id, dist = 900) { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i]; controls.target.set(c.s.x, c.s.gy + 50, c.s.y); setView(.9, dist); },
   resize: doResize,
+  groundAt: (x, z) => hAt(x, z),
+  scene,
+  sites: () => sites.map((q) => ({ id: q.id, x: q.x, z: q.y, y: q.gy, tier: q.tier, name: q.name })),
   dispose() { running = false; ro.disconnect(); renderer.dispose(); try { renderer.forceContextLoss(); } catch {} host.innerHTML = ''; host.classList.remove('map3d'); },
 };
 scene.traverse((o) => { if (o.isInstancedMesh) o.layers.set(1); }); cam.layers.enable(1);
