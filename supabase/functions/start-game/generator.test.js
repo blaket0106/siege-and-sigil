@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateWorld, assignSeats, SPACING } from './generator.js';
+import { generateWorld, assignSeats, SPACING, SHAPES } from './generator.js';
 
 const SIZES = { compact: 12, standard: 24, large: 36 };
 const SEEDS = [1, 42, 987654321, 9007199254740991];
@@ -285,4 +285,34 @@ test('scaled spacing: castles are three times further apart', () => {
   const three = generateWorld({ ...c, scale: 3 });
   const closest = (layout) => Math.min(...layout.territories.flatMap((a, i) => layout.territories.slice(i + 1).map((b) => Math.hypot(a.x - b.x, a.y - b.y))));
   assert.ok(near(closest(three), closest(one) * 3, 1), `${closest(three)} vs ${closest(one) * 3}`);
+});
+
+test('every map shape generates a connected, fair, land-bound world', () => {
+  for (const shape of SHAPES) {
+    for (const [players, seed, mapSize] of [[2, 3, 'compact'], [4, 11, 'standard'], [5, 42, 'standard'], [8, 7, 'compact']]) {
+      const c = { shape, players, seed, mapSize, style: 'scatter', startingTerritories: 4, startingGarrison: 10 };
+      const lab = `${shape}/${players}p/${mapSize}/seed ${seed}`;
+      const road = generateWorld(c);
+      assert.equal(road.territories.length, players * SIZES[mapSize], lab);
+      assert.ok(isConnected(road), lab);
+      const profile = (seat) => road.territories.filter((x) => x.owner_seat === seat).map((x) => `${x.tier}:${x.natural_resources}`).sort().join();
+      for (let s = 1; s < players; s++) assert.equal(profile(s), profile(0), lab);
+      for (const x of road.territories) {
+        assert.ok(heightAt(road.art, road, x.x, x.y) >= road.art.sea, `${lab} ${x.name} at sea`);
+        if (x.owner_seat !== null) assert.notEqual(x.terrain, 'mountain', lab);
+      }
+      const free = generateWorld({ ...c, scale: 3, freeTravel: true });
+      assert.ok(isConnected(free), `${lab} free links`);
+    }
+  }
+});
+
+test('shapes differ: ring has a central sea, archipelago is mostly sea', () => {
+  const base = { players: 4, seed: 5, mapSize: 'standard', style: 'scatter', startingTerritories: 4, startingGarrison: 10 };
+  const ring = generateWorld({ ...base, shape: 'ring' });
+  const mid = ring.map_w / 2;
+  assert.ok(heightAt(ring.art, ring, mid, mid) < ring.art.sea);
+  const round = generateWorld({ ...base, shape: 'round' });
+  assert.ok(heightAt(round.art, round, round.map_w / 2, round.map_w / 2) >= round.art.sea);
+  assert.throws(() => generateWorld({ ...base, shape: 'cube' }));
 });

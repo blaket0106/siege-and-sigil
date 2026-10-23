@@ -64,10 +64,10 @@ function round4(value) {
   return Math.round(value * 1e4) / 1e4;
 }
 
-function placeWedge({ rng, players, start, radius, wedge, minDist }) {
+function placeWedge({ rng, players, start, radius, wedge, minDist, rMin = 0, capRange = [0.5, 0.65] }) {
   const placed = [];
   const locals = [];
-  const innerMin = minDist / (2 * Math.sin(Math.PI / players));
+  const innerMin = Math.max(rMin, minDist / (2 * Math.sin(Math.PI / players)));
   const minSq = minDist * minDist;
 
   const fits = (p) => {
@@ -87,7 +87,7 @@ function placeWedge({ rng, players, start, radius, wedge, minDist }) {
     locals.push(p);
   };
 
-  const capR = radius * (0.5 + rng() * 0.15);
+  const capR = radius * (capRange[0] + rng() * (capRange[1] - capRange[0]));
   const capT = wedge * (0.4 + rng() * 0.2);
   const capital = { x: capR * Math.cos(capT), y: capR * Math.sin(capT) };
   if (!fits(capital)) return null;
@@ -201,7 +201,107 @@ export function assignSeats(seed, playerIds) {
   return seats;
 }
 
-function placeNeutrals({ rng, count, radius, center, minDist, clump, taken }) {
+
+export const SHAPES = ['continent', 'round', 'ring', 'twin', 'archipelago', 'rift'];
+const AREA_FRAC = { continent: 1, round: 1, ring: 0.78, twin: 0.5, archipelago: 0.42, rift: 0.8 };
+const CROSS_CAP = { twin: 2, archipelago: 2, rift: 3 };
+const RING_INNER = 0.46;
+
+const smooth = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+function makeShape(kind, R, rng, players) {
+  const phi = rng() * 2 * Math.PI;
+  const rot = (p) => ({ x: p.x * Math.cos(-phi) - p.y * Math.sin(-phi), y: p.x * Math.sin(-phi) + p.y * Math.cos(-phi) });
+  const dist = (p) => Math.hypot(p.x, p.y);
+  const disc = (p, c, r) => Math.hypot(p.x - c.x, p.y - c.y) <= r;
+  const discLand = (p, c, r) => 1 - smooth(0.88 * r, 1.1 * r, Math.hypot(p.x - c.x, p.y - c.y));
+  const out = { kind, symmetric: kind === 'continent' || kind === 'round' || kind === 'ring', label: () => 0, crossCap: CROSS_CAP[kind] || 0 };
+
+  if (kind === 'continent' || kind === 'round') {
+    out.rMin = 0;
+    out.capRange = [0.5, 0.65];
+    out.inside = (p) => dist(p) <= 0.97 * R;
+    out.land = (p) => 1 - smooth(0.88 * R, 1.08 * R, dist(p));
+  } else if (kind === 'ring') {
+    out.rMin = RING_INNER * R * 1.12;
+    out.capRange = [0.66, 0.86];
+    out.inside = (p) => dist(p) <= 0.97 * R && dist(p) >= RING_INNER * R * 1.12;
+    out.land = (p) => Math.min(1 - smooth(0.88 * R, 1.08 * R, dist(p)), smooth(RING_INNER * R * 0.85, RING_INNER * R * 1.08, dist(p)));
+  } else if (kind === 'twin') {
+    const c = [{ x: -0.52 * R, y: 0 }, { x: 0.52 * R, y: 0 }];
+    const rr = 0.5 * R;
+    out.inside = (p) => { const q = rot(p); return c.some((m) => disc(q, m, rr * 0.95)); };
+    out.land = (p) => { const q = rot(p); return Math.max(...c.map((m) => discLand(q, m, rr))); };
+    out.label = (p) => (rot(p).x < 0 ? 0 : 1);
+    out.homeLabel = (k) => k % 2;
+  } else if (kind === 'archipelago') {
+    const n = players <= 4 ? 5 : players <= 6 ? 7 : 9;
+    const islands = [];
+    for (let tries = 0; islands.length < n && tries < 4000; tries++) {
+      const r = R * (0.17 + 0.1 * rng());
+      const a = 2 * Math.PI * rng();
+      const d = (0.78 * R - r) * Math.sqrt(rng());
+      const c = { x: d * Math.cos(a), y: d * Math.sin(a), r };
+      if (islands.every((o) => Math.hypot(o.x - c.x, o.y - c.y) > (o.r + c.r) * 1.2)) islands.push(c);
+    }
+    out.islands = islands;
+    out.inside = (p) => islands.some((m) => disc(p, m, m.r * 0.95));
+    out.land = (p) => Math.max(...islands.map((m) => discLand(p, m, m.r)));
+    out.label = (p) => {
+      let best = 0;
+      let bd = Infinity;
+      islands.forEach((m, i) => { const d = Math.hypot(p.x - m.x, p.y - m.y) / m.r; if (d < bd) { bd = d; best = i; } });
+      return best;
+    };
+  } else {
+    const amp = 0.14 * R;
+    const k = (2 * Math.PI * (1 + Math.floor(rng() * 2))) / (2 * R);
+    const ph = rng() * 2 * Math.PI;
+    const hw = 0.09 * R;
+    const off = (p) => { const q = rot(p); return q.y - amp * Math.sin(k * q.x + ph); };
+    out.inside = (p) => dist(p) <= 0.97 * R && Math.abs(off(p)) >= hw * 1.5;
+    out.land = (p) => Math.min(1 - smooth(0.88 * R, 1.08 * R, dist(p)), smooth(hw * 0.7, hw * 1.3, Math.abs(off(p))));
+    out.label = (p) => (off(p) < 0 ? 0 : 1);
+    out.homeLabel = (k2) => k2 % 2;
+  }
+  return out;
+}
+
+function placeClusters({ rng, players, start, shape, minDist, R }) {
+  const base = [{ x: 0, y: 0 }];
+  for (let j = 1; j < start; j++) {
+    const a = (2 * Math.PI * (j - 1)) / Math.max(1, start - 1) + 0.4;
+    base.push({ x: minDist * 1.15 * Math.cos(a), y: minDist * 1.15 * Math.sin(a) });
+  }
+  const homes = [];
+  const centers = [];
+  for (let k = 0; k < players; k++) {
+    let best = null;
+    let bestScore = -1;
+    for (let t = 0; t < 400; t++) {
+      const a = 2 * Math.PI * rng();
+      const d = R * 0.97 * Math.sqrt(rng());
+      const c = { x: d * Math.cos(a), y: d * Math.sin(a) };
+      if (!shape.inside(c)) continue;
+      if (shape.homeLabel && shape.label(c) !== shape.homeLabel(k)) continue;
+      const ang = 2 * Math.PI * rng();
+      const pts = base.map((b) => ({ x: c.x + b.x * Math.cos(ang) - b.y * Math.sin(ang), y: c.y + b.x * Math.sin(ang) + b.y * Math.cos(ang) }));
+      if (!pts.every((q) => shape.inside(q))) continue;
+      if (pts.some((q) => homes.some((h) => Math.hypot(h.x - q.x, h.y - q.y) < minDist))) continue;
+      const score = centers.length ? Math.min(...centers.map((o) => Math.hypot(o.x - c.x, o.y - c.y))) : 1;
+      if (score > bestScore) { bestScore = score; best = pts; }
+    }
+    if (!best) return null;
+    centers.push(best[0]);
+    homes.push(...best);
+  }
+  return homes;
+}
+
+function placeNeutrals({ rng, count, radius, center, minDist, clump, taken, inside }) {
   const blobs = Array.from({ length: 3 + Math.floor(count / 10) }, () => {
     const r = radius * 0.9 * Math.sqrt(rng());
     const a = 2 * Math.PI * rng();
@@ -217,12 +317,13 @@ function placeNeutrals({ rng, count, radius, center, minDist, clump, taken }) {
   const all = taken.map((p) => ({ x: p.x - center, y: p.y - center }));
   for (let i = 0; i < count; i++) {
     let p = null;
-    for (let t = 0; t < 800 && !p; t++) {
+    for (let t = 0; t < 2400 && !p; t++) {
       const r = radius * 0.97 * Math.sqrt(rng());
       const a = 2 * Math.PI * rng();
       const c = { x: r * Math.cos(a), y: r * Math.sin(a) };
+      if (!inside(c)) continue;
       if (rng() > density(c)) continue;
-      const md = minDist * (t > 400 ? 0.8 : 1);
+      const md = minDist * (t > 1200 ? 0.8 : 1);
       if (all.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md * md)) p = c;
     }
     if (!p) return null;
@@ -250,10 +351,11 @@ function neutralResources(rng, count) {
   return values;
 }
 
-export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false }) {
+export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false, shape: shapeKind = 'continent' }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
   if (!perPlayer) throw new Error(`unknown map size: ${mapSize}`);
+  if (!SHAPES.includes(shapeKind)) throw new Error(`unknown map shape: ${shapeKind}`);
   if (!styleConfig) throw new Error(`unknown map style: ${style}`);
   if (!Number.isInteger(players) || players < 2 || players > 8) throw new Error(`players must be 2 to 8, got ${players}`);
   if (!Number.isInteger(startingTerritories) || startingTerritories < 1 || startingTerritories > START_RESOURCES.length || perPlayer - startingTerritories < 2) {
@@ -264,28 +366,42 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   const total = players * perPlayer;
   const startTotal = players * startingTerritories;
   const neutralTotal = total - startTotal;
-  const radius = spacing * Math.sqrt(total / Math.PI);
+  const radius = spacing * Math.sqrt(total / (Math.PI * AREA_FRAC[shapeKind]));
   const center = radius + MARGIN * scale;
   const wedge = (2 * Math.PI) / players;
   const rng = makeRng(seed, 1);
   const phase = rng() * 2 * Math.PI;
 
+  const shape = makeShape(shapeKind, radius, makeRng(seed, 5), players);
+  const shapeAbs = {
+    inside: (p) => shape.inside(p),
+    land: (x, y) => shape.land({ x: x - center, y: y - center }),
+  };
+
   let locals = null;
   let neutrals = null;
   for (let attempt = 0; attempt < 40 && !neutrals; attempt++) {
     const minDist = spacing * styleConfig.minDist * 0.96 ** attempt;
-    locals = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: Math.max(minDist, spacing * 0.7) });
-    if (!locals) continue;
-    const homes = [];
-    for (let k = 0; k < players; k++) {
-      for (const l of locals) {
-        const q = rotate(l, phase + k * wedge);
-        homes.push({ x: center + q.x, y: center + q.y });
+    const homeDist = Math.max(minDist, spacing * 0.7);
+    let homes = [];
+    if (shape.symmetric) {
+      const local = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, rMin: shape.rMin, capRange: shape.capRange });
+      if (!local) continue;
+      for (let k = 0; k < players; k++) {
+        for (const l of local) {
+          const q = rotate(l, phase + k * wedge);
+          homes.push({ x: q.x, y: q.y });
+        }
       }
+    } else {
+      homes = placeClusters({ rng, players, start: startingTerritories, shape, minDist: homeDist, R: radius });
+      if (!homes) continue;
     }
-    neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center, minDist, clump: styleConfig.clump, taken: homes });
-    if (neutrals) neutrals = neutrals.map((p) => ({ x: center + p.x, y: center + p.y }));
-    if (neutrals) locals = homes;
+    neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center: 0, minDist, clump: styleConfig.clump, taken: homes, inside: (p) => shape.inside(p) });
+    if (neutrals) {
+      locals = homes.map((p) => ({ x: center + p.x, y: center + p.y }));
+      neutrals = neutrals.map((p) => ({ x: center + p.x, y: center + p.y }));
+    }
   }
   if (!neutrals) throw new Error('could not place territories for these settings');
 
@@ -326,6 +442,25 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     const length = lengthOf(a, b);
     if (length > styleConfig.prune * spacing) removed.push({ a, b, length });
     else kept.set(keyOf(a, b), [Math.min(a, b), Math.max(a, b)]);
+  }
+
+  if (shape.crossCap) {
+    const labelOf = points.map((p) => shape.label({ x: p.x - center, y: p.y - center }));
+    const crossing = [...kept.values()].filter(([a, b]) => labelOf[a] !== labelOf[b]).sort((x, y) => lengthOf(x[0], x[1]) - lengthOf(y[0], y[1]) || x[0] - y[0] || x[1] - y[1]);
+    const taken = new Map();
+    for (const [a, b] of crossing) {
+      const pair = labelOf[a] < labelOf[b] ? `${labelOf[a]}-${labelOf[b]}` : `${labelOf[b]}-${labelOf[a]}`;
+      const picked = taken.get(pair) || [];
+      const mid = { x: (points[a].x + points[b].x) / 2, y: (points[a].y + points[b].y) / 2 };
+      const ok = picked.length < shape.crossCap && picked.every((m) => Math.hypot(m.x - mid.x, m.y - mid.y) > spacing * 1.5);
+      if (ok) {
+        picked.push(mid);
+        taken.set(pair, picked);
+      } else {
+        kept.delete(keyOf(a, b));
+        removed.push({ a, b, length: lengthOf(a, b) });
+      }
+    }
   }
 
   const parent = Array.from({ length: total }, (_, i) => i);
@@ -375,6 +510,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       owned: territories.map((t) => t.owner_seat !== null),
       seatOf: territories.map((t) => (t.owner_seat === null ? -1 : t.owner_seat)),
       players,
+      shapeLand: shapeKind === 'continent' ? null : shapeAbs.land,
     });
     territories.forEach((t, g) => {
       t.terrain = world.terrain[g];

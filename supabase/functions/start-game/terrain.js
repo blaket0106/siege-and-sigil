@@ -205,7 +205,8 @@ export function buildTerrain(o) {
       const cont = fbm(noiseE, x / (spacing * 3.4), y / (spacing * 3.4), 5);
       const rad = Math.hypot(x - mapW / 2, y - mapW / 2) / (mapW / 2);
       const cm = cont + 0.55 * Math.min(0, 0.85 - rad);
-      const p = Math.max(near[i], 0.92 * corr[i], Math.min(1, Math.max(0, (cm - 0.43) * 2.2 + 0.4)));
+      const base = o.shapeLand ? o.shapeLand(x, y) : Math.min(1, Math.max(0, (cm - 0.43) * 2.2 + 0.4));
+      const p = Math.max(near[i], 0.92 * corr[i], base);
       const fade = smoothstep(0, fadeLen, Math.min(x, y, mapW - x, mapW - y));
       const n1 = fbm(noiseA, x / (spacing * 1.6), y / (spacing * 1.6), 4);
       score[i] = (p + 0.42 * (n1 - 0.5)) * (0.3 + 0.7 * fade);
