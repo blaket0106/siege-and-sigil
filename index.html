@@ -564,7 +564,7 @@
       ['Time', 'The game advances in ticks. Orders you give take effect as ticks pass; the countdown shows the next tick. Turn-based games advance when everyone ends their turn or the deadline passes.'],
       ['Castles', 'Click a castle to see its troops and upgrades. Build Treasury for gold, Recruitment for troops and Prestige for research. Natural resources set the tier (1 to 20 is Tier 1, 21 to 40 Tier 2, 41 to 60 Tier 3) and make upgrades cheaper; the halo around a castle shows how rich it is. Build a road at two castles to march between them faster.'],
       ['Commanders', 'Commanders lead troops. Hire more, spend gold on their abilities and move troops between a commander and a castle. A commander left in a castle garrisons it.'],
-      ['Marching', 'Select a commander and choose March, then click a destination. In free-travel games you can march straight to any castle within your range (Stables extends it); the ground between decides the time: forest, hills and high ground slow a march, fords and passes slow it more; the sea, rivers and mountain ranges block a direct march, so cross at a ford (bridge icon) or a mountain pass and chain stops with a multi-stop route. Otherwise armies follow roads through friendly castles.'],
+      ['Marching', 'Select a commander and choose March, then click a destination. In castle-trail games armies walk the trails between castles, never across country. Castles within range glow; a castle that is not yours or an ally\'s stops a march and a battle is fought there, so rivers and mountain ranges can be crossed only through a river castle or a pass you hold. Add stops to build a route: at each castle you own you can collect, drop or garrison troops, wait some ticks, and loop the route to keep supplies flowing. In free-travel games you can march straight to any castle within your range (Stables extends it); the ground between decides the time: forest, hills and high ground slow a march, fords and passes slow it more; the sea, rivers and mountain ranges block a direct march, so cross at a ford (bridge icon) or a mountain pass and chain stops with a multi-stop route. Otherwise armies follow roads through friendly castles.'],
       ['Combat', 'Armies that meet in the field fight, and an army arriving at an enemy castle lays siege. A besieged castle can sally out or be relieved by a friendly army. Battle reports are in the Battles list. A defeated commander may be captured instead of killed: the captor can ransom, release or execute them, and captives sometimes escape. A commander who wins five battles earns a name and a bonus; losing a king or a named commander costs prestige and lowers production for a while.'],
       ['Fog of war', 'In fog games you only see what your castles and armies can scan. A "?" means information you cannot currently see. In dark games the map itself is black until your castles or armies scan it; explored ground stays visible but only updates live inside your scan range.'],
       ['Diplomacy', 'From the Standings list you can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war. Peace is a truce that blocks attacks for a set number of ticks; at war you can also send peace terms (gold, tribute or a castle). Allies can lock a marriage alliance that cannot be broken until it ends. A third player can offer mediation between two players at war. Breaking a pact or alliance, or attacking during a grace period, costs honor.'],
@@ -2248,16 +2248,16 @@
             const pts = (e.path || [[A.x, A.y], [B.x, B.y]]).map((q) => `${q[0]},${q[1]}`).join(' ');
             const road = A.has_road && B.has_road;
             const o = ms.vis.has(A.id) || ms.vis.has(B.id) ? 1 : 0.3;
-            const base = { points: pts, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', style: 'pointer-events:none' };
+            const base = { points: pts, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' };
             if (e.kind === 'wormhole') {
               return [
-                sv('polyline', { ...base, stroke: '#7a4ad8', 'stroke-width': 8 * M(), 'stroke-opacity': 0.18 * o }),
-                sv('polyline', { ...base, stroke: '#c9a8ff', 'stroke-width': 2.4 * M(), 'stroke-opacity': 0.95 * o, 'stroke-dasharray': `${1 * M()} ${6 * M()}` }),
+                sv('polyline', { ...base, stroke: '#7a4ad8', 'stroke-width': 9, 'stroke-opacity': 0.2 * o }),
+                sv('polyline', { ...base, stroke: '#c9a8ff', 'stroke-width': 2.6, 'stroke-opacity': 0.95 * o, 'stroke-dasharray': '1 6' }),
               ];
             }
             return [
-              sv('polyline', { ...base, stroke: '#2a1d0e', 'stroke-width': (road ? 5.4 : 4.2) * M(), 'stroke-opacity': 0.45 * o }),
-              sv('polyline', { ...base, stroke: road ? '#e0b64a' : e.kind === 'pass' ? '#cdb897' : '#e6d6a4', 'stroke-width': (road ? 3 : 2.1) * M(), 'stroke-opacity': 0.9 * o, 'stroke-dasharray': !road && e.kind === 'pass' ? `${3 * M()} ${4 * M()}` : null }),
+              sv('polyline', { ...base, stroke: '#2a1d0e', 'stroke-width': road ? 7 : 5.5, 'stroke-opacity': 0.5 * o }),
+              sv('polyline', { ...base, stroke: road ? '#e0b64a' : e.kind === 'pass' ? '#cdb897' : '#e6d6a4', 'stroke-width': road ? 4 : 2.8, 'stroke-opacity': 0.95 * o, 'stroke-dasharray': !road && e.kind === 'pass' ? '4 4' : null }),
             ];
           }));
         }
@@ -2271,7 +2271,7 @@
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
           const pos = c && cmdPos(c, tf);
           const stables = (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
-          if (pos && trailsOn() && ms.reachable) ms.reachable.forEach((id) => { const q = ms.t.get(id); pv.push(sv('circle', { cx: q.x, cy: q.y, r: 24 * M(), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${3 * M()} ${5 * M()}`, style: 'pointer-events:none' })); });
+          if (pos && trailsOn() && ms.reachable) ms.reachable.forEach((id) => { const q = ms.t.get(id); pv.push(sv('circle', { cx: q.x, cy: q.y, r: 75 * M(), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2.5, 'vector-effect': 'non-scaling-stroke', 'stroke-dasharray': '4 6', style: 'pointer-events:none' })); });
           if (pos && !trailsOn()) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: rangeOf(stables), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${2 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
         }
         if (ms.marching && ms.stops.length && ms.sel && ms.sel.type === 'c') {
@@ -2279,11 +2279,11 @@
           const pos = c && cmdPos(c, tf);
           if (pos) {
             const pts = trailsOn() && c.current_territory_id ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [pos, ...ms.stops.map((st) => ms.t.get(st.id))];
-            pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3 * M(), 'stroke-dasharray': `${8 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
+            pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', 'stroke-dasharray': '9 6', style: 'pointer-events:none' }));
             ms.stops.forEach((st, i) => {
               const q = ms.t.get(st.id);
-              pv.push(sv('circle', { cx: q.x, cy: q.y, r: 17 * M(), fill: '#3a2f12', stroke: '#f0cf7d', 'stroke-width': 2.5 * M(), style: 'pointer-events:none' }));
-              pv.push(sv('text', { x: q.x, y: q.y + 5 * M(), 'text-anchor': 'middle', 'font-size': 15 * M(), style: 'fill:#f0cf7d;font-weight:bold' }, String(i + 1)));
+              pv.push(sv('circle', { cx: q.x, cy: q.y - 90 * M(), r: 40 * M(), fill: '#3a2f12', stroke: '#f0cf7d', 'stroke-width': 3 * M(), style: 'pointer-events:none' }));
+              pv.push(sv('text', { x: q.x, y: q.y - 90 * M() + 12 * M(), 'text-anchor': 'middle', 'font-size': 34 * M(), style: 'fill:#f0cf7d;font-weight:bold;pointer-events:none' }, String(i + 1)));
             });
           }
         }
@@ -2292,9 +2292,9 @@
           const ok = !ms.preview.plan || ms.preview.plan.in_range;
           const tone = ms.preview.error ? '#e0685c' : (ok ? '#7fd08a' : '#e0685c');
           if (ms.preview.plan) {
-            pv.push(sv('polyline', { points: (trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id))).map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4 * M(), 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
+            pv.push(sv('polyline', { points: (trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id))).map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4.5, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
           }
-          pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 26 * M(), fill: 'none', stroke: tone, 'stroke-width': 3 * M(), style: 'pointer-events:none' }));
+          pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 70 * M(), fill: 'none', stroke: tone, 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }));
         }
         L.preview.replaceChildren(...pv);
 
@@ -2314,7 +2314,7 @@
           const friend = isFriend(c.owner_player_id);
           if (friend) {
             const pts = [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
-            out.push(sv('polyline', { class: 'marchline', points: pts.join(' '), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3 * M(), 'stroke-linecap': 'round', 'stroke-dasharray': `${6 * M()} ${9 * M()}`, style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
+            out.push(sv('polyline', { class: 'marchline', points: pts.join(' '), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', 'stroke-dasharray': '8 8', style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
           }
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
           const label = friend ? String(c.troops) : '?';
