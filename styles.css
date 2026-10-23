@@ -549,6 +549,7 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
   .mnavbtn, .mnavbtn:hover:not(:disabled) { white-space: nowrap; border-left: none; border-bottom: 2px solid transparent; }
   .mnavbtn.on, .mnavbtn.on:hover:not(:disabled) { border-left: none; border-bottom-color: var(--gilt); }
   .mpane { padding: 16px 16px 24px; }
+  .mgroup { display: none; }
 }
 
 .legallinks { display: flex; justify-content: center; gap: 10px; margin-top: 22px; font-size: 0.92rem; color: var(--faint); }
@@ -568,3 +569,36 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 .xref, .xref:hover:not(:disabled), .xref:active:not(:disabled) { display: inline; background: none; border: none; border-radius: 0; box-shadow: none; filter: none; padding: 0; font: inherit; letter-spacing: 0; text-shadow: none; color: var(--gilt); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; transform: none; }
 .xref:hover:not(:disabled) { color: var(--gilt-hi); text-decoration-style: solid; }
 .mpane h3 { scroll-margin-top: 8px; }
+
+:root[data-theme='light'] .hud { background: linear-gradient(180deg, var(--ink-2), var(--ink-1)); border-bottom: 1px solid var(--rule); box-shadow: 0 1px 0 var(--gilt-lo), 0 8px 16px -10px rgba(60, 38, 8, 0.6); color: var(--text); }
+:root[data-theme='light'] .hud button:not(.primary) { --plate-a: #f3e7c8; --plate-b: #dcc998; color: var(--text); }
+:root[data-theme='light'] .hud button.ghost { background: transparent; }
+:root[data-theme='light'] .hud-id b { text-shadow: none; }
+:root[data-theme='light'] .hud-id .sub, :root[data-theme='light'] .meter-label { color: var(--dim); }
+:root[data-theme='light'] .meter-track { background: #cfbd92; border-color: var(--rule); box-shadow: 0 0 0 1px var(--gilt-lo), inset 0 2px 4px rgba(60, 38, 8, 0.45); }
+:root[data-theme='light'] .meter-track::after { background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(60, 38, 8, 0.35) calc(10% - 1px) 10%); }
+:root[data-theme='light'] .stat { box-shadow: inset 0 2px 4px rgba(60, 38, 8, 0.25); }
+:root[data-theme='light'] .hud label.check { color: var(--text); }
+:root[data-theme='light'] .legend { background: linear-gradient(180deg, var(--ink-2), var(--ink-1)); color: var(--text); box-shadow: 0 8px 18px -8px rgba(60, 38, 8, 0.6); }
+.mgroup { font-family: var(--font-display); font-weight: 600; font-size: 0.66rem; letter-spacing: 0.16em; color: var(--faint); padding: 14px 12px 4px; text-transform: uppercase; }
+.mgroup:first-child { padding-top: 4px; }
+.mcalc { max-width: 520px; margin: 8px 0 14px; padding: 14px 16px; background: var(--recess); border: 1px solid var(--rule-soft); border-radius: 3px; }
+.mcalc label { margin: 12px 0 4px; }
+.mcalc input[type=range] { padding: 0; background: none; border: none; box-shadow: none; accent-color: var(--gilt); }
+.calcout { margin-top: 12px; }
+.cbarrow { display: grid; grid-template-columns: 74px 1fr 40px; gap: 10px; align-items: center; margin: 6px 0; }
+.cbarrow span { font-family: var(--font-display); font-size: 0.74rem; letter-spacing: 0.08em; color: var(--dim); }
+.cbarrow b { text-align: right; color: var(--text); }
+.cbar { height: 14px; background: var(--ink-0); border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; }
+.cbar i { display: block; height: 100%; transition: width 0.25s; }
+.cbar i.att { background: var(--gules-hi); }
+.cbar i.def { background: var(--azure); }
+
+.friendbadge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: var(--gules); color: #fbefd6; font-size: 0.72rem; line-height: 18px; text-align: center; letter-spacing: 0; text-shadow: none; }
+.friends .frow, .fprofile .frow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule-soft); }
+.fcode { font-family: var(--font-display); font-size: 1.3rem; letter-spacing: 0.14em; color: var(--gilt-hi); }
+.friends .row, .fprofile .row { display: flex; align-items: center; }
+.friends input { flex: 1; }
+.fhead { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.modal:has(.friends), .modal:has(.fprofile) { max-width: 560px; }
+.friends { max-height: 62vh; overflow-y: auto; padding-right: 6px; }

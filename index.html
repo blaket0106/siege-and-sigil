@@ -588,11 +588,13 @@
 
     function topbar() {
       const light = document.documentElement.getAttribute('data-theme') === 'light';
+      setTimeout(refreshFriendBadge, 0);
       return h('div', { class: 'topbar' },
         h('button', { class: 'brandmark', onclick: showHome, 'aria-label': 'Siege and Sigil home' }, emblem(30), h('span', {}, 'Siege & Sigil')),
         h('div', { class: 'topnav' },
           h('span', { class: 'who' }, state.profile ? state.profile.display_name : ''),
           h('button', { class: 'ghost', onclick: renameDialog }, 'Rename'),
+          h('button', { class: 'ghost', onclick: () => friendsDialog() }, 'Friends', h('span', { class: 'friendbadge', style: state.friendReq ? '' : 'display:none' }, state.friendReq || '')),
           h('button', { class: 'ghost', onclick: helpDialog }, 'How to play'),
           h('button', { class: 'iconbtn', id: 'soundbtn', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.replaceChildren(icon(on ? 'sound' : 'mute')); }, title: 'Sound on or off', 'aria-label': 'Toggle sound' }, icon(Sfx.on ? 'sound' : 'mute')),
           h('button', { class: 'iconbtn', id: 'themebtn', onclick: toggleTheme, title: 'Switch theme', 'aria-label': 'Switch between dark and light theme' }, icon(light ? 'moon' : 'sun')),
@@ -600,7 +602,7 @@
     }
 
     const MANUAL = [
-      { id: 'basics', title: 'The basics', blocks: [
+      { id: 'basics', group: 'Start here', title: 'The basics', blocks: [
         ['p', 'Siege & Sigil is a game of castles and armies. You lead a house. Take [[map|castles]], grow their [[economy|income]], and hold more of the realm than anyone else. There are no dice: every [[battles|fight]] is arithmetic, so the player who plans better wins.'],
         ['h', 'What wins the game'],
         ['p', 'The first player to hold the share of castles shown in the "Road to victory" bar wins. The host sets it ([[hosting#rules|Hosting a game]]); half of all castles is the default. A player who loses every castle is eliminated. If only one player is left standing, that player wins.'],
@@ -615,7 +617,23 @@
           'Open Standings and meet your neighbours ([[diplomacy|Diplomacy]]). A quiet border is worth more than one more army.',
         ]],
       ] },
-      { id: 'map', title: 'The map', blocks: [
+      { id: 'screen', group: 'Start here', title: 'Reading the screen', blocks: [
+        ['p', 'This is the map screen, where you spend nearly all of a game. The numbers in the picture match the list below it.'],
+        ['diagram', 'screen'],
+        ['table', { head: ['', 'What it shows'], rows: [
+          ['1', 'The game name and the time to the next tick.'],
+          ['2', 'Road to victory: how close the leader is to the castle share that wins ([[basics#what-wins-the-game|how you win]]).'],
+          ['3', 'Your gold. It grows each production cycle ([[economy#how-production-works|production]]).'],
+          ['4', 'Menu: Empires, Intel, Battle calculator, Game rules, Host tools, Options and this manual.'],
+          ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
+          ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
+          ['7', 'A route in progress ([[marching#routes|routes]]).'],
+          ['8', 'The side panel. Info shows what you have selected, News lists events, Inbox holds messages and reports, Chat is the game channel.'],
+          ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]).'],
+        ] }],
+        ['note', 'Click any castle or army to select it and see its actions in the Info tab.'],
+      ] },
+      { id: 'map', group: 'The world', title: 'The map', blocks: [
         ['p', 'The realm is a set of castles joined by routes. Everything that matters happens at castles or on the routes between them.'],
         ['diagram', 'map'],
         ['h', 'Trails and free travel'],
@@ -630,8 +648,9 @@
         ['h', 'Natural wealth'],
         ['p', 'Each castle has natural resources, shown by the halo around it. Richer castles make [[economy#upgrade-costs|upgrades cheaper]], and tiers are Tier 1 (1 to 20), Tier 2 (21 to 40) and Tier 3 (41 to 60). Grab the rich ones first.'],
       ] },
-      { id: 'economy', title: 'Castles and economy', blocks: [
+      { id: 'economy', group: 'The world', title: 'Castles and economy', blocks: [
         ['p', 'Every castle has three upgrade tracks. Each track pays out in a different way.'],
+        ['diagram', 'economy'],
         ['table', { head: ['Track', 'What it gives', 'Base cost'], rows: [
           ['Treasury', 'Gold every production cycle', '500'],
           ['Recruitment', 'New troops at that castle', '1000'],
@@ -651,7 +670,7 @@
         ['h', 'Capturing castles'],
         ['p', 'A captured castle keeps its Recruitment, Prestige and roads but its Treasury is destroyed. You are paid 10 gold for each Treasury level destroyed. The castle starts with no garrison, so the army that took it must hold it.'],
       ] },
-      { id: 'areas', title: 'Realm areas', blocks: [
+      { id: 'areas', group: 'The world', title: 'Realm areas', blocks: [
         ['p', 'Your realm has seven areas. They are not buildings on the map. They are levels that apply across all of your castles. You build one at a time, and prestige from all of your castles flows into the one you choose.'],
         ['table', { head: ['Area', 'What it does'], rows: [
           ['Armory', 'How many troops your army kills each round of a [[battles#damage-per-round|battle]]'],
@@ -664,7 +683,7 @@
         ] }],
         ['p', 'Armory decides [[battles|battles]], so most winning players raise it early. Mint and Guildhall pay for themselves in a long game. [[marching#range|Stables]] matters most on big maps.'],
       ] },
-      { id: 'commanders', title: 'Commanders', blocks: [
+      { id: 'commanders', group: 'Your forces', title: 'Commanders', blocks: [
         ['p', 'Commanders carry troops. They are cheap, and you will lose some. A commander who survives [[battles|battles]] gets stronger and becomes worth protecting.'],
         ['h', 'Hiring'],
         ['p', 'Pick a school and pay the price. You get a generated name and one level in a random ability of that school.'],
@@ -681,7 +700,7 @@
         ['p', 'Each house has one king, chosen from your commanders. The king\'s abilities become realm-wide bonuses and his battle abilities apply to any [[battles|fight]] he is in. If he dies, those bonuses vanish instantly and it takes a few ticks to crown a new one. Keep him out of the front line.'],
         ['note', 'A commander whose army is destroyed in a [[battles#fighting-at-a-castle|battle]] dies. So does every commander in a castle that falls.'],
       ] },
-      { id: 'marching', title: 'Marching and routes', blocks: [
+      { id: 'marching', group: 'Your forces', title: 'Marching and routes', blocks: [
         ['p', 'Select a [[commanders|commander]] and choose March, then click a destination. The map shows the path, the time to arrive and the cost.'],
         ['h', 'Range'],
         ['p', 'One order can cover only so much distance. Your [[areas|Stables]] level sets that distance. A single hop to a neighbouring castle is always allowed. Castles you can reach glow on the map.'],
@@ -704,7 +723,7 @@
         ['h', 'Changing your mind'],
         ['p', 'Abort makes the army finish its current stretch and stop at the next castle. Recall sends it back to where it started.'],
       ] },
-      { id: 'battles', title: 'Battles', blocks: [
+      { id: 'battles', group: 'War', title: 'Battles', blocks: [
         ['p', 'There are no dice. Each side destroys a fixed number of enemy troops every round and the battle runs until one side has none left.'],
         ['h', 'Damage per round'],
         ['p', 'Your damage each round is your [[areas|Armory]] level plus the [[commanders|Valor]] of the commander leading your army. It is never less than 1.'],
@@ -717,13 +736,17 @@
         ['p', 'To starve a castle instead of storming it, see [[sieges|Sieges]].'],
         ['h', 'A worked example'],
         ['p', '30 troops attack a castle held by 20 troops. Both sides have Armory 2 and no Valor. The attacker kills 2 troops per round and the defender kills 3. The defender needs 10 rounds to destroy 30 troops. The attacker needs 10 rounds to destroy 20. The defender strikes first, so the defender wins with 2 troops left. Bring 33 troops and the attacker wins instead.'],
+        ['h', 'Try it yourself'],
+        ['p', 'Change the numbers and drag the slider to watch a battle play out round by round.'],
+        ['calc'],
         ['h', 'Fighting in the open'],
         ['p', 'When two armies meet on the [[marching|trail]], both are attackers with no defender bonus. The side with the higher initiative ([[areas|Watchtowers]] level plus the leader\'s [[commanders|Tactics]]) strikes first. The loser is destroyed.'],
         ['h', 'Allies'],
         ['p', '[[diplomacy|Allied]] armies fight as one side using the best Armory among them, and the defending team gets the +1.'],
       ] },
-      { id: 'sieges', title: 'Sieges', blocks: [
+      { id: 'sieges', group: 'War', title: 'Sieges', blocks: [
         ['p', 'A siege starves a castle instead of [[battles#fighting-at-a-castle|storming]] it. It is slow, but you do not lose troops to the castle\'s +1 defense.'],
+        ['diagram', 'siege'],
         ['list', [
           'Every tick the garrison loses about 3% of its troops, more if the besieger has [[commanders|Siegecraft]].',
           'Every production cycle the castle loses one level on one of its [[economy|tracks]].',
@@ -733,7 +756,15 @@
         ]],
         ['note', 'A sieging army can be caught by a relief force. Keep the besiegers strong enough to beat what is coming.'],
       ] },
-      { id: 'diplomacy', title: 'Diplomacy and honor', blocks: [
+      { id: 'fog', group: 'War', title: 'Fog of war', blocks: [
+        ['p', 'If the [[hosting#rules|host]] turned fog on, you only see what your castles and armies can scan. A question mark means information you cannot see right now.'],
+        ['list', [
+          '[[areas|Watchtowers]] extends the scan range of every castle you own.',
+          'The Scout ability ([[commanders|Commanders]]) extends it for a commander.',
+          'In dark games the map is black until something of yours scans it. Explored ground stays visible but only updates live inside your scan range.',
+        ]],
+      ] },
+      { id: 'diplomacy', group: 'Other players', title: 'Diplomacy and honor', blocks: [
         ['p', 'Open Standings and click a player. You can propose an alliance, a non-aggression pact, peace or a trade deal, or declare war.'],
         ['list', [
           'Peace is a truce that blocks attacks for a set number of ticks.',
@@ -745,15 +776,24 @@
         ['h', 'Honor'],
         ['p', 'Honor is your reputation across games. Breaking a pact or alliance, or attacking during a grace period, costs honor. It is public on the Roll of Honor.'],
       ] },
-      { id: 'fog', title: 'Fog of war', blocks: [
-        ['p', 'If the [[hosting#rules|host]] turned fog on, you only see what your castles and armies can scan. A question mark means information you cannot see right now.'],
+      { id: 'friends', group: 'Other players', title: 'Friends', blocks: [
+        ['p', 'Friends are players you approve. They can see your profile and stats, and you can see theirs. Open Friends in the top bar.'],
+        ['h', 'Adding a friend'],
         ['list', [
-          '[[areas|Watchtowers]] extends the scan range of every castle you own.',
-          'The Scout ability ([[commanders|Commanders]]) extends it for a commander.',
-          'In dark games the map is black until something of yours scans it. Explored ground stays visible but only updates live inside your scan range.',
+          'Share your friend code, such as 4QV3-H6SQ, and ask your friend to send you a request with it, or send one with theirs.',
+          'After a game ends, open the final standings and use Add friend next to any human player. Names are shown again at the end, even in games that hid them.',
+          'A request must be accepted before anything is shared.',
         ]],
+        ['h', 'What friends can see'],
+        ['p', 'A friend can see your honor, infamy, games, wins, favorite house and your recent finished games. They never see games still in progress, so they cannot tell which house you are in an anonymous game.'],
+        ['h', 'Who can see your stats'],
+        ['list', [
+          'Friends only (the default): only approved friends see your stats.',
+          'Everyone: any player can see you on the Roll of honor.',
+        ]],
+        ['note', 'You can remove a friend at any time from their profile. Removing a friend stops them seeing your stats.'],
       ] },
-      { id: 'hosting', title: 'Hosting a game', blocks: [
+      { id: 'hosting', group: 'Other players', title: 'Hosting a game', blocks: [
         ['p', 'Anyone can raise a campaign. The setup has four steps: Realm, Rules, Players and Review. The Realm page shows a live preview of the land that the same settings will create.'],
         ['h', 'Realm'],
         ['list', [
@@ -771,29 +811,162 @@
         ['h', 'Host tools'],
         ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. Finished games can be replayed from the Replay bar.'],
       ] },
+      { id: 'glossary', group: 'Reference', title: 'Glossary', blocks: [
+        ['p', 'Every term in the game, in one line, with a link to where it is explained.'],
+        ['table', { head: ['Term', 'Meaning'], rows: [
+          ['Armory', 'The realm area that sets how many troops you kill each round ([[areas|Realm areas]]).'],
+          ['Assault', 'A march that fights on arrival ([[marching#march-types|March types]]).'],
+          ['Barracks', 'The realm area that raises troop production ([[areas|Realm areas]]).'],
+          ['Castle', 'A place on the map you can hold, upgrade and garrison ([[map|The map]]).'],
+          ['Commander', 'A leader who carries troops and has abilities ([[commanders|Commanders]]).'],
+          ['Crossing', 'A river castle or pass castle that controls a barrier ([[map#rivers-and-mountains|Rivers and mountains]]).'],
+          ['Friend code', 'A short code you share so another player can send you a friend request ([[friends|Friends]]).'],
+          ['Garrison', 'The troops standing in a castle, and the commander who leads them ([[commanders#garrison-commanders|Garrison commanders]]).'],
+          ['Guildhall', 'The realm area that makes upgrades cheaper ([[areas|Realm areas]]).'],
+          ['Friend', 'A player you approve who can see your profile and stats ([[friends|Friends]]).'],
+          ['Honor', 'Your reputation across games ([[diplomacy#honor|Honor]]).'],
+          ['Initiative', 'Who strikes first in an open-field battle ([[battles#fighting-in-the-open|Fighting in the open]]).'],
+          ['King', 'The one commander whose abilities become realm-wide bonuses ([[commanders#the-king|The king]]).'],
+          ['Library', 'The realm area that adds prestige to your other areas ([[areas|Realm areas]]).'],
+          ['Mint', 'The realm area that raises gold income ([[areas|Realm areas]]).'],
+          ['Natural resources', 'How rich a castle is; richer castles upgrade more cheaply ([[map#natural-wealth|Natural wealth]]).'],
+          ['Pass', 'A gap in a mountain range, held by a pass castle ([[map#rivers-and-mountains|Rivers and mountains]]).'],
+          ['Prestige', 'Points that level up your realm areas ([[areas|Realm areas]]).'],
+          ['Production cycle', 'The interval at which gold is paid; 12 ticks by default ([[economy#how-production-works|Production]]).'],
+          ['Rank', 'The total of a commander\'s ability levels, capped at 20 ([[commanders#growing-stronger|Growing stronger]]).'],
+          ['Recall', 'Send a marching army back to where it started ([[marching#changing-your-mind|Changing your mind]]).'],
+          ['Relief', 'A friendly army that breaks a siege ([[sieges|Sieges]]).'],
+          ['Route', 'A march through several castles, optionally looping ([[marching#routes|Routes]]).'],
+          ['Sally', 'A garrison sortie that fights the besiegers in the open ([[sieges|Sieges]]).'],
+          ['School', 'Battleschool, University or Rangers: the three groups of commander abilities ([[commanders#hiring|Hiring]]).'],
+          ['Siege', 'Starving a castle instead of storming it ([[sieges|Sieges]]).'],
+          ['Stables', 'The realm area that sets how far one order can reach ([[marching#range|Range]]).'],
+          ['Tick', 'The unit of game time ([[basics#how-time-works|How time works]]).'],
+          ['Tier', 'A castle\'s wealth class, 1 to 3 ([[map#natural-wealth|Natural wealth]]).'],
+          ['Trail', 'A route armies walk between castles ([[map#trails-and-free-travel|Trails and free travel]]).'],
+          ['Valor', 'The commander ability that adds battle damage ([[commanders|Commanders]]).'],
+          ['Watchtowers', 'The realm area that sets sight range and open-field initiative ([[areas|Realm areas]]).'],
+        ] }],
+      ] },
     ];
 
-    const MANUAL_DIAGRAM = () => {
-      const castle = (x, y, fill, label) => [
-        sv('rect', { x: x - 9, y: y - 9, width: 18, height: 18, rx: 2, fill, stroke: 'var(--gilt-lo)', 'stroke-width': 1.5 }),
-        sv('path', { d: `M${x - 6} ${y - 6}h3v3h3v-3h3v3h3v-3h0v9h-12Z`, fill: 'var(--ink-1)', opacity: 0.7 }),
-        label ? sv('text', { x, y: y + 24, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--dim)' }, label) : null,
+    const MANUAL_DIAGRAM = () => manualDiagram('map');
+
+    function manualDiagram(name) {
+      const T = (x, y, text, o = {}) => sv('text', { x, y, 'text-anchor': o.anchor || 'middle', 'font-size': o.size || 11, fill: o.fill || 'var(--dim)', 'font-weight': o.weight || 400 }, text);
+      const frame = (w, h2, label) => sv('svg', { viewBox: `0 0 ${w} ${h2}`, class: 'mdiagram', role: 'img', 'aria-label': label }, sv('rect', { x: 0, y: 0, width: w, height: h2, fill: 'var(--recess)', rx: 3 }));
+      const castle = (x, y, fill, label, r = 9) => [
+        sv('rect', { x: x - r, y: y - r, width: 2 * r, height: 2 * r, rx: 2, fill, stroke: 'var(--gilt-lo)', 'stroke-width': 1.5 }),
+        sv('path', { d: `M${x - r * 0.65} ${y - r * 0.65}h${r * 0.33}v${r * 0.33}h${r * 0.33}v${-r * 0.33}h${r * 0.33}v${r * 0.33}h${r * 0.33}v${-r * 0.33}h${r * 0.33}v${r * 1.3}h${-r * 1.3}Z`, fill: 'var(--ink-1)', opacity: 0.7 }),
+        label ? T(x, y + r + 14, label) : null,
       ];
-      return sv('svg', { viewBox: '0 0 520 190', class: 'mdiagram', role: 'img', 'aria-label': 'A trail map with a river castle, a mountain range and a pass castle' },
-        sv('rect', { x: 0, y: 0, width: 520, height: 190, fill: 'var(--recess)', rx: 3 }),
-        sv('path', { d: 'M170 0C150 40 190 70 170 100S150 150 170 190', fill: 'none', stroke: 'var(--azure)', 'stroke-width': 14, opacity: 0.55, 'stroke-linecap': 'round' }),
-        sv('path', { d: 'M360 0L376 22L352 46L380 70L356 96L384 120L360 190', fill: 'none', stroke: 'var(--faint)', 'stroke-width': 16, opacity: 0.55, 'stroke-linejoin': 'round' }),
-        sv('path', { d: 'M52 95H170M170 95H270M270 95H360M360 95H468M270 95L300 40M270 95L300 150', fill: 'none', stroke: 'var(--gilt-lo)', 'stroke-width': 2, 'stroke-dasharray': '2 5', 'stroke-linecap': 'round' }),
-        ...castle(52, 95, 'var(--gilt)', 'Your castle'),
-        ...castle(170, 95, 'var(--azure)', 'River castle'),
-        ...castle(270, 95, 'var(--gilt-lo)', 'Neutral castle'),
-        ...castle(300, 40, 'var(--gilt-lo)', null),
-        ...castle(300, 150, 'var(--gilt-lo)', null),
-        ...castle(360, 95, 'var(--purpure)', 'Pass castle'),
-        ...castle(468, 95, 'var(--gules)', 'Enemy castle'),
-        sv('text', { x: 140, y: 20, 'font-size': 11, fill: 'var(--azure)' }, 'River'),
-        sv('text', { x: 392, y: 20, 'font-size': 11, fill: 'var(--faint)' }, 'Mountains'));
-    };
+      const badge = (x, y, n) => [sv('circle', { cx: x, cy: y, r: 9, fill: 'var(--gules)', stroke: 'var(--gilt)', 'stroke-width': 1.2 }), T(x, y + 3.5, n, { fill: '#fbefd6', weight: 700, size: 10 })];
+
+      if (name === 'map') {
+        const svg = frame(520, 190, 'A trail map with a river castle, a mountain range and a pass castle');
+        svg.append(
+          sv('path', { d: 'M170 0C150 40 190 70 170 100S150 150 170 190', fill: 'none', stroke: 'var(--azure)', 'stroke-width': 14, opacity: 0.55, 'stroke-linecap': 'round' }),
+          sv('path', { d: 'M360 0L376 22L352 46L380 70L356 96L384 120L360 190', fill: 'none', stroke: 'var(--faint)', 'stroke-width': 16, opacity: 0.55, 'stroke-linejoin': 'round' }),
+          sv('path', { d: 'M52 95H170M170 95H270M270 95H360M360 95H468M270 95L300 40M270 95L300 150', fill: 'none', stroke: 'var(--gilt-lo)', 'stroke-width': 2, 'stroke-dasharray': '2 5', 'stroke-linecap': 'round' }),
+          ...castle(52, 95, 'var(--gilt)', 'Your castle'), ...castle(170, 95, 'var(--azure)', 'River castle'), ...castle(270, 95, 'var(--gilt-lo)', 'Neutral castle'),
+          ...castle(300, 40, 'var(--gilt-lo)', null), ...castle(300, 150, 'var(--gilt-lo)', null), ...castle(360, 95, 'var(--purpure)', 'Pass castle'), ...castle(468, 95, 'var(--gules)', 'Enemy castle'),
+          T(140, 20, 'River', { fill: 'var(--azure)' }), T(392, 20, 'Mountains', { fill: 'var(--faint)' }));
+        return svg;
+      }
+
+      if (name === 'screen') {
+        const svg = frame(560, 340, 'The map screen with numbered callouts');
+        svg.append(
+          sv('rect', { x: 6, y: 6, width: 548, height: 328, rx: 3, fill: 'var(--ink-1)', stroke: 'var(--rule)' }),
+          sv('rect', { x: 6, y: 6, width: 548, height: 34, fill: 'var(--ink-2)', stroke: 'var(--rule)' }),
+          T(16, 27, 'Your game · tick 20', { anchor: 'start', fill: 'var(--text)', weight: 600 }),
+          sv('rect', { x: 200, y: 16, width: 140, height: 12, rx: 2, fill: 'var(--recess)', stroke: 'var(--gilt-lo)' }),
+          sv('rect', { x: 200, y: 16, width: 30, height: 12, rx: 2, fill: 'var(--gilt)' }),
+          sv('rect', { x: 372, y: 12, width: 62, height: 22, rx: 2, fill: 'var(--recess)', stroke: 'var(--gilt-lo)' }),
+          T(403, 27, '348 gold', { fill: 'var(--gilt-hi)', weight: 600 }),
+          sv('rect', { x: 452, y: 12, width: 48, height: 22, rx: 2, fill: 'var(--gules)' }),
+          T(476, 27, 'Menu', { fill: '#fbefd6', weight: 600 }),
+          sv('rect', { x: 6, y: 40, width: 370, height: 294, fill: 'var(--recess)' }),
+          sv('circle', { cx: 130, cy: 190, r: 70, fill: 'none', stroke: 'var(--gilt)', 'stroke-dasharray': '4 4', opacity: 0.7 }),
+          sv('path', { d: 'M130 190L230 140L300 210', fill: 'none', stroke: 'var(--gilt-hi)', 'stroke-width': 2, 'stroke-dasharray': '6 5' }),
+          ...castle(130, 190, 'var(--gilt)', 'Brannock 18'), ...castle(230, 140, 'var(--gilt-lo)', null, 7), ...castle(300, 210, 'var(--gules)', 'Enemy 30'), ...castle(90, 100, 'var(--gilt-lo)', null, 7), ...castle(190, 255, 'var(--gilt-lo)', null, 7),
+          sv('rect', { x: 14, y: 286, width: 96, height: 40, rx: 2, fill: 'var(--ink-2)', stroke: 'var(--rule)' }),
+          T(22, 302, 'Yours', { anchor: 'start', size: 9, fill: 'var(--text)' }), T(22, 313, 'Other players', { anchor: 'start', size: 9, fill: 'var(--text)' }), T(22, 324, 'Unclaimed', { anchor: 'start', size: 9, fill: 'var(--text)' }),
+          sv('rect', { x: 376, y: 40, width: 178, height: 294, fill: 'var(--ink-2)', stroke: 'var(--rule)' }),
+          T(402, 58, 'Info', { size: 10, fill: 'var(--gilt-hi)', weight: 600 }), T(436, 58, 'News', { size: 10 }), T(472, 58, 'Inbox', { size: 10 }), T(512, 58, 'Chat', { size: 10 }),
+          sv('rect', { x: 386, y: 74, width: 158, height: 8, rx: 2, fill: 'var(--rule-soft)' }), sv('rect', { x: 386, y: 94, width: 120, height: 8, rx: 2, fill: 'var(--rule-soft)' }), sv('rect', { x: 386, y: 114, width: 140, height: 8, rx: 2, fill: 'var(--rule-soft)' }),
+          );
+        const marks = [[160, 23, '1'], [188, 23, '2'], [358, 23, '3'], [516, 23, '4'], [146, 178, '5'], [56, 190, '6'], [276, 160, '7'], [545, 57, '8'], [128, 304, '9']];
+        marks.forEach(([x, y, n]) => svg.append(...badge(x, y, n)));
+        return svg;
+      }
+
+      if (name === 'economy') {
+        const svg = frame(520, 150, 'Upgrade tracks and what they produce');
+        const box = (x, y, w, label, sub, fill) => [sv('rect', { x, y, width: w, height: 40, rx: 3, fill: fill || 'var(--ink-2)', stroke: 'var(--rule)' }), T(x + w / 2, y + 17, label, { fill: 'var(--text)', weight: 600 }), T(x + w / 2, y + 31, sub, { size: 9 })];
+        const arrow = (x1, y1, x2, y2) => sv('path', { d: `M${x1} ${y1}L${x2} ${y2}`, stroke: 'var(--gilt-lo)', 'stroke-width': 2, fill: 'none', 'marker-end': 'url(#arr)' });
+        svg.append(sv('defs', {}, sv('marker', { id: 'arr', viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto' }, sv('path', { d: 'M0 0L10 5L0 10Z', fill: 'var(--gilt-lo)' }))),
+          ...box(20, 14, 120, 'Treasury', 'upgrade track'), ...box(200, 14, 120, 'Gold', 'every cycle'), ...box(380, 14, 120, 'Upgrades', 'any track'),
+          ...box(20, 62, 120, 'Recruitment', 'upgrade track'), ...box(200, 62, 120, 'Troops', 'every tick'), ...box(380, 62, 120, 'Armies', 'commanders'),
+          ...box(20, 110, 120, 'Prestige', 'upgrade track'), ...box(200, 110, 120, 'Prestige', 'every tick'), ...box(380, 110, 120, 'Realm area', 'levels up'),
+          arrow(142, 34, 198, 34), arrow(322, 34, 378, 34), arrow(142, 82, 198, 82), arrow(322, 82, 378, 82), arrow(142, 130, 198, 130), arrow(322, 130, 378, 130));
+        return svg;
+      }
+
+      const svg = frame(520, 120, 'How a siege plays out');
+      const evt = (x, label, sub) => [sv('circle', { cx: x, cy: 44, r: 5, fill: 'var(--gilt)' }), T(x, 28, label, { fill: 'var(--text)', weight: 600 }), T(x, 66, sub, { size: 9 })];
+      svg.append(sv('path', { d: 'M30 44H490', stroke: 'var(--gilt-lo)', 'stroke-width': 2 }),
+        ...evt(40, 'Siege starts', 'army camps outside'), ...evt(170, 'Every tick', 'garrison loses about 3%'), ...evt(310, 'Every cycle', 'one upgrade level lost'), ...evt(450, 'Ends when', 'castle falls or is relieved'),
+        T(260, 100, 'The defender can sally out, a friend can relieve, or the besieger can storm', { size: 10 }));
+      return svg;
+    }
+
+    function manualCalc() {
+      const field = (label, input) => h('div', {}, h('label', {}, label), input);
+      const num = (v) => h('input', { type: 'number', min: '0', value: String(v) });
+      const aT = num(30); const aD = num(2); const dT = num(20); const dD = num(2);
+      const kind = selectOf({ castle: 'Castle (defender strikes first, +1 damage)', field: 'Open field (attacker strikes first)' }, 'castle');
+      const slider = h('input', { type: 'range', min: '0', max: '0', value: '0', 'aria-label': 'Round' });
+      const out = h('div', { class: 'calcout' });
+      const sim = () => {
+        const mode = kind.value;
+        const A = { t: Math.max(0, Math.floor(Number(aT.value))), dmg: Math.max(1, Math.floor(Number(aD.value))) };
+        const D = { t: Math.max(0, Math.floor(Number(dT.value))), dmg: Math.max(1, Math.floor(Number(dD.value))) + (mode === 'castle' ? 1 : 0) };
+        const defFirst = mode === 'castle';
+        const F = defFirst ? D : A;
+        const S = defFirst ? A : D;
+        const rounds = [[A.t, D.t]];
+        let a = A.t; let d = D.t;
+        for (let guard = 0; guard < 400 && a > 0 && d > 0; guard++) {
+          const hitF = defFirst ? () => { a = Math.max(0, a - F.dmg); } : () => { d = Math.max(0, d - F.dmg); };
+          const hitS = defFirst ? () => { d = Math.max(0, d - S.dmg); } : () => { a = Math.max(0, a - S.dmg); };
+          hitF();
+          if (a > 0 && d > 0) hitS();
+          rounds.push([a, d]);
+        }
+        return { rounds, A, D };
+      };
+      const draw = () => {
+        const { rounds, A, D } = sim();
+        slider.max = String(rounds.length - 1);
+        const i = Math.min(Number(slider.value), rounds.length - 1);
+        slider.value = String(i);
+        const [a, d] = rounds[i];
+        const last = rounds[rounds.length - 1];
+        const verdict = last[0] === 0 && last[1] === 0 ? 'Both sides are empty.' : last[1] === 0 ? `Attacker wins with ${last[0]} troops left.` : last[0] === 0 ? `Defender wins with ${last[1]} troops left.` : '';
+        const bar = (who, now, start, cls) => h('div', { class: 'cbarrow' }, h('span', {}, who), h('div', { class: 'cbar' }, h('i', { class: cls, style: `width:${start ? (100 * now) / start : 0}%` })), h('b', {}, String(now)));
+        out.replaceChildren(
+          bar('Attacker', a, A.t, 'att'), bar('Defender', d, D.t, 'def'),
+          h('div', { class: 'tip' }, `After round ${i} of ${rounds.length - 1}. ${verdict}`));
+      };
+      [aT, aD, dT, dD, kind].forEach((el) => { el.addEventListener('input', draw); el.addEventListener('change', draw); });
+      slider.addEventListener('input', draw);
+      draw();
+      return h('div', { class: 'mcalc' },
+        h('div', { class: 'grid2' }, field('Attacker troops', aT), field('Attacker damage per round', aD), field('Defender troops', dT), field('Defender damage per round', dD)),
+        h('label', {}, 'Kind of battle'), kind,
+        h('label', {}, 'Step through the rounds'), slider, out);
+    }
 
     let manualGo = null;
     const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -819,7 +992,8 @@
       if (kind === 'h') return h('h3', { 'data-anchor': slug(v) }, v);
       if (kind === 'note') return h('div', { class: 'mnote' }, ...inline(v));
       if (kind === 'list') return h('ul', {}, v.map((t) => h('li', {}, ...inline(t))));
-      if (kind === 'diagram') return MANUAL_DIAGRAM();
+      if (kind === 'diagram') return manualDiagram(v);
+      if (kind === 'calc') return manualCalc();
       if (kind === 'table') return h('table', {}, h('thead', {}, h('tr', {}, v.head.map((c) => h('th', {}, c)))), h('tbody', {}, v.rows.map((r) => h('tr', {}, r.map((c) => h('td', {}, ...inline(c)))))));
       return null;
     };
@@ -860,6 +1034,7 @@
           ['Display name', 'Shown to other players, unless the game hides names until it ends.'],
           ['Game activity: orders, battles, chat messages, diplomacy, honor and statistics', 'To run the game, show it to the players in it, and keep rankings and replays.'],
           ['Last activity time', 'To tell hosts and players who is active and handle absent players.'],
+          ['Friend code and friend list', 'To let players you approve see your profile, honor, wins, favorite house and recent finished games.'],
         ] }],
         ['h', 'What I do not do'],
         ['list', [
@@ -875,6 +1050,8 @@
         ]],
         ['h', 'Stored in your browser'],
         ['p', 'The game keeps your sign-in session and a few settings (theme, sound, map options, help seen, alliance groups) in your browser\'s local storage. It does not use advertising cookies.'],
+        ['h', 'Friends and your stats'],
+        ['p', 'Only players you accept as friends can see your profile and stats. In your settings you can choose Friends only (the default) or Everyone, which also lists you on the public Roll of honor. Friends never see games that are still in progress.'],
         ['h', 'Names in games'],
         ['p', 'Other players in your game can see your display name and what you do in that game. In games with hidden names, players see your house name until the game ends.'],
         ['h', 'Keeping and deleting your data'],
@@ -939,7 +1116,12 @@
       const drawNav = () => {
         const q = search.value.trim().toLowerCase();
         const shown = q ? MANUAL.filter((s) => textOf(s).includes(q)) : MANUAL;
-        const items = shown.map((s) => h('button', { type: 'button', class: 'mnavbtn' + (s.id === current ? ' on' : ''), onclick: () => showSection(s.id) }, s.title));
+        const items = [];
+        let lastGroup = null;
+        shown.forEach((sec) => {
+          if (!q && sec.group !== lastGroup) { items.push(h('div', { class: 'mgroup' }, sec.group)); lastGroup = sec.group; }
+          items.push(h('button', { type: 'button', class: 'mnavbtn' + (sec.id === current ? ' on' : ''), onclick: () => showSection(sec.id) }, sec.title));
+        });
         if (!shown.length) items.push(h('div', { class: 'tip' }, 'Nothing matches that search.'));
         nav.replaceChildren(...items);
       };
@@ -954,13 +1136,105 @@
     }
 
     async function summaryDialog(gameId) {
-      const { data, error } = await sb.rpc('game_summary', { p_game_id: gameId });
+      const [{ data, error }, roster] = await Promise.all([sb.rpc('game_summary', { p_game_id: gameId }), sb.rpc('room_players', { p_game_id: gameId })]);
       if (error) return toast(error.message);
+      const mine = new Set((roster.data || []).filter((x) => x.is_me).map((x) => x.id));
       const rows = data.players.map((p) => h('div', { class: 'game' },
         h('div', {},
-          h('div', { class: 'name' }, sigil(p.faction, 28), p.name, p.player_id === data.winner_player_id ? h('span', { class: 'tag gold' }, 'winner') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
-          h('div', { class: 'meta' }, `${p.castles} castles · ${p.troops} troops · ${p.battles} battles${p.eliminated_at_tick != null ? ` · eliminated at tick ${p.eliminated_at_tick}` : ''}`))));
+          h('div', { class: 'name' }, sigil(p.faction, 28), p.name, p.player_id === data.winner_player_id ? h('span', { class: 'tag gold' }, 'winner') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, mine.has(p.player_id) ? h('span', { class: 'tag green' }, 'you') : null),
+          h('div', { class: 'meta' }, `${p.castles} castles · ${p.troops} troops · ${p.battles} battles${p.eliminated_at_tick != null ? ` · eliminated at tick ${p.eliminated_at_tick}` : ''}`),
+          !p.is_ai && !mine.has(p.player_id)
+            ? h('button', {
+              class: 'small',
+              style: 'margin-top:6px',
+              onclick: (e) => run(e.currentTarget, async () => {
+                const r = await sb.rpc('friend_request_from_game', { p_game_id: gameId, p_player_id: p.player_id });
+                if (r.error) throw r.error;
+                toast(r.data === 'accepted' ? 'You are now friends' : 'Friend request sent', true);
+              }),
+            }, 'Add friend')
+            : null)));
       modal(`${data.name}: final standings`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);margin-bottom:8px' }, `Ended at tick ${data.ticks}${data.reason ? ` (${data.reason})` : ''}`), h('div', { class: 'list', style: 'max-height:50vh;overflow-y:auto' }, ...rows)), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+    }
+
+    function updateFriendBadge(n) {
+      state.friendReq = n;
+      document.querySelectorAll('.friendbadge').forEach((el) => { el.textContent = n || ''; el.style.display = n ? '' : 'none'; });
+    }
+
+    async function refreshFriendBadge() {
+      const { data } = await sb.rpc('list_friends');
+      if (data) updateFriendBadge(data.incoming.length);
+    }
+
+    async function friendProfileDialog(f) {
+      const { data, error } = await sb.rpc('friend_profile', { p_id: f.id });
+      if (error) return toast(error.message);
+      const rate = data.games ? `${Math.round((100 * data.wins) / data.games)}%` : 'None yet';
+      const stat = (k, v) => h('div', {}, h('b', {}, k), String(v));
+      const recent = data.recent.length
+        ? data.recent.map((g) => h('div', { class: 'frow' }, h('span', { class: 'row', style: 'gap:8px' }, sigil(g.faction, 22), g.name), h('span', {}, g.won ? h('span', { class: 'tag gold' }, 'won') : null, h('span', { class: 'tip', style: 'margin:0 0 0 8px' }, `tick ${g.ticks}`))))
+        : [h('div', { class: 'empty' }, 'No finished games yet.')];
+      modal(data.name, h('div', { class: 'fprofile' },
+        h('div', { class: 'fhead' }, data.favorite_house ? sigil(data.favorite_house, 64) : emblem(64),
+          h('div', {}, h('h3', {}, data.name), h('div', { class: 'tip' }, `Friends since ${new Date(data.friends_since).toLocaleDateString()}`))),
+        h('div', { class: 'kv' }, stat('Honor', data.honor), stat('Infamy', data.infamy), stat('Games', data.games), stat('Wins', data.wins), stat('Win rate', rate),
+          stat('Favorite house', data.favorite_house ? factionOf(data.favorite_house).name : 'None yet')),
+        h('label', {}, 'Recent finished games'),
+        h('div', {}, recent)), (close) => [
+        h('button', {
+          class: 'danger',
+          onclick: (e) => { if (confirm(`Remove ${data.name} from your friends?`)) run(e.currentTarget, async () => { const r = await sb.rpc('remove_friend', { p_id: f.id }); if (r.error) throw r.error; close(); toast('Friend removed', true); }); },
+        }, 'Remove friend'),
+        h('button', { class: 'primary', onclick: close }, 'Close')]);
+    }
+
+    async function friendsDialog() {
+      const body = h('div', { class: 'friends' }, h('div', { class: 'empty' }, 'Loading'));
+      const codeInput = h('input', { type: 'text', placeholder: 'ABCD-1234', maxlength: '9', 'aria-label': 'Friend code', autocomplete: 'off' });
+      let data = null;
+      let social = null;
+      const reload = async () => {
+        const [fl, sc] = await Promise.all([sb.rpc('list_friends'), sb.rpc('my_social')]);
+        if (fl.error) return toast(fl.error.message);
+        data = fl.data;
+        social = sc.data;
+        updateFriendBadge(data.incoming.length);
+        draw();
+      };
+      const act = (btn, fn, message) => run(btn, async () => {
+        const r = await fn();
+        if (r.error) throw r.error;
+        if (message) toast(typeof message === 'function' ? message(r.data) : message, true);
+        await reload();
+      });
+      const draw = () => {
+        const visibility = selectOf({ friends: 'Friends only', public: 'Everyone, and listed on the Roll of honor' }, social.visibility);
+        visibility.addEventListener('change', () => act(visibility, () => sb.rpc('set_stats_visibility', { p_value: visibility.value }), 'Saved'));
+        const send = h('button', { class: 'primary small', onclick: (e) => { const v = codeInput.value.trim(); if (!v) return toast('Enter a friend code'); act(e.currentTarget, () => sb.rpc('friend_request_by_code', { p_code: v }), (res) => { codeInput.value = ''; return res === 'accepted' ? 'You are now friends' : 'Friend request sent'; }); } }, 'Send request');
+        const person = (f, buttons) => h('div', { class: 'frow' }, h('span', {}, h('b', {}, f.name), f.honor !== undefined ? h('span', { class: 'tip', style: 'margin:0 0 0 8px' }, `Honor ${f.honor} · ${f.wins} wins in ${f.games} games`) : null), h('span', { class: 'row', style: 'gap:6px' }, buttons));
+        const kids = [
+          h('label', { style: 'margin-top:0' }, 'Your friend code'),
+          h('div', { class: 'frow' }, h('b', { class: 'fcode' }, social.code),
+            h('button', { class: 'small', onclick: () => { try { navigator.clipboard.writeText(social.code); toast('Copied', true); } catch { toast(social.code); } } }, 'Copy')),
+          h('div', { class: 'tip' }, 'Share this with someone you want as a friend. They must accept before they can see your stats.'),
+          h('label', {}, 'Add a friend'),
+          h('div', { class: 'row', style: 'gap:8px' }, codeInput, send),
+          data.incoming.length ? h('div', {}, h('label', {}, 'Requests to you'), ...data.incoming.map((f) => person(f, [
+            h('button', { class: 'primary small', onclick: (e) => act(e.currentTarget, () => sb.rpc('respond_friend_request', { p_id: f.id, p_accept: true }), 'Friend added') }, 'Accept'),
+            h('button', { class: 'small', onclick: (e) => act(e.currentTarget, () => sb.rpc('respond_friend_request', { p_id: f.id, p_accept: false })) }, 'Decline')]))) : null,
+          data.outgoing.length ? h('div', {}, h('label', {}, 'Requests you sent'), ...data.outgoing.map((f) => person(f, [
+            h('button', { class: 'small', onclick: (e) => act(e.currentTarget, () => sb.rpc('remove_friend', { p_id: f.id })) }, 'Cancel')]))) : null,
+          h('label', {}, `Friends (${data.friends.length})`),
+          data.friends.length ? h('div', {}, ...data.friends.map((f) => person(f, [h('button', { class: 'small', onclick: () => friendProfileDialog(f).then(reload) }, 'View')])))
+            : h('div', { class: 'empty' }, 'No friends yet. Trade friend codes, or add players from a finished game.'),
+          h('label', {}, 'Who can see your stats'),
+          visibility,
+          h('div', { class: 'tip' }, 'Friends can always see your honor, wins and recent finished games. Everyone means any player can see you on the Roll of honor.')];
+        body.replaceChildren(...kids.filter(Boolean));
+      };
+      modal('Friends', body, (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+      await reload();
     }
 
     function renameDialog() {

@@ -1462,3 +1462,10 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - In an anonymous game that has not finished, `player_reputations` returns only the trust word (Trusted, Unproven or Notorious), never honor, infamy or win counts, because those numbers could be matched against the public `profiles` table. `room_players` hides the host flag in the same case.
 - Eight row-level policies that looked up `game_players.user_id` directly now call the helpers `is_my_player` and `my_player_id`, which run with definer rights.
 - Still visible: `games.created_by` identifies the host (the host is public in the lobby anyway). Recognising someone by play style or chat cannot be prevented.
+
+**Friends** (migration `friends`)
+- Each profile has a `friend_code` (8 characters from an unambiguous alphabet, shown as `XXXX-XXXX`) and `stats_visibility` (`friends` default, or `public`). `profiles` is now readable only for your own row; other players' stats come through functions.
+- Table `friendships` (pending or accepted, one row per pair) has no client access. Functions: `my_social`, `set_stats_visibility`, `friend_request_by_code`, `friend_request_from_game` (finished games only), `respond_friend_request`, `remove_friend`, `list_friends`, `friend_profile`. A request sent to someone who already requested you is accepted at once. Limit: 30 pending requests.
+- `friend_profile` shows honor, infamy, games, wins, favorite house and the last 8 finished games only, so a friend cannot learn which seat you hold in an anonymous game in progress.
+- `get_leaderboard` lists only players whose `stats_visibility` is `public`.
+- Not built: blocking, lobby invites, "friend is hosting" tags.
