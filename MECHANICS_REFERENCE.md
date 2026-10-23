@@ -1438,3 +1438,10 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - Controls: left-drag pans, right-drag rotates, wheel zooms; Tilted and Top-down camera, shadows and occlusion toggles; frame rate 60 on a compact map; build time about 1.3 s there. A lighter mode is used below 900 px wide.
 - Also fixed in 2D: marching armies and the march line followed straight lines between castles; in trails games they now follow the trail paths.
 - Tested in the browser against a real game's data (30 castles, passes, trails, an army, the route builder, 2D/3D toggling) and against a generated river-valley map with 3 river castles and 2 wormholes. Not tested: phones, very large maps (8 players, large), fog games, replay mode in 3D (the replay bar shows ownership only in 2D).
+
+**Bigger maps (lobby map scale)**
+
+- The lobby's Map scale now runs from Classic 1x to Titanic 6x, with **Colossal 5x as the new default** (it was Vast 3x). Castle spacing is `150 x scale`, so 5x puts castles about 67% further apart than before; castle models stay the same size, so there is more land between them. Nothing in the database limits the scale.
+- Game pace does not change with scale: in trails games march speed is multiplied by the scale, so a hop still takes the same number of ticks, and range and scan radii scale too.
+- A sweep of scales 5 and 6 over every shape, four sizes and two terrain presets built 96 of 96 connected maps, each in under 0.7 s. The largest map (8 players, large) is about 35,000 units wide at 5x and 42,000 at 6x.
+- 3D at that size is the open question. On a 333-castle, 35,000-unit map the 3D view built in 18 s and ran 28 to 42 frames per second right after its terrain tiles finished loading, then dropped to about 1 in the test pane (cause not found). Maps with more than 200 castles now open 3D in its lighter quality mode, and a 2D fallback is always one click away.

@@ -812,8 +812,8 @@
       const mirror = check(false, 'Mirrored stars (2, 4 or 8 players): the map is mirrored on both axes for equal starts');
       const style = selectOf(STYLES, 'scatter');
       const size = choice([['tiny', 'Tiny', '8 castles per house'], ['compact', 'Compact', '12 per house'], ['small', 'Small', '16 per house'], ['standard', 'Standard', '24 per house'], ['large', 'Large', '36 per house']], 'standard', () => { syncHint(); update(); });
-      const scaleSel = h('select', {}, h('option', { value: '1' }, 'Classic (1x)'), h('option', { value: '2' }, 'Wide (2x)'), h('option', { value: '3' }, 'Vast (3x)'), h('option', { value: '4' }, 'Immense (4x)'));
-      scaleSel.value = '3';
+      const scaleSel = h('select', {}, h('option', { value: '1' }, 'Classic (1x)'), h('option', { value: '2' }, 'Wide (2x)'), h('option', { value: '3' }, 'Vast (3x)'), h('option', { value: '4' }, 'Immense (4x)'), h('option', { value: '5' }, 'Colossal (5x)'), h('option', { value: '6' }, 'Titanic (6x)'));
+      scaleSel.value = '5';
       const travelSel = selectOf(TRAVEL_INFO, 'trails');
       const mapPreset = selectOf(PRESET_INFO, 'continental');
       const homeSel = selectOf(HOME_INFO, 'medium');
@@ -2454,7 +2454,7 @@
           art: ms.art,
           sites: list.map((t) => ({ id: t.id, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false })),
           edges: ms.edges.filter((e) => idx.has(e.from_territory_id) && idx.has(e.to_territory_id)).map((e) => ({ a: idx.get(e.from_territory_id), b: idx.get(e.to_territory_id), kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path })),
-          lowQuality: window.innerWidth < 900,
+          lowQuality: window.innerWidth < 900 || list.length > 200,
           colors: (pid) => [color(pid), color2(pid)],
           onSelect: (id) => {
             if (ms.syncing3d) return;
