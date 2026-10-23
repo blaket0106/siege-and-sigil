@@ -1291,7 +1291,7 @@ Supersedes the tier and influence rules in sections 5 and 10 where they conflict
 - **No regions:** ownership regions (Voronoi cells and borders) were client-only drawing; no rule used them, and they are gone on terrain maps. Ownership shows as a colored ring around each castle, and the gold ring marks the selected castle. Fog of war still uses scan rings and dims castles you cannot see. Games without terrain art keep the old cell drawing.
 - **Continent land:** land is a noise-based continent filling the map (inland seas, lakes, ragged coast) rather than discs around castles. Small land patches around castles and narrow land bridges along the base road graph still guarantee every castle is on land and the map is connected. Mountain ridges cover about 12 to 20 percent of land.
 - **Link cap:** in free travel, `territory_edges` holds passable pairs within 5 spacings (1500 links for 96 castles, about 5600 for a 288 castle map). This replaces "no length cap" in 20ab.
-- **Generation cost:** large maps build 10 terrain candidates instead of 20 to stay inside the function CPU limit (about 1.1 s for 288 castles).
+- **Generation cost:** the edge function has a CPU limit and a 96-castle game once failed with `CPU Time exceeded` (status 546), so terrain candidates are now 5 up to 60 castles, 4 up to 150 and 3 above, and the worst case measured locally is about 0.55 s of CPU.
 
 ### 20ae. Map shapes, dark fog and castle contrast (implemented)
 

@@ -2,7 +2,6 @@ export const GRID = 192;
 export const SEA = 0.2;
 const LAND_T = 0.36;
 const MOUNT_T = 0.53;
-const CANDIDATES = 20;
 
 function smoothstep(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -527,7 +526,7 @@ export function buildTerrain(o) {
 
 export function bestTerrain(o) {
   let best = null;
-  const count = o.points.length > 150 ? CANDIDATES / 2 : CANDIDATES;
+  const count = o.points.length > 150 ? 3 : o.points.length > 60 ? 4 : 5;
   for (let salt = 0; salt < count; salt++) {
     const result = buildTerrain({ ...o, salt });
     if (!best || result.fairness < best.fairness) best = result;
