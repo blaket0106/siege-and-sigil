@@ -429,7 +429,6 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .mapbody.sideleft { flex-direction: row-reverse; }
 .mapbody.sideleft .side { border-left: none; border-right: 1px solid var(--gilt-lo); }
 .mapwrap { overflow: hidden; flex: 1; min-width: 0; background: var(--map-bg); position: relative; box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.75); }
-.mapwrap.tilted::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 34%; background: linear-gradient(180deg, var(--map-bg) 0%, rgba(8, 11, 23, 0.82) 40%, transparent 100%); pointer-events: none; z-index: 1; }
 .mapwrap::after { content: ''; position: absolute; inset: 6px; border: 1px solid rgba(214, 171, 82, 0.35); pointer-events: none; -webkit-mask: none; }
 .mapwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; user-select: none; }
 .mapwrap text { font-family: var(--font-ui); font-weight: 600; pointer-events: none; fill: #efe3c4; }
@@ -602,7 +601,7 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 
 body.on-login #stage, body.on-login::after { display: none; }
 .login { --text: #ecdfc2; --dim: #b5a687; --faint: #7e7259; --gilt: #d6ab52; --gilt-hi: #f5dc94; --gilt-lo: #8d6a28; --rule: #7a5e32; --rule-soft: #3d2d1b; --gules: #9c2e26; --gules-hi: #cf5246; --recess: rgba(0, 0, 0, 0.42); --text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75); position: fixed; inset: 0; overflow: hidden; background: #07090d; color: var(--text); z-index: 3; }
-.login-poster { position: absolute; inset: 0; background: radial-gradient(ellipse 90% 55% at 66% 80%, rgba(233, 160, 96, 0.5), transparent 62%), linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
+.login-poster { position: absolute; inset: 0; background: url('assets/login-still-wide.jpg') center / cover no-repeat, radial-gradient(ellipse 90% 55% at 66% 80%, rgba(233, 160, 96, 0.5), transparent 62%), linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
 .flyover { position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s ease; }
 .flyover.on { opacity: 1; }
 .flyover #ui, .flyover #labels, .flyover #load { display: none !important; }
@@ -617,15 +616,27 @@ body.on-login #stage, body.on-login::after { display: none; }
 .login .lede { font-size: 1.12rem; color: var(--dim); }
 .login-rail .auth-card { background: none; border: 0; box-shadow: none; padding: 0; width: 100%; margin-top: 14px; text-align: left; }
 .login-rail .auth-card .tabs button { padding: 9px; }
+.login-rail .auth-card .switch { display: none; text-align: center; margin-top: 14px; }
 .login-rail .roster { margin-top: auto; padding-top: 16px; }
 .login .lower { position: absolute; left: 420px; bottom: 34px; font-family: var(--font-display); letter-spacing: 0.22em; font-size: 0.78rem; color: rgba(245, 220, 148, 0.85); text-shadow: 0 2px 8px #000; opacity: 0; transition: opacity 1.6s; pointer-events: none; }
 .login .lower b { display: block; margin-top: 4px; font-weight: 600; font-size: 1.05rem; letter-spacing: 0.26em; color: #fbefd6; }
 .login .lower.on { opacity: 1; }
 @media (max-width: 899px) {
   .login-rail { top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 88vh; padding: 14px 22px 12px; border-right: 0; border-top: 1px solid rgba(214, 171, 82, 0.55); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55); }
-  .login .bigcrest { width: 58px; }
-  .login h1 { font-size: 1.15rem; margin-top: 10px; }
+  .login .bigcrest { display: none; }
+  .login h1 { font-size: 1rem; letter-spacing: 0.34em; margin: 2px 0 4px; }
+  .login-rail { padding: 18px 24px 12px; }
+  .login-rail .auth-card .tabs { display: none; }
+  .login-rail .auth-card label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0; }
+  .login-rail .auth-card input { padding: 13px 2px; }
+  .login-rail .auth-card button.primary { margin-top: 20px !important; padding: 14px; }
+  .login-rail .auth-card .switch { display: block; margin-top: 8px; }
+  .login-rail .auth-card button.link { font-size: 0.92rem; color: var(--dim); text-decoration-thickness: 1px; }
+  .login-rail .auth-card form > div[style] { margin-top: 12px !important; }
+  .login-rail .auth-card .consent { font-size: 0.8rem; margin-top: 10px; }
+  .login-rail .auth-card .legallinks { margin-top: 10px; font-size: 0.78rem; opacity: 0.7; }
   .login .rule, .login .lede, .login .roster, .login .housename { display: none; }
   .login-rail .auth-card { margin-top: 6px; }
-  .login .lower { left: 20px; bottom: auto; top: 20px; }
+  .login .lower { display: none; }
+  .login-poster { background: url('assets/login-still-tall.jpg') center top / cover no-repeat, linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
 }

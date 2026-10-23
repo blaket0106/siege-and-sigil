@@ -504,6 +504,7 @@
       state.factions = data || [];
     }
 
+    const TOUCH_DEVICE = window.innerWidth < 900 || window.matchMedia('(pointer: coarse)').matches;
     const FLIGHT = { alt: 170, pitch: (9 * Math.PI) / 180, speed: 32, fov: 48, fog: 2.4, sun: { el: 9, az: 248 }, horizon: 0xe9b48a, exposure: 1.15 };
 
     function loginWorld(opts, seed0) {
@@ -584,22 +585,21 @@
     async function startLoginFlyover(host, caption) {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       if (navigator.connection && navigator.connection.saveData) return;
+      if (window.innerWidth < 900 || window.matchMedia('(pointer: coarse)').matches) return;
       let stopped = false;
       let api = null;
       const alive = () => host.isConnected && !stopped;
       state.cleanup.push(() => { stopped = true; if (api) { try { api.dispose(); } catch {} } });
-      const phone = window.innerWidth < 900 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
       try {
         const presets = ['highlands', 'river_valley', 'continental'];
         const seed0 = Math.floor(Math.random() * 2 ** 30) + 1;
-        const layout = await loginWorld({ players: phone ? 2 : 3, mapSize: 'compact', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: phone ? 2.2 : 2.6, freeTravel: false, shape: 'continent', richness: 'standard', randomRoads: 'none', starScatter: 'random', mirrored: false, trails: true, preset: presets[seed0 % 3], homeDistance: 'medium' }, seed0);
+        const layout = await loginWorld({ players: 3, mapSize: 'compact', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: 2.6, freeTravel: false, shape: 'continent', richness: 'standard', randomRoads: 'none', starScatter: 'random', mirrored: false, trails: true, preset: presets[seed0 % 3], homeDistance: 'medium' }, seed0);
         if (!alive()) return;
         const { createMap3D } = await import('./map3d.js');
         if (!alive()) return;
         const seats = ['kaldran', 'veyra', 'thornwick'];
         const sites = layout.territories.map((t, i) => ({ id: i, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false }));
         const edges = layout.edges.map((e) => ({ a: e.a, b: e.b, kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path }));
-        const pitch = phone ? (25 * Math.PI) / 180 : FLIGHT.pitch;
         let track = null;
         let castles = [];
         let frames = 0;
@@ -608,7 +608,7 @@
         let label = '';
         const giveUp = () => { stopped = true; host.classList.remove('on'); setTimeout(() => { if (api) { try { api.dispose(); } catch {} api = null; } }, 2400); };
         const made = await createMap3D(host, {
-          map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: !!phone,
+          map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: false,
           colors: (pid) => { const f = factionOf(seats[pid]); return [f.color, f.color2]; },
           sun: FLIGHT.sun, horizon: FLIGHT.horizon, fogMul: FLIGHT.fog, exposure: FLIGHT.exposure,
           onFrame: (t, dt, cam, controls) => {
@@ -623,7 +623,7 @@
             const at = (arr, k) => { const i = Math.floor(k) % track.N; const j = (i + 1) % track.N; const r = k - Math.floor(k); return arr[i] * (1 - r) + arr[j] * r; };
             const px = at(track.CX, f); const pz = at(track.CZ, f); const py = at(track.Y, f);
             const lx = at(track.CX, f + track.LA); const lz = at(track.CZ, f + track.LA);
-            const ly = py - Math.hypot(lx - px, lz - pz) * Math.tan(pitch);
+            const ly = py - Math.hypot(lx - px, lz - pz) * Math.tan(FLIGHT.pitch);
             cam.position.set(px, py, pz); cam.up.set(0, 1, 0); cam.lookAt(lx, ly, lz);
             controls.target.set(lx, Math.max(made.groundAt(lx, lz), 20), lz);
             let near = null; let nd = 1e9;
@@ -640,7 +640,7 @@
         if (!alive()) { try { made.dispose(); } catch {} api = null; return; }
         made.update(layout.territories.map((t, i) => ({ id: i, owner: t.owner_seat, troops: t.owner_seat != null ? 10 + (i % 7) * 3 : 12, mine: false })));
         castles = made.sites().filter((s) => !sites[s.id].crossing_kind);
-        track = flightTrack(made, castles, phone ? 260 : FLIGHT.alt);
+        track = flightTrack(made, castles, FLIGHT.alt);
         host.classList.add('on');
       } catch (err) {
         console.warn('Login fly-over unavailable:', err);
@@ -652,9 +652,10 @@
       clearCleanup();
       let tab = recovery ? 'recovery' : state.authTab;
       const message = h('div', { class: 'msg' });
-      const email = h('input', { type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
-      const password = h('input', { type: 'password', autocomplete: tab === 'signup' || tab === 'recovery' ? 'new-password' : 'current-password' });
-      const name = h('input', { type: 'text', maxlength: '40', placeholder: 'Shown to other players' });
+      const compact = window.innerWidth < 900;
+      const email = h('input', { type: 'email', autocomplete: 'email', 'aria-label': 'Email', placeholder: compact ? 'Email' : 'you@example.com' });
+      const password = h('input', { type: 'password', 'aria-label': 'Password', placeholder: compact ? 'Password' : '', autocomplete: tab === 'signup' || tab === 'recovery' ? 'new-password' : 'current-password' });
+      const name = h('input', { type: 'text', maxlength: '40', 'aria-label': 'Display name', placeholder: compact ? 'Display name' : 'Shown to other players' });
       const form = h('form', { novalidate: true });
 
       const draw = () => {
@@ -663,12 +664,14 @@
         const tabs = recovery ? null : h('div', { class: 'tabs' },
           h('button', { type: 'button', class: tab === 'signin' ? 'on' : '', onclick: () => { state.authTab = tab = 'signin'; draw(); } }, 'Sign in'),
           h('button', { type: 'button', class: tab === 'signup' ? 'on' : '', onclick: () => { state.authTab = tab = 'signup'; draw(); } }, 'Create account'));
+        if (compact) password.placeholder = tab === 'recovery' ? 'New password' : 'Password';
         const kids = [tabs];
         if (tab === 'signup') kids.push(h('label', {}, 'Display name'), name);
         if (tab !== 'recovery') kids.push(h('label', {}, 'Email'), email);
         if (tab !== 'reset') kids.push(h('label', {}, tab === 'recovery' ? 'New password' : 'Password'), password);
         kids.push(submit);
         if (tab === 'signin') kids.push(h('div', { style: 'margin-top:14px;text-align:center' }, h('button', { type: 'button', class: 'link', onclick: () => { tab = 'reset'; draw(); } }, 'Forgot password?')));
+        if (tab === 'signin' || tab === 'signup') kids.push(h('div', { class: 'switch' }, h('button', { type: 'button', class: 'link', onclick: () => { state.authTab = tab = tab === 'signin' ? 'signup' : 'signin'; draw(); } }, tab === 'signin' ? 'New here? Create an account' : 'Have an account? Sign in')));
         if (tab === 'reset') kids.push(h('div', { style: 'margin-top:14px;text-align:center' }, h('button', { type: 'button', class: 'link', onclick: () => { tab = 'signin'; draw(); } }, 'Back to sign in')));
         if (tab === 'signup') kids.push(h('p', { class: 'consent' }, 'By creating an account you agree to the ', h('button', { type: 'button', class: 'link', onclick: () => legalDialog('terms') }, 'Terms of use'), ' and ', h('button', { type: 'button', class: 'link', onclick: () => legalDialog('privacy') }, 'Privacy policy'), '.'));
         kids.push(message);
@@ -3032,7 +3035,7 @@
           const g = plate
             ? plateCastle({ t, tier, owner, seen, mine, showTroops, selected, sieged, here, reach, pick, nameLabel, colors: { c: color(owner), c2: color2(owner), cmd: color }, onCmd: (c) => select('c', c.id), cmdSel: (c) => !!ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id })
             : sv('g', {}, sv('circle', { cx: 0, cy: 0, r: 8 + 3 * tier, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }), sv('text', { x: 0, y: -8 - 3 * tier - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'));
-          g.setAttribute('transform', `translate(${t.x},${t.y}) scale(${k},${k * tiltK()})`);
+          g.setAttribute('transform', `translate(${t.x},${t.y}) scale(${k},${k})`);
           castles.push(g);
         });
         L.cells.replaceChildren(...cells);
@@ -3129,7 +3132,7 @@
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
           const label = friend ? String(c.troops) : '?';
           const bw = Math.max(24, label.length * 9 + 12);
-          out.push(sv('g', { transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.1},${M() * 1.1 * tiltK()})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
+          out.push(sv('g', { transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.1},${M() * 1.1})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
             sv('ellipse', { cx: 2, cy: 2, rx: 11, ry: 3.6, fill: 'rgba(0,0,0,0.4)' }),
             sel ? sv('ellipse', { class: 'selring', cx: 0, cy: 1, rx: 17, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 2, 'stroke-dasharray': '6 5' }) : null,
             sv('line', { x1: 0, y1: 0, x2: 0, y2: -30, stroke: '#2a1c0c', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
@@ -3453,9 +3456,8 @@
           g.status === 'finished' ? h('button', { class: 'primary', onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
           stat('Treasury', ms.me.gold),
           g.fog_of_war ? h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null,
-          h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.tilt, onchange: (e) => { ms.tilt = e.target.checked; try { localStorage.setItem('ss-tilt', ms.tilt ? '1' : '0'); } catch {} applyTilt(); render(); } }), 'Tilt'),
           h('button', { class: 'ghost', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
-          h('button', { onclick: toggle3D }, ms.view3d ? '2D map' : '3D map'),
+          TOUCH_DEVICE ? null : h('button', { onclick: toggle3D }, ms.view3d ? '2D map' : '3D map'),
           h('button', { class: 'primary', onclick: menuDialog }, 'Menu'),
           h('button', { class: 'ghost', onclick: helpDialog }, 'Help')].filter(Boolean));
         updateCountdown();
@@ -4380,33 +4382,12 @@
         sideEl.replaceChildren(sideTabs(), ...parts.filter(Boolean));
       };
 
-      const TILT = { deg: 34, persp: 1400, zoom: 1.22, origin: 0.55 };
-      try { ms.tilt = localStorage.getItem('ss-tilt') !== '0'; } catch { ms.tilt = true; }
-      const tiltK = () => (ms.tilt ? 1 / Math.cos((TILT.deg * Math.PI) / 180) : 1);
-      const applyTilt = () => {
-        wrap.style.perspective = ms.tilt ? `${TILT.persp}px` : '';
-        wrap.style.perspectiveOrigin = `50% ${TILT.origin * 100}%`;
-        svg.style.transformOrigin = `50% ${TILT.origin * 100}%`;
-        svg.style.transform = ms.tilt ? `rotateX(${TILT.deg}deg) scale(${TILT.zoom})` : '';
-        wrap.classList.toggle('tilted', ms.tilt);
-      };
       const toMapWith = (view, e) => {
         const box = wrap.getBoundingClientRect();
         const W = box.width;
         const H = box.height;
-        let lx = e.clientX - box.left;
-        let ly = e.clientY - box.top;
-        if (ms.tilt) {
-          const th = (TILT.deg * Math.PI) / 180;
-          const ox = W / 2;
-          const oy = TILT.origin * H;
-          const X = lx - ox;
-          const Y = ly - oy;
-          const u = (Y * TILT.persp) / (TILT.persp * Math.cos(th) + Y * Math.sin(th));
-          const sc = TILT.persp / (TILT.persp - u * Math.sin(th));
-          lx = ox + X / sc / TILT.zoom;
-          ly = oy + u / TILT.zoom;
-        }
+        const lx = e.clientX - box.left;
+        const ly = e.clientY - box.top;
         const k = Math.min(W / view.w, H / view.h);
         return { x: view.x + (lx - (W - view.w * k) / 2) / k, y: view.y + (ly - (H - view.h * k) / 2) / k };
       };
@@ -4481,7 +4462,6 @@
         if (e.target === svg) select(null);
       });
 
-      applyTilt();
       let firstLoad = true;
       const load = async () => {
         if (state.view !== 'map' || state.roomId !== gameId) return;
@@ -4609,7 +4589,7 @@
         if (animStep === 0) updateCountdown();
       }, 250);
       const loadTimer = setInterval(load, 20000);
-      try { if (localStorage.getItem('ss-view3d') === '1' && ms.art) toggle3D(); } catch {}
+      try { if (!TOUCH_DEVICE && localStorage.getItem('ss-view3d') === '1' && ms.art) toggle3D(); } catch {}
       const onKey = (e) => {
         if (e.key !== 'Escape' || document.activeElement instanceof HTMLInputElement) return;
         if (ms.marching) { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); }

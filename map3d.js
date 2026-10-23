@@ -784,6 +784,7 @@ const api = {
   focus(id, dist = 900) { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i]; controls.target.set(c.s.x, c.s.gy + 50, c.s.y); setView(.9, dist); },
   resize: doResize,
   groundAt: (x, z) => hAt(x, z),
+  capture(w, h, q) { composer.render(); const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(renderer.domElement, 0, 0, w, h); return c.toDataURL('image/jpeg', q || 0.8); },
   scene,
   sites: () => sites.map((q) => ({ id: q.id, x: q.x, z: q.y, y: q.gy, tier: q.tier, name: q.name })),
   dispose() { running = false; ro.disconnect(); renderer.dispose(); try { renderer.forceContextLoss(); } catch {} host.innerHTML = ''; host.classList.remove('map3d'); },

@@ -86,6 +86,12 @@ import { generateWorld } from '../supabase/functions/start-game/generator.js';
 import { createMap3D } from '../map3d.js';
 
 const Q = new URLSearchParams(location.search);
+const SHOT = (Q.get('shot') || '').split('x').map(Number);
+if (SHOT.length === 2 && SHOT[0]) {
+  document.querySelectorAll('.rail, .grade, .vignette, #grain, .lower, .hud').forEach((e) => { e.style.display = 'none'; });
+  const st = document.getElementById('stage');
+  st.style.cssText = `position:fixed;left:0;top:0;width:${SHOT[0]}px;height:${SHOT[1]}px;overflow:hidden`;
+}
 if (Q.get('rail') === '0') document.querySelector('.rail').style.display = 'none';
 if (Q.get('rail') === '0') document.getElementById('lower').style.left = '40px';
 const HOUSES = {
@@ -210,7 +216,7 @@ async function build() {
   const lower = document.getElementById('lower');
   let lastLabel = '';
   const hud = document.getElementById('hud');
-  api = await createMap3D(document.getElementById('stage'), {
+  api = window.__api = await createMap3D(document.getElementById('stage'), {
     map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: false,
     colors: (pid) => { const H = HOUSES[seats[pid]]; return [H.c1, H.c2]; },
     sun, horizon: Number(Q.get('hz') ? parseInt(Q.get('hz'), 16) : 0xe9b48a), fogMul: Number(Q.get('fog') || 3.2), exposure: Number(Q.get('exp') || 1.05),
@@ -218,6 +224,7 @@ async function build() {
     onFrame: (t, dt, cam, controls) => {
       if (!ready) return;
       if (!path) return;
+      if (Number(Q.get('vy')) && !cam.view) { const el = document.getElementById('stage'); cam.setViewOffset(el.clientWidth, el.clientHeight, 0, el.clientHeight * Number(Q.get('vy')), el.clientWidth, el.clientHeight); }
       controls.enabled = false; controls.maxPolarAngle = Math.PI * 0.62; controls.minDistance = 1;
       if (Math.abs(cam.fov - FOV) > 0.01) { cam.fov = FOV; cam.updateProjectionMatrix(); }
       const f = ((((t * speed + START * path.len) / path.len) % 1) + 1) % 1 * path.N;
