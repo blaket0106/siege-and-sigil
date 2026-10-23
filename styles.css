@@ -289,12 +289,30 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 
 /* auth */
 .welcome { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 430px); gap: 60px; align-items: center; min-height: 84vh; }
-.welcome .lede { font-family: var(--font-ui); font-style: italic; font-size: 1.5rem; color: var(--text); margin: 18px 0 0; max-width: 30ch; line-height: 1.3; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9); }
-.welcome h1 { font-family: var(--font-title); font-weight: 900; font-size: clamp(2.6rem, 6.5vw, 4.8rem); letter-spacing: 0.05em; line-height: 1.05; background: linear-gradient(180deg, var(--gilt-hi) 0%, var(--gilt) 50%, var(--gilt-lo) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 28px var(--edge-glow)); text-shadow: none; }
-.welcome .roster { display: flex; gap: 12px; margin-top: 38px; flex-wrap: wrap; }
-.welcome .roster svg { width: 40px; height: 46px; }
-.welcome .bigcrest { width: min(230px, 46vw); margin-bottom: 26px; filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.75)); }
-.auth-card { padding: 32px 30px; }
+.welcome .hero { text-align: center; }
+.welcome h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.9rem, 3.6vw, 2.9rem); letter-spacing: 0.26em; text-transform: uppercase; line-height: 1.15; margin: 26px 0 0; padding-left: 0.26em; color: var(--gilt-hi); text-shadow: var(--text-shadow); }
+.welcome .rule { position: relative; height: 9px; width: min(300px, 70%); margin: 20px auto 18px; background: linear-gradient(90deg, transparent, var(--gilt-lo)) left 0 top 4px / calc(50% - 14px) 1px no-repeat, linear-gradient(90deg, var(--gilt-lo), transparent) right 0 top 4px / calc(50% - 14px) 1px no-repeat; }
+.welcome .rule::after { content: ''; position: absolute; left: 50%; top: 1px; width: 7px; height: 7px; margin-left: -3.5px; background: var(--gilt); transform: rotate(45deg); }
+.welcome .lede { font-family: var(--font-ui); font-style: italic; font-size: 1.3rem; color: var(--text); margin: 0 auto; max-width: 30ch; line-height: 1.3; text-shadow: var(--text-shadow); }
+.welcome .roster { display: flex; justify-content: center; gap: 4px; margin-top: 34px; flex-wrap: wrap; }
+.welcome .house, .welcome .house:hover:not(:disabled), .welcome .house:active:not(:disabled) { background: none; border: none; box-shadow: none; filter: none; padding: 6px 5px 9px; border-radius: 2px; opacity: 0.7; transition: opacity 0.18s, transform 0.18s; }
+.welcome .house:hover:not(:disabled), .welcome .house:focus-visible, .welcome .house.on { opacity: 1; transform: translateY(-3px); }
+.welcome .house::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 14px; height: 2px; margin-left: -7px; background: var(--gilt); opacity: 0; transition: opacity 0.18s; }
+.welcome .house.on::after { opacity: 1; }
+.welcome .house .sigil { filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45)); }
+.welcome .housename { margin-top: 12px; min-height: 1.4em; font-family: var(--font-display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); text-shadow: var(--text-shadow); }
+.welcome .bigcrest { width: 190px; margin: 0 auto; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.5)); }
+.welcome .bigcrest .sigil { width: 100%; height: auto; filter: none; }
+.welcome .bigcrest.swap .sigil { animation: crestswap 0.32s ease-out; }
+@keyframes crestswap { from { opacity: 0; transform: translateY(6px) scale(0.97); } to { opacity: 1; transform: none; } }
+.auth-card { position: relative; padding: 38px 36px 30px; border: 1px solid var(--rule); border-radius: 2px; background: linear-gradient(180deg, var(--surface-a), var(--surface-b)); background-blend-mode: normal; box-shadow: var(--shadow), inset 0 0 0 6px var(--surface-b), inset 0 0 0 7px var(--rule-soft); }
+.auth-card input { background: transparent; border: none; border-bottom: 1px solid var(--rule); border-radius: 0; box-shadow: none; padding: 9px 2px 10px; font-size: 1.1rem; }
+.auth-card input:focus { border-bottom-color: var(--gilt-hi); box-shadow: 0 1px 0 var(--gilt-hi); }
+.auth-card label { margin: 22px 0 2px; font-size: 0.72rem; letter-spacing: 0.16em; color: var(--dim); }
+.auth-card button.primary { background: var(--gules); border: 1px solid var(--gilt-lo); border-radius: 2px; box-shadow: none; padding: 13px 28px; font-size: 0.84rem; letter-spacing: 0.2em; text-shadow: none; margin-top: 28px !important; }
+.auth-card button.primary::after { display: none; }
+.auth-card button.primary:hover:not(:disabled) { background: var(--gules-hi); border-color: var(--gilt); box-shadow: none; filter: none; }
+.auth-card .tabs { margin: 0 0 4px; }
 .tabs { display: flex; margin-bottom: 6px; background: linear-gradient(90deg, transparent, var(--rule) 20%, var(--rule) 80%, transparent) bottom / 100% 1px no-repeat; }
 .tabs button { flex: 1; border-radius: 0; background: none; border: none; box-shadow: none; border-bottom: 2px solid transparent; padding: 11px; color: var(--dim); }
 .tabs button:hover:not(:disabled) { box-shadow: none; filter: none; color: var(--text); }
@@ -440,8 +458,8 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .selring { animation: dashmove 3s linear infinite; }
 @keyframes dashmove { to { stroke-dashoffset: -32; } }
 .flag { transform-box: fill-box; transform-origin: 0 50%; animation: wave 2.6s ease-in-out infinite; }
-.zoomonly { display: none; }
-svg.zoomed .zoomonly { display: inline; }
+.lbl-plate, .lbl-army, .lbl-infra { display: inline; }
+svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra { display: none; }
 
 @media (max-width: 1020px) {
   .sheet { grid-template-columns: 1fr; }
@@ -460,7 +478,13 @@ svg.zoomed .zoomonly { display: inline; }
 @media (pointer: coarse) { button:not(.link), select, input:not([type='checkbox']) { min-height: 44px; } .hud { gap: 8px 12px; } }
 @media (prefers-reduced-motion: reduce) { .sigil.draw .outline { animation: none; stroke-dashoffset: 0; } button, .banner { transition: none; } #stage .land, #stage .mist, .house .crest::before, .modal, .overlay, .toast { animation: none; } button.primary::after { display: none; } .selring, .flag, .marchline { animation: none; } }
 
-.mappreview { position: sticky; top: 8px; z-index: 5; margin-bottom: 18px; padding: 10px; background: var(--surface-b, #1b130c); border: 1px solid var(--gilt-lo); border-radius: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+.mappreview { margin-bottom: 18px; padding: 10px; background: var(--surface-b, #1b130c); border: 1px solid var(--gilt-lo); border-radius: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+@media (min-width: 1060px) {
+  .stepbody > section.realm-sec.on { display: grid; grid-template-columns: minmax(0, 1fr) 400px; column-gap: 28px; align-items: start; }
+  .realm-sec > .sheet-head { grid-column: 1 / -1; }
+  .realm-sec > :not(.sheet-head):not(.mappreview) { grid-column: 1; }
+  .realm-sec > .mappreview { grid-column: 2; grid-row: 2 / span 40; position: sticky; top: 16px; margin-bottom: 0; }
+}
 .mapstage { position: relative; width: min(100%, 440px); aspect-ratio: 1 / 1; margin: 0 auto; background: #0e2f4f; overflow: hidden; border-radius: 2px; }
 
 .map3d-host { position: absolute; inset: 0; z-index: 2; }

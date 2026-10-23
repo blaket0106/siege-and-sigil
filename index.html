@@ -42,7 +42,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, wormholes';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -376,10 +376,11 @@
     };
     const SHIELD = 'M4 4H60V34C60 52 46 62 32 68C18 62 4 52 4 34Z';
     const DIVISIONS = {
-      chief: 'M0 0H64V24H0Z', pale: 'M32 0H64V72H32Z', bend: 'M0 0H18L64 54V72H46L0 20Z', fess: 'M0 26H64V44H0Z',
-      chevron: 'M0 50L32 22L64 50V62L32 34L0 62Z', quarterly: 'M32 0H64V36H32ZM0 36H32V72H0Z', plain: '',
+      chief: 'M0 0H64V20H0Z', pale: 'M32 0H64V72H32Z', bend: 'M0 0H18L64 54V72H46L0 20Z', fess: 'M0 25H64V43H0Z',
+      chevron: 'M0 56L32 28L64 56V68L32 40L0 68Z', quarterly: 'M32 0H64V36H32ZM0 36H32V72H0Z', plain: '',
     };
-    const STAR = Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? 5.4 : 13; const a = (Math.PI * i) / 5 - Math.PI / 2; return `${(32 + r * Math.cos(a)).toFixed(1)},${(38 + r * Math.sin(a)).toFixed(1)}`; }).join(' ');
+    const CHARGE_AT = { x: 32, y: 34 };
+    const STAR = Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? 6.2 : 15; const a = (Math.PI * i) / 5 - Math.PI / 2; return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`; }).join(' ');
     let sigilSeq = 0;
 
     function luminance(hex) {
@@ -391,23 +392,44 @@
       const f = factionOf(slug);
       const [division, charge] = ARMS[slug] || ['plain', 'star'];
       const id = `sg${++sigilSeq}`;
-      const ink = luminance(f.color) > 0.55 ? '#1a2040' : '#f2d58f';
-      const mark = { fill: ink, stroke: 'rgba(0,0,0,0.4)', 'stroke-width': 0.8, 'stroke-linejoin': 'round' };
+      const behind = ['fess', 'chevron', 'bend'].includes(division) ? f.color2 : (division === 'chief' || division === 'plain' ? f.color : null);
+      const dark = behind ? luminance(behind) > 0.5 : false;
+      const ink = dark ? '#1a2040' : '#f6e3a8';
+      const haloColor = dark ? 'rgba(255,250,235,0.9)' : 'rgba(12,8,5,0.78)';
+      const halo = { stroke: haloColor, 'stroke-width': 3.4, 'stroke-linejoin': 'round', 'paint-order': 'stroke' };
+      const solid = (d) => sv('path', { d, fill: ink, ...halo });
+      const line = (d, w) => [
+        sv('path', { d, fill: 'none', stroke: haloColor, 'stroke-width': w + 3.4, 'stroke-linecap': 'round' }),
+        sv('path', { d, fill: 'none', stroke: ink, 'stroke-width': w, 'stroke-linecap': 'round' }),
+      ];
       const charges = {
-        tower: [sv('path', { ...mark, d: 'M22 28h4v4h4v-4h4v4h4v-4h4v8h-3v12H25V36h-3Z' })],
-        crescent: [sv('path', { ...mark, d: 'M38 24a13 13 0 1 0 0 28a10 10 0 1 1 0-28Z' })],
-        star: [sv('polygon', { ...mark, points: STAR })],
-        sun: [sv('circle', { ...mark, cx: 32, cy: 38, r: 6.5 }), ...Array.from({ length: 8 }, (_, i) => { const a = (Math.PI * i) / 4; return sv('line', { x1: 32 + 9.5 * Math.cos(a), y1: 38 + 9.5 * Math.sin(a), x2: 32 + 14 * Math.cos(a), y2: 38 + 14 * Math.sin(a), stroke: ink, 'stroke-width': 2.2, 'stroke-linecap': 'round' }); })],
-        wave: [0, 7, 14].map((dy) => sv('path', { d: `M18 ${30 + dy}q4-5 7 0t7 0 7 0 7 0`, fill: 'none', stroke: ink, 'stroke-width': 2.6, 'stroke-linecap': 'round' })),
-        tree: [sv('path', { ...mark, d: 'M32 24L42 40H35L44 50H20L29 40H22Z' }), sv('path', { ...mark, d: 'M30 50H34V57H30Z' })],
-        spear: [sv('path', { ...mark, d: 'M30 58V34h-4l6-12 6 12h-4v24Z' })],
+        tower: { dx: 0, dy: 0.5, parts: [solid('M-9 -14h4v4h3v-4h4v4h3v-4h4v9h-2v18h-14v-18h-2Z'), sv('path', { d: 'M-2.6 13v-6.5a2.6 2.6 0 0 1 5.2 0V13Z', fill: haloColor, opacity: 0.85 })] },
+        crescent: { dx: 3.33, dy: 0, parts: [solid('M7.33 -11.93A14 14 0 1 0 7.33 11.93A12 12 0 0 1 7.33 -11.93Z')] },
+        star: { dx: 0, dy: 1.4, parts: [sv('polygon', { points: STAR, fill: ink, ...halo })] },
+        sun: { dx: 0, dy: 0, parts: [
+          ...Array.from({ length: 8 }, (_, i) => { const a = (Math.PI * i) / 4; return line(`M${(9.5 * Math.cos(a)).toFixed(2)} ${(9.5 * Math.sin(a)).toFixed(2)}L${(14.5 * Math.cos(a)).toFixed(2)} ${(14.5 * Math.sin(a)).toFixed(2)}`, 2.4); }).flat(),
+          sv('circle', { cx: 0, cy: 0, r: 6.4, fill: ink, ...halo }),
+        ] },
+        wave: { dx: 0, dy: 0, parts: [-8, 0, 8].flatMap((dy) => line(`M-14 ${dy}q3.5-5 7 0t7 0 7 0 7 0`, 2.8)) },
+        tree: { dx: 0, dy: -0.5, parts: [solid('M0 -15L10 1H4.5L12 11H-12L-4.5 1H-10Z'), solid('M-2.2 11H2.2V16H-2.2Z')] },
+        spear: { dx: 0, dy: 0, parts: [solid('M0 -15L6 -3H2.5V15H-2.5V-3H-6Z')] },
       };
+      const c = charges[charge] || charges.star;
       return sv('svg', { viewBox: '0 0 64 72', width, height: Math.round((width * 72) / 64), class: 'sigil' + (opts.draw ? ' draw' : ''), role: 'img', 'aria-label': `${f.name} arms` },
-        sv('defs', {}, sv('clipPath', { id }, sv('path', { d: SHIELD }))),
+        sv('defs', {},
+          sv('clipPath', { id }, sv('path', { d: SHIELD })),
+          sv('linearGradient', { id: `${id}s`, x1: 0, y1: 0, x2: 0, y2: 1 },
+            sv('stop', { offset: '0', 'stop-color': '#fff', 'stop-opacity': 0.26 }),
+            sv('stop', { offset: '0.42', 'stop-color': '#fff', 'stop-opacity': 0 }),
+            sv('stop', { offset: '1', 'stop-color': '#000', 'stop-opacity': 0.3 }))),
         sv('path', { d: SHIELD, fill: f.color }),
         DIVISIONS[division] ? sv('g', { 'clip-path': `url(#${id})` }, sv('path', { d: DIVISIONS[division], fill: f.color2 })) : null,
-        ...(charges[charge] || charges.star),
-        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--gilt-hi)', 'stroke-width': 2.6, 'stroke-linejoin': 'round', class: 'outline' }));
+        sv('g', { 'clip-path': `url(#${id})` },
+          sv('path', { d: SHIELD, fill: 'none', stroke: 'rgba(0,0,0,0.32)', 'stroke-width': 1, transform: 'translate(32 37) scale(0.84) translate(-32 -37)' }),
+          sv('g', { transform: `translate(${CHARGE_AT.x + c.dx} ${CHARGE_AT.y + c.dy})` }, ...c.parts),
+          sv('path', { d: SHIELD, fill: `url(#${id}s)` })),
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'rgba(0,0,0,0.55)', 'stroke-width': 4, 'stroke-linejoin': 'round' }),
+        sv('path', { d: SHIELD, fill: 'none', stroke: 'var(--gilt-hi)', 'stroke-width': 2, 'stroke-linejoin': 'round', class: 'outline' }));
     }
 
     function openShield(width = 20) {
@@ -537,14 +559,28 @@
 
       draw();
       const slugs = Object.keys(FACTION_FALLBACK);
-      const crest = slugs[Math.floor(Math.random() * slugs.length)];
+      let current = slugs[Math.floor(Math.random() * slugs.length)];
+      const crestHost = h('div', { class: 'bigcrest' });
+      const houseName = h('div', { class: 'housename' });
+      const buttons = slugs.map((sl) => h('button', { type: 'button', class: 'house', 'aria-label': factionOf(sl).name, onmouseenter: () => showCrest(sl), onfocus: () => showCrest(sl), onclick: () => showCrest(sl) }, sigil(sl, 40)));
+      function showCrest(sl, first) {
+        if (sl === current && !first) return;
+        current = sl;
+        crestHost.replaceChildren(sigil(sl, 190, { draw: first }));
+        if (!first) { crestHost.classList.remove('swap'); void crestHost.offsetWidth; crestHost.classList.add('swap'); }
+        houseName.textContent = `House ${factionOf(sl).name}`;
+        buttons.forEach((btn, i) => btn.classList.toggle('on', slugs[i] === sl));
+      }
+      showCrest(current, true);
       mount(h('div', { class: 'wrap' }, h('div', { class: 'welcome' },
-        h('div', {},
-          h('div', { class: 'bigcrest' }, sigil(crest, 240, { draw: true })),
+        h('div', { class: 'hero' },
+          crestHost,
           h('h1', {}, 'Siege & Sigil'),
+          h('div', { class: 'rule' }),
           h('p', { class: 'lede' }, 'Raise a house. Hold the castles.'),
-          h('div', { class: 'roster', 'aria-label': 'The eight houses' }, slugs.map((sl) => h('span', { title: factionOf(sl).name }, sigil(sl, 38))))),
-        h('div', { class: 'panel auth-card' }, form))));
+          h('div', { class: 'roster', role: 'group', 'aria-label': 'The eight houses' }, buttons),
+          houseName),
+        h('div', { class: 'auth-card' }, form))));
     }
 
     function topbar() {
@@ -763,7 +799,6 @@
       plains: 'Open plains: no rivers or mountains',
     };
     const HOME_INFO = { close: 'Close: houses start near the middle', medium: 'Medium', far: 'Far: houses start near the edges' };
-    const WORMHOLE_INFO = { none: 'No wormholes', rare: 'Rare wormholes', common: 'Common wormholes' };
     const TRAVEL_INFO = {
       trails: 'Castle trails: armies follow the trails between castles. Rivers and mountains block except at crossings and passes',
       free: 'Free travel: march to any castle in range',
@@ -816,8 +851,8 @@
       scaleSel.value = '5';
       const travelSel = selectOf(TRAVEL_INFO, 'trails');
       const mapPreset = selectOf(PRESET_INFO, 'continental');
+      const anonSel = selectOf({ normal: 'Names shown', extra: 'Names hidden until the game ends' }, 'normal');
       const homeSel = selectOf(HOME_INFO, 'medium');
-      const wormSel = selectOf(WORMHOLE_INFO, 'none');
       const richness = selectOf({ sparse: 'Sparse (expensive to build on)', standard: 'Standard', plentiful: 'Plentiful (cheap to build on)' }, 'standard');
       const fog = choice([['fog', 'Fog', 'The whole map is visible. Enemy troops and upgrades are hidden outside your scan range.'], ['dark', 'Dark', 'The map is black until you explore it. Explored ground stays visible.'], ['off', 'No fog', 'Everything is visible to everyone.']], 'fog', update);
       const alliances = selectOf({ none: 'No alliances', '0': 'Alliances, no warning when ended', '24': 'Alliances, 24 tick warning', '48': 'Alliances, 48 tick warning' }, '24');
@@ -894,7 +929,6 @@
           h('div', { class: 'facts' }, facts.map((t) => h('span', { class: 'fact' }, t))));
       }
 
-      const SEAT_COLORS = ['#d94a4a', '#4a8fd9', '#e8c14a', '#58b86a', '#b06ad9', '#e08a3a', '#4ac7c7', '#d96aa8'];
       const preview = (() => {
         const stage = h('div', { class: 'mapstage' });
         const status = h('div', { class: 'tip', style: 'margin:0' }, 'Choose settings to preview the map.');
@@ -911,37 +945,17 @@
           seed, players: Number(players.value), mapSize: size.value, startingTerritories: Number(starting.value), style: style.value,
           startingGarrison: Number(garrison.value) || 0, scale: Number(scaleSel.value), freeTravel: travelSel.value === 'free', shape: shape.value,
           richness: richness.value, randomRoads: randomRoads.value, starScatter: scatter.value, mirrored: mirror.el.checked,
-          trails: travelSel.value === 'trails', preset: mapPreset.value, homeDistance: homeSel.value, wormholes: wormSel.value,
+          trails: travelSel.value === 'trails', preset: mapPreset.value, homeDistance: homeSel.value,
         });
         const draw = (layout) => {
           const W = layout.map_w;
-          const terr = paintTerrain(layout.art, W, layout.territories);
-          const capitals = new Set(layout.seats.map((st) => st.capital_idx));
+          const terr = paintTerrain(layout.art, W, []);
           const k = W * 0.0085;
-          const edges = layout.edges.map((e) => {
-            const A = layout.territories[e.a];
-            const B = layout.territories[e.b];
-            const pts = (e.path || [[A.x, A.y], [B.x, B.y]]).map((q) => `${q[0]},${q[1]}`).join(' ');
-            return e.kind === 'wormhole'
-              ? sv('polyline', { points: pts, fill: 'none', stroke: '#c9a8ff', 'stroke-width': k * 0.7, 'stroke-dasharray': `${k * 0.3} ${k * 1.6}`, 'stroke-linecap': 'round' })
-              : sv('polyline', { points: pts, fill: 'none', stroke: '#efe4bf', 'stroke-opacity': 0.75, 'stroke-width': k * 0.45, 'stroke-linejoin': 'round' });
-          });
           const rivers = terr.rivers.map((r) => sv('path', { d: 'M' + r.p.map((q) => `${q[0]} ${q[1]}`).join(' L'), fill: 'none', stroke: '#7fb9ea', 'stroke-width': (1.6 + r.w) * k * 0.28, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9 }));
-          const castles = layout.territories.map((t) => {
-            if (t.crossing) return sv('rect', { x: t.x - k * 0.8, y: t.y - k * 0.8, width: k * 1.6, height: k * 1.6, transform: `rotate(45 ${t.x} ${t.y})`, fill: t.crossing_kind === 'pass' ? '#e8dcc2' : '#7fb9ea', stroke: '#2a2418', 'stroke-width': k * 0.18 });
-            const owned = t.owner_seat !== null && t.owner_seat !== undefined;
-            return sv('circle', { cx: t.x, cy: t.y, r: k * (owned ? 1.15 : 0.7) * (0.8 + 0.15 * t.tier), fill: owned ? SEAT_COLORS[t.owner_seat % SEAT_COLORS.length] : '#cfd3dc', stroke: capitals.has(t.idx) ? '#fff' : '#1a1410', 'stroke-width': capitals.has(t.idx) ? k * 0.4 : k * 0.18 });
-          });
           stage.replaceChildren(
-            h('img', { src: terr.url, alt: 'Map preview', style: 'position:absolute;inset:0;width:100%;height:100%' }),
-            sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'position:absolute;inset:0;width:100%;height:100%' }, ...rivers, ...edges, ...castles));
-          const count = (kind) => layout.territories.filter((t) => t.crossing_kind === kind).length;
-          const bits = [`${layout.territories.filter((t) => !t.crossing).length} castles`, `${layout.art.rivers.length} rivers`];
-          if (count('river')) bits.push(`${count('river')} river castles`);
-          if (count('pass')) bits.push(`${count('pass')} passes`);
-          const worms = layout.edges.filter((e) => e.kind === 'wormhole').length;
-          if (worms) bits.push(`${worms} wormholes`);
-          status.textContent = `${bits.join(', ')}. Map ${seed}. Assumes every seat is filled.`;
+            h('img', { src: terr.url, alt: 'Terrain preview', style: 'position:absolute;inset:0;width:100%;height:100%' }),
+            sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'position:absolute;inset:0;width:100%;height:100%' }, ...rivers));
+          status.textContent = `${layout.territories.filter((t) => !t.crossing).length} castles on this land, ${layout.art.rivers.length} rivers. Map ${seed}. Castle positions are a surprise. Assumes every seat is filled.`;
         };
         const generate = () => {
           if (worker) worker.terminate();
@@ -951,7 +965,7 @@
           try { worker = new Worker(workerUrl, { type: 'module' }); } catch { status.textContent = 'The map preview is not available in this browser.'; return; }
           const done = (fn) => (ev) => { if (mine !== token) return; worker.terminate(); worker = null; fn(ev); };
           worker.onmessage = done((ev) => {
-            if (!ev.data.ok) { stage.replaceChildren(); status.textContent = ev.data.error; return; }
+            if (!ev.data.ok) { stage.replaceChildren(); status.textContent = ev.data.error.includes('dynamically imported') ? 'The map preview could not load the map generator. Reload the page and try again.' : ev.data.error; return; }
             draw(ev.data.layout);
           });
           worker.onerror = done(() => { stage.replaceChildren(); status.textContent = 'The map preview could not load.'; });
@@ -967,7 +981,7 @@
               status)),
         };
         Object.assign(previewRef, { schedule: api.schedule });
-        [players, starting, garrison, scaleSel, scatter, style, richness, mapPreset, travelSel, homeSel, wormSel, mirror.el].forEach((el) => { el.addEventListener('input', api.schedule); el.addEventListener('change', api.schedule); });
+        [players, starting, garrison, scaleSel, scatter, style, richness, mapPreset, travelSel, homeSel, mirror.el].forEach((el) => { el.addEventListener('input', api.schedule); el.addEventListener('change', api.schedule); });
         return api;
       })();
 
@@ -979,11 +993,11 @@
         ['Realm', sec(heading('Shape the realm', 'Where the castles sit and what lies between them.'), preview.el,
           h('label', {}, 'Land'), shape.el,
           h('label', {}, 'Castles per house'), size.el,
-          h('div', { class: 'grid2' }, field('Star scatter', scatter), field('Castle placement', style), field('Map scale', scaleSel), field('Natural resources', richness), field('Roads', roadsMode), field('Random roads', randomRoads), field('Terrain', mapPreset), field('Travel', travelSel), field('Home distance', homeSel, 'Applies to round, continent, ring and mirrored maps.'), field('Wormholes', wormSel, 'Fixed 24 tick links between far castles. Castle trails only.')),
+          h('div', { class: 'grid2' }, field('Star scatter', scatter), field('Castle placement', style), field('Map scale', scaleSel), field('Natural resources', richness), field('Roads', roadsMode), field('Random roads', randomRoads), field('Terrain', mapPreset), field('Travel', travelSel), field('Home distance', homeSel, 'Applies to round, continent, ring and mirrored maps.')),
           mirror.row)],
         ['Rules', sec(heading('Set the rules', 'How the war is won and what each house can see.'),
           h('label', {}, 'Fog of war'), fog.el,
-          h('div', { class: 'grid2' }, field('Castles to win (% of all)', victory), field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'), field('Formal alliances', alliances)),
+          h('div', { class: 'grid2' }, field('Castles to win (% of all)', victory), field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'), field('Formal alliances', alliances), field('Player names', anonSel, 'Hidden names show only each house\'s faction. Real names return when the game ends.')),
           h('label', {}, 'Starting locations'), startSel.el,
           h('div', { class: 'grid2' }, field('Time to choose (minutes)', pickMins)),
           seasons.row, field('Season length (ticks, 12 to 240)', seasonLen), events.row, mercs.row)],
@@ -1004,6 +1018,7 @@
           fill.row, autoStart.row, h('label', {}, 'Your house'), picker)],
       ];
 
+      sections.find(([title]) => title === 'Realm')[1].classList.add('realm-sec');
       const body = h('div', { class: 'stepbody' }, sections.map(([, el]) => el));
       const rail = h('nav', { class: 'rail', 'aria-label': 'Setup steps' });
       const foot = h('div', { class: 'sheet-foot' });
@@ -1045,7 +1060,7 @@
           map_preset: mapPreset.value,
           world_seed: preview.seed,
           home_distance: homeSel.value,
-          wormholes: wormSel.value,
+          anonymity: anonSel.value,
           resource_richness: richness.value,
           roads_mode: roadsMode.value,
           random_roads: randomRoads.value,
@@ -1407,7 +1422,7 @@
     }
 
     const TERRAIN_NAMES = { plains: 'Plains', forest: 'Forest', hills: 'Hills', mountain: 'Mountain fortress', coast: 'Coast' };
-    const EDGE_NAMES = { land: 'open ground', pass: 'mountain pass', river: 'river crossing', sea: 'sea lane', wormhole: 'wormhole' };
+    const EDGE_NAMES = { land: 'open ground', pass: 'mountain pass', river: 'river crossing', sea: 'sea lane' };
     const ACTION_NAMES = { nothing: 'Do nothing', collect_all: 'Collect all', drop_all: 'Drop all', collect: 'Collect', drop: 'Drop', collect_all_but: 'Collect all but', drop_all_but: 'Drop all but', garrison: 'Garrison to' };
     const ACTION_NEEDS_AMOUNT = new Set(['collect', 'drop', 'collect_all_but', 'drop_all_but', 'garrison']);
     const orderControls = (st, onChange) => {
@@ -1756,13 +1771,13 @@
         selected ? ring({ class: 'selring', stroke: '#f5dc94', 'stroke-width': 2.6, 'stroke-dasharray': '9 7', rx: W * 1.16, ry: W * 0.43 }) : null,
         sieged ? ring({ class: 'selring', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '6 5', rx: W * 1.26, ry: W * 0.48 }) : null,
         sv('g', { style: 'cursor:pointer;pointer-events:none' }, castleSprite(tier, t.terrain, ownerCol, owner ? colors.c2 : '#5a574f')),
-        sv('g', { style: 'pointer-events:none' },
+        sv('g', { class: 'lbl-plate', style: 'pointer-events:none' },
           sv('rect', { x: x0, y: tagY, width: tw, height: 21, rx: 3, fill: 'rgba(16,11,6,0.78)', stroke: mine ? 'rgba(245,220,148,0.9)' : 'rgba(214,171,82,0.5)', 'stroke-width': 1.1 }),
           sv('path', { d: `M${x0 + 5} ${tagY + 4}h12v9q0 5 -6 7q-6 -2 -6 -7Z`, fill: ownerCol, stroke: '#0e0905', 'stroke-width': 1 }),
           owner ? sv('path', { d: `M${x0 + 5} ${tagY + 8}h12v3h-12Z`, fill: colors.c2, opacity: 0.9 }) : null,
           sv('text', { x: x0 + 23, y: tagY + 15, 'font-size': 12.5, style: 'fill:#efe3c4;font-family:Cinzel,serif;font-weight:600;letter-spacing:.03em' }, nameLabel),
           sv('text', { x: x0 + tw - 8, y: tagY + 15.5, 'text-anchor': 'end', 'font-size': 13, style: `fill:${showTroops ? '#f5dc94' : '#9a8a64'};font-family:Cinzel,serif;font-weight:700` }, troop)),
-        showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'zoomonly', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
+        showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'lbl-infra', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
         here.map((c, i) => sv('circle', {
           cx: (i - (here.length - 1) / 2) * 16, cy: tagY + 31, r: c.role === 'king' ? 7 : 5.8, fill: colors.cmd(c.owner_player_id),
           stroke: cmdSel(c) ? '#fff' : (c.role === 'king' ? '#f5dc94' : '#000'), 'stroke-width': c.role === 'king' ? 2 : 1.4, style: 'cursor:pointer',
@@ -1773,8 +1788,9 @@
     const PREFS = (() => {
       let v = {};
       try { v = JSON.parse(localStorage.getItem('ss-prefs')) || {}; } catch {}
-      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right' };
-      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side })); } catch {} };
+      const when = (x, d) => (['always', 'zoomed', 'close', 'never'].includes(x) ? x : d);
+      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right', plates: when(v.plates, 'always'), armies: when(v.armies, 'always'), infra: when(v.infra, 'zoomed') };
+      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side, plates: prefs.plates, armies: prefs.armies, infra: prefs.infra })); } catch {} window.dispatchEvent(new Event('ss-prefs')); };
       return prefs;
     })();
 
@@ -1786,13 +1802,13 @@
             ['Scale', `${game.world_scale || 1}x${game.travel_mode === 'trails' ? ', castle trails' : game.free_travel ? ', free travel' : ', roads'}`],
             ['Terrain', (PRESET_INFO[game.map_preset] || 'Continental').split(':')[0]],
             game.home_distance && game.home_distance !== 'medium' ? ['Home distance', (HOME_INFO[game.home_distance] || '').split(':')[0]] : null,
-            game.wormholes && game.wormholes !== 'none' ? ['Wormholes', (WORMHOLE_INFO[game.wormholes] || '').split(' ')[0]] : null,
             ['Roads', `${game.roads_mode}${game.random_roads !== 'none' ? `, ${game.random_roads} random` : ''}`],
             game.mirrored ? ['Layout', 'Mirrored stars'] : game.star_scatter === 'twin_rings' ? ['Layout', 'Twin rings'] : null),
           art('Victory and sight',
             ['Victory', `${Math.round(game.victory_pct * 100)}% of castles`],
             game.victory_decay ? ['Decay', `${game.victory_decay} castles per production`] : null,
             ['Fog', game.fog_dark ? 'Dark' : game.fog_of_war ? 'Fog' : 'Off'],
+            game.anonymity === 'extra' ? ['Names', 'Hidden until the game ends'] : null,
             game.start_selection === 'choose' ? ['Starts', `Houses choose (${game.pick_minutes} min)`] : null,
             game.time_limit_ticks ? ['Time limit', `tick ${game.time_limit_ticks}`] : null),
           art('Time',
@@ -1857,10 +1873,17 @@
       const action = selectOf(ACTION_NAMES, PREFS.action);
       const side = selectOf({ right: 'Right of the map', left: 'Left of the map' }, PREFS.side);
       const sound = h('input', { type: 'checkbox', checked: Sfx.on });
+      const WHEN = { always: 'Always', zoomed: 'When zoomed in', close: 'Only when close up', never: 'Never' };
+      const plates = selectOf(WHEN, PREFS.plates);
+      const armiesSel = selectOf(WHEN, PREFS.armies);
+      const infra = selectOf(WHEN, PREFS.infra);
       modal('Options', h('div', {},
         h('label', {}, 'Default order at new route stops'), action,
         h('div', { class: 'tip' }, 'Do nothing is the safe choice. Collect all empties a castle\'s garrison into the commander.'),
         h('label', {}, 'Side panel'), side,
+        h('label', {}, 'Map text: castle names and troops'), plates,
+        h('label', {}, 'Map text: army troop counts'), armiesSel,
+        h('label', {}, 'Map text: castle upgrade levels'), infra,
         h('label', { class: 'check', style: 'margin-top:10px' }, sound, 'Sound effects')), (close) => [
         h('button', { onclick: close }, 'Cancel'),
         h('button', {
@@ -1868,6 +1891,9 @@
           onclick: () => {
             PREFS.action = action.value;
             PREFS.side = side.value;
+            PREFS.plates = plates.value;
+            PREFS.armies = armiesSel.value;
+            PREFS.infra = infra.value;
             PREFS.save();
             if (sound.checked !== Sfx.on) Sfx.toggle();
             const body = document.querySelector('.mapbody');
@@ -2278,12 +2304,6 @@
             const road = A.has_road && B.has_road;
             const o = ms.vis.has(A.id) || ms.vis.has(B.id) ? 1 : 0.3;
             const base = { points: pts, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' };
-            if (e.kind === 'wormhole') {
-              return [
-                sv('polyline', { ...base, stroke: '#7a4ad8', 'stroke-width': 9, 'stroke-opacity': 0.2 * o }),
-                sv('polyline', { ...base, stroke: '#c9a8ff', 'stroke-width': 2.6, 'stroke-opacity': 0.95 * o, 'stroke-dasharray': '1 6' }),
-              ];
-            }
             return [
               sv('polyline', { ...base, stroke: '#2a1d0e', 'stroke-width': road ? 7 : 5.5, 'stroke-opacity': 0.5 * o }),
               sv('polyline', { ...base, stroke: road ? '#e0b64a' : e.kind === 'pass' ? '#cdb897' : '#e6d6a4', 'stroke-width': road ? 4 : 2.8, 'stroke-opacity': 0.95 * o, 'stroke-dasharray': !road && e.kind === 'pass' ? '4 4' : null }),
@@ -2358,8 +2378,8 @@
             sv('g', { transform: 'translate(0,-29)' }, sv('g', { class: 'flag' },
               sv('path', { d: 'M1 0H17L13.5 5L17 10H1Z', fill: color(c.owner_player_id), stroke: '#1a1008', 'stroke-width': 1, 'stroke-linejoin': 'round' }),
               sv('path', { d: 'M1 3.6H15L14 5L15 6.4H1Z', fill: color2(c.owner_player_id), opacity: 0.95 }))),
-            sv('rect', { x: -bw / 2, y: 5, width: bw, height: 16, rx: 3, fill: 'rgba(16,11,6,0.85)', stroke: c.role === 'king' ? '#f5dc94' : 'rgba(214,171,82,0.6)', 'stroke-width': 1 }),
-            sv('text', { x: 0, y: 17, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;font-family:Cinzel,serif;font-weight:700' }, label)));
+            sv('rect', { class: 'lbl-army', x: -bw / 2, y: 5, width: bw, height: 16, rx: 3, fill: 'rgba(16,11,6,0.85)', stroke: c.role === 'king' ? '#f5dc94' : 'rgba(214,171,82,0.6)', 'stroke-width': 1 }),
+            sv('text', { class: 'lbl-army', x: 0, y: 17, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;font-family:Cinzel,serif;font-weight:700' }, label)));
         });
         L.dyn.replaceChildren(...out);
       };
@@ -2490,23 +2510,53 @@
 
       const DIP_NAMES = { allied: 'Allied', truce: 'Truce', proposed: 'Alliance offered', peace_proposed: 'Peace offered', neutral: 'At war' };
 
+      const GROUPS = [['', 'No group', null], ['a', 'Crimson', '#d94a4a'], ['b', 'Azure', '#4a8fd9'], ['c', 'Emerald', '#58b86a'], ['d', 'Amber', '#e8c14a'], ['e', 'Violet', '#b06ad9']];
+      const groupKey = `ss-groups-${gameId}-${uid}`;
+      const loadGroups = () => { try { return JSON.parse(localStorage.getItem(groupKey)) || {}; } catch { return {}; } };
+      const saveGroups = (g) => { try { localStorage.setItem(groupKey, JSON.stringify(g)); } catch {} };
+
       const empiresDialog = () => {
         const g = ms.game;
         const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
+        const groups = loadGroups();
         const rows = [...ms.players.values()].map((p) => {
           const seen = [...ms.t.values()].filter((t) => t.owner_player_id === p.id && ms.vis.has(t.id)).reduce((sum, t) => sum + (t.troops || 0), 0);
-          return { p, n: castlesOf(p.id), troops: seen };
+          return { p, n: castlesOf(p.id), troops: seen, group: groups[p.id] || '' };
         }).sort((x, y) => y.n - x.n);
-        const cols = 'display:grid;grid-template-columns:1.7fr .5fr 1.3fr .9fr .8fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(214,171,82,0.15)';
-        const head = h('div', { style: `${cols};color:var(--dim);font-size:.8rem` }, h('span', {}, 'House'), h('span', {}, 'Castles'), h('span', {}, `Toward ${winAt}`), h('span', {}, 'Relation'), h('span', {}, 'Troops seen'));
-        const list = rows.map(({ p, n, troops }) => h('div', { style: cols },
-          h('span', { style: 'display:flex;align-items:center;gap:8px' }, sigil(p.faction_slug, 26), p.display_name, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'tag', style: 'color:var(--gules-hi)' }, 'out') : null),
-          h('b', {}, String(n)),
-          h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: p.id === ms.me.id ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
-          h('span', {}, p.id === ms.me.id ? 'You' : DIP_NAMES[dipStatus(p.id)] || dipStatus(p.id)),
-          h('span', { style: 'color:var(--dim)' }, p.id === ms.me.id || isFriend(p.id) || troops ? String(troops) : '?')));
-        modal('Empires', h('div', {}, head, list,
-          h('div', { class: 'tip', style: 'margin-top:8px' }, `${winAt} of ${ms.t.size} castles wins the game${g.victory_decay ? `, and the target drops by ${g.victory_decay} each production` : ''}. Troop counts cover only castles you can see.`),
+        let close = () => {};
+        const redo = () => { close(); empiresDialog(); };
+        const cols = 'display:grid;grid-template-columns:1.6fr .45fr 1.1fr .8fr .7fr .9fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(214,171,82,0.15)';
+        const head = h('div', { style: `${cols};color:var(--dim);font-size:.8rem` }, h('span', {}, 'House'), h('span', {}, 'Castles'), h('span', {}, `Toward ${winAt}`), h('span', {}, 'Relation'), h('span', {}, 'Troops seen'), h('span', {}, 'Group'));
+        const list = rows.map(({ p, n, troops, group }) => {
+          const sel = h('select', { style: 'padding:3px 6px', 'aria-label': `Group for ${p.display_name}`, onchange: (e) => { const next = loadGroups(); if (e.target.value) next[p.id] = e.target.value; else delete next[p.id]; saveGroups(next); redo(); } }, GROUPS.map(([k, name]) => h('option', { value: k }, name)));
+          sel.value = group;
+          const gcol = (GROUPS.find((x) => x[0] === group) || [])[2];
+          return h('div', { style: cols },
+            h('span', { style: 'display:flex;align-items:center;gap:8px' }, sigil(p.faction_slug, 26), p.display_name, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'tag', style: 'color:var(--gules-hi)' }, 'out') : null),
+            h('b', {}, String(n)),
+            h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: p.id === ms.me.id ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
+            h('span', {}, p.id === ms.me.id ? 'You' : DIP_NAMES[dipStatus(p.id)] || dipStatus(p.id)),
+            h('span', { style: 'color:var(--dim)' }, p.id === ms.me.id || isFriend(p.id) || troops ? String(troops) : '?'),
+            h('span', { style: 'display:flex;align-items:center;gap:6px' }, gcol ? h('i', { style: `width:10px;height:10px;border-radius:50%;background:${gcol};display:inline-block` }) : null, sel));
+        });
+        const totals = GROUPS.filter((x) => x[0]).map(([k, name, col]) => {
+          const members = rows.filter((r) => r.group === k);
+          if (!members.length) return null;
+          const castles = members.reduce((sum, r) => sum + r.n, 0);
+          const troops = members.reduce((sum, r) => sum + r.troops, 0);
+          return h('div', { style: cols.replace('1.6fr .45fr 1.1fr .8fr .7fr .9fr', '1.4fr .5fr 1.2fr 2.4fr') },
+            h('span', { style: 'display:flex;align-items:center;gap:8px' }, h('i', { style: `width:12px;height:12px;border-radius:50%;background:${col};display:inline-block` }), `${name} (${members.length})`),
+            h('b', {}, String(castles)),
+            h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: 'rival', style: `width:${Math.min(100, (castles / Math.max(1, winAt)) * 100)}%;background:${col}` })),
+            h('span', { style: 'color:var(--dim)' }, `${troops} troops seen, ${Math.round((castles / Math.max(1, ms.t.size)) * 100)}% of all castles`));
+        }).filter(Boolean);
+        const allies = rows.filter((r) => r.p.id !== ms.me.id && dipStatus(r.p.id) === 'allied');
+        close = modal('Empires', h('div', {}, head, list,
+          totals.length ? h('div', { style: 'margin-top:14px' }, h('b', {}, 'Group strength'), totals) : null,
+          h('div', { class: 'row wrap2', style: 'margin-top:10px' },
+            h('button', { disabled: !allies.length, onclick: () => { const next = {}; next[ms.me.id] = 'b'; allies.forEach((r) => { next[r.p.id] = 'b'; }); saveGroups({ ...loadGroups(), ...next }); redo(); } }, 'Group my alliance'),
+            h('button', { disabled: !Object.keys(groups).length, onclick: () => { saveGroups({}); redo(); } }, 'Clear groups')),
+          h('div', { class: 'tip', style: 'margin-top:8px' }, `${winAt} of ${ms.t.size} castles wins the game${g.victory_decay ? `, and the target drops by ${g.victory_decay} each production` : ''}. Groups are private notes for comparing rivals and allies. Troop counts cover only castles you can see.`),
           canAct() ? h('div', { style: 'margin-top:12px' }, h('button', {
             class: 'danger',
             onclick: (e) => {
@@ -2514,7 +2564,7 @@
                 run(e.currentTarget, async () => { const { error } = await sb.rpc('concede_defeat', { p_game_id: gameId }); if (error) throw error; toast('You have conceded', true); await load(); });
               }
             },
-          }, 'Concede defeat')) : null), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+          }, 'Concede defeat')) : null), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
       };
 
       const INTEL_METRICS = {
@@ -3606,9 +3656,16 @@
         return { x: view.x + (lx - (W - view.w * k) / 2) / k, y: view.y + (ly - (H - view.h * k) / 2) / k };
       };
       const toMap = (e) => toMapWith(ms.view, e);
+      const onPrefs = () => applyView();
+      window.addEventListener('ss-prefs', onPrefs);
+      state.cleanup.push(() => window.removeEventListener('ss-prefs', onPrefs));
       const applyView = () => {
         svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
-        svg.classList.toggle('zoomed', !!ms.full && ms.view.w < ms.full.w * 0.5);
+        const ratio = ms.full ? ms.view.w / ms.full.w : 1;
+        const shown = (setting) => setting === 'always' || (setting === 'zoomed' && ratio < 0.5) || (setting === 'close' && ratio < 0.25);
+        svg.classList.toggle('hide-plates', !shown(PREFS.plates));
+        svg.classList.toggle('hide-armies', !shown(PREFS.armies));
+        svg.classList.toggle('hide-infra', !shown(PREFS.infra));
       };
 
       svg.addEventListener('wheel', (e) => {

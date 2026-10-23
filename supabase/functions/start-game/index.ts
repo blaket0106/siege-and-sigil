@@ -78,7 +78,6 @@ Deno.serve(async (req: Request) => {
       trails: game.travel_mode === 'trails',
       preset: game.map_preset || 'continental',
       homeDistance: game.home_distance || 'medium',
-      wormholes: game.wormholes || 'none',
     });
   } catch (error) {
     return respond({ error: (error as Error).message }, 422);

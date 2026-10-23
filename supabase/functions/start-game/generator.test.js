@@ -540,32 +540,6 @@ test('home distance: close homes sit nearer the centre than medium, and medium n
   assert.throws(() => generateWorld({ style: 'scatter', players: 2, mapSize: 'compact', seed: 1, startingTerritories: 4, startingGarrison: 10, homeDistance: 'nope' }), /unknown home distance/);
 });
 
-test('wormholes: fixed-time links between distant neutral castles, trails untouched', () => {
-  for (const c of TRAIL_CASES.slice(0, 4)) {
-    const base = trailLayout(c);
-    const worm = trailLayout({ ...c, wormholes: 'common' });
-    const links = worm.edges.filter((e) => e.kind === 'wormhole');
-    assert.ok(links.length >= 1, `has wormholes ${JSON.stringify(c)}`);
-    assert.ok(base.edges.every((e) => e.kind !== 'wormhole'));
-    assert.deepEqual(worm.edges.filter((e) => e.kind !== 'wormhole'), base.edges);
-    assert.deepEqual(trailLayout({ ...c, wormholes: 'common' }).edges, worm.edges);
-    const ends = links.flatMap((e) => [e.a, e.b]);
-    assert.equal(new Set(ends).size, ends.length, 'each castle has at most one wormhole');
-    const spacing = SPACING * (worm.world_scale || 1);
-    const startTotal = c.players * 4;
-    for (const e of links) {
-      assert.ok(e.a < e.b);
-      assert.ok(e.a >= startTotal && !worm.territories[e.a].crossing && !worm.territories[e.b].crossing, 'neutral, non-crossing ends');
-      assert.ok(e.length >= 4 * spacing - 1);
-      assert.ok(Math.abs(e.length * e.move_cost_mult - 24 * 17.5 * (worm.world_scale || 1)) < 1, 'takes 24 ticks at base speed');
-      assert.equal(e.path.length, 2);
-    }
-    assert.ok(isConnected(worm));
-  }
-  assert.ok(trailLayout({ ...TRAIL_CASES[0], wormholes: 'rare' }).edges.filter((e) => e.kind === 'wormhole').length <= trailLayout({ ...TRAIL_CASES[0], wormholes: 'common' }).edges.filter((e) => e.kind === 'wormhole').length);
-  assert.throws(() => generateWorld({ style: 'scatter', players: 2, mapSize: 'compact', seed: 1, startingTerritories: 4, startingGarrison: 10, wormholes: 'nope' }), /unknown wormholes/);
-});
-
 test('trails: legacy free travel layouts are unchanged when trails are off', () => {
   const a = generateWorld({ style: 'scatter', players: 4, mapSize: 'standard', seed: 5, startingTerritories: 4, startingGarrison: 10, scale: 3, freeTravel: true });
   assert.ok(!a.trails);
