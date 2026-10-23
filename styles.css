@@ -462,3 +462,24 @@ svg.zoomed .zoomonly { display: inline; }
 
 .mappreview { position: sticky; top: 8px; z-index: 5; margin-bottom: 18px; padding: 10px; background: var(--surface-b, #1b130c); border: 1px solid var(--gilt-lo); border-radius: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
 .mapstage { position: relative; width: min(100%, 440px); aspect-ratio: 1 / 1; margin: 0 auto; background: #0e2f4f; overflow: hidden; border-radius: 2px; }
+
+.map3d-host { position: absolute; inset: 0; z-index: 2; }
+.map3d { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(180deg, #5d7fa3 0%, #9db3c2 38%, #c9cfc4 58%); }
+.map3d #wrap { position: absolute; inset: 0; }
+.map3d canvas { display: block; }
+.map3d #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.map3d .bn { position: absolute; left: 0; top: 0; display: flex; align-items: center; transform: translate(-10px, -100%); will-change: transform; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
+.map3d .bn .sh { flex: none; width: 21px; height: 24px; margin-right: -3px; z-index: 1; }
+.map3d .bn .rb { height: 14px; padding: 0 14px 0 6px; display: flex; align-items: center; gap: 6px; background: linear-gradient(90deg, rgba(24, 18, 12, 0.86), rgba(24, 18, 12, 0.62)); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); font: 600 9px 'Cinzel', serif; letter-spacing: 0.04em; white-space: nowrap; border-left: 2px solid var(--c); color: #ecdfc2; }
+.map3d .bn .rb b { color: #f5dc94; font-weight: 700; }
+.map3d .bn.sel .rb { background: linear-gradient(90deg, rgba(60, 44, 16, 0.95), rgba(40, 30, 12, 0.8)); }
+.map3d .bn.big .sh { width: 32px; height: 37px; }
+.map3d .bn.big .rb { height: 20px; font-size: 11px; }
+.map3d .bn.compact .rb { display: none; }
+.map3d .bn.compact .sh { margin-right: 0; }
+.map3d .bn.army .sh { width: 15px; height: 17px; }
+.map3d .bn.army .rb { height: 11px; font-size: 8px; }
+.map3d #ui { position: absolute; left: 12px; top: 12px; display: flex; gap: 8px; z-index: 5; }
+.map3d #ui button { font: 600 12px 'Cinzel', serif; letter-spacing: 0.08em; color: #ecdfc2; background: linear-gradient(180deg, #4d3a21, #2b1f12); border: 1px solid #8d6a28; border-radius: 3px; padding: 8px 14px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 228, 160, 0.28), 0 2px 5px rgba(0, 0, 0, 0.5); }
+.map3d #ui button.on { border-color: #f5dc94; box-shadow: 0 0 12px rgba(245, 220, 148, 0.4); }
+.map3d #load { position: absolute; inset: 0; display: grid; place-items: center; background: #0b0d12; font: 600 22px 'Cinzel', serif; letter-spacing: 0.1em; color: #d6ab52; z-index: 9; }

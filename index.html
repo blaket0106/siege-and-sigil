@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cinzel+Decorative:wght@700;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
   <script>
     (function () {
       var t = null;
@@ -1925,7 +1926,8 @@
         sv('radialGradient', { id: 'gShadow' }, sv('stop', { offset: '0', 'stop-color': '#000', 'stop-opacity': 0.5 }), sv('stop', { offset: '1', 'stop-color': '#000', 'stop-opacity': 0 })),
         sv('linearGradient', { id: 'gStone', x1: 0, x2: 1, y1: 0, y2: 0 }, sv('stop', { offset: '0', 'stop-color': '#e6dcc2' }), sv('stop', { offset: '0.55', 'stop-color': '#c4b89d' }), sv('stop', { offset: '1', 'stop-color': '#8d826c' }))));
       svg.append(...Object.values(L));
-      const wrap = h('div', { class: 'mapwrap' }, svg);
+      const stage3d = h('div', { class: 'map3d-host', style: 'display:none' });
+      const wrap = h('div', { class: 'mapwrap' }, svg, stage3d);
       mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' + (PREFS.side === 'left' ? ' sideleft' : '') }, wrap, sideEl)));
 
       try {
@@ -2040,6 +2042,28 @@
         return g.current_tick + Math.min(1, Math.max(0, (Date.now() - Date.parse(g.last_tick_processed_at)) / interval));
       };
 
+      const edgePath = (a, b) => {
+        if (ms.edgeMapFor !== ms.edges) { ms.edgeMap = new Map(ms.edges.map((e) => [e.from_territory_id + '-' + e.to_territory_id, e])); ms.edgeMapFor = ms.edges; }
+        const e = ms.edgeMap.get(a + '-' + b) || ms.edgeMap.get(b + '-' + a);
+        if (!e || !e.path || e.path.length < 2) return null;
+        const pts = e.path.map((q) => ({ x: q[0], y: q[1] }));
+        return e.from_territory_id === a ? pts : pts.reverse();
+      };
+      const alongPath = (pts, f) => {
+        let total = 0;
+        for (let k = 1; k < pts.length; k++) total += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y);
+        let d = f * total;
+        for (let k = 1; k < pts.length; k++) {
+          const L = Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y);
+          if (d <= L || k === pts.length - 1) {
+            const u = L ? Math.min(1, d / L) : 1;
+            return { x: pts[k - 1].x + (pts[k].x - pts[k - 1].x) * u, y: pts[k - 1].y + (pts[k].y - pts[k - 1].y) * u, dx: pts[k].x - pts[k - 1].x, dy: pts[k].y - pts[k - 1].y };
+          }
+          d -= L;
+        }
+        return null;
+      };
+
       const movementPos = (m, tf) => {
         const p = m.path;
         const a = m.path_arrival_ticks;
@@ -2054,7 +2078,12 @@
         const B = ms.t.get(p[i + 1]);
         const d = a[i + 1] - a[i];
         const f = d <= 0 ? 1 : Math.min(1, Math.max(0, (tf - a[i]) / d));
-        return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f, i };
+        if (trailsOn()) {
+          const pts = edgePath(p[i], p[i + 1]);
+          const q = pts && alongPath(pts, f);
+          if (q) return { x: q.x, y: q.y, i, dx: q.dx, dy: q.dy };
+        }
+        return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f, i, dx: B.x - A.x, dy: B.y - A.y };
       };
 
       const cmdPos = (c, tf) => {
@@ -2299,12 +2328,14 @@
         L.preview.replaceChildren(...pv);
 
         renderDyn();
+        sync3d();
         drawHud();
       };
 
       const renderDyn = () => {
         if (ms.replay) { L.dyn.replaceChildren(); return; }
         const tf = tickF();
+        if (ms.view3d) { sync3dArmies(tf); return; }
         const out = [];
         ms.cmd.forEach((c) => {
           if (c.status !== 'moving') return;
@@ -2313,7 +2344,7 @@
           const pos = movementPos(m, tf);
           const friend = isFriend(c.owner_player_id);
           if (friend) {
-            const pts = [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
+            const pts = trailsOn() ? [`${pos.x},${pos.y}`, ...trailPoly(m.path.slice(pos.i)).map((q) => `${q.x},${q.y}`)] : [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
             out.push(sv('polyline', { class: 'marchline', points: pts.join(' '), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', 'stroke-dasharray': '8 8', style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
           }
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
@@ -2374,6 +2405,88 @@
         const idx = Math.floor(g.current_tick / len) % 4;
         return `${SEASONS[idx]} (to tick ${(Math.floor(g.current_tick / len) + 1) * len})`;
       };
+
+      const sync3d = () => {
+        if (!ms.m3 || !ms.view3d) return;
+        ms.syncing3d = true;
+        ms.m3.update([...ms.t.values()].map((t) => {
+          const seen = ms.vis.has(t.id);
+          const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
+          return { id: t.id, owner, troops: seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war) ? t.troops : null, mine: owner === ms.me.id };
+        }));
+        ms.m3.select(ms.sel && ms.sel.type === 't' ? ms.sel.id : null);
+        const routes = [];
+        const c = ms.marching && ms.sel && ms.sel.type === 'c' ? ms.cmd.find((x) => x.id === ms.sel.id) : null;
+        if (c && c.current_territory_id && ms.stops.length) {
+          const pts = trailsOn() ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [ms.t.get(c.current_territory_id), ...ms.stops.map((st) => ms.t.get(st.id))];
+          routes.push({ pts: pts.map((q) => [q.x, q.y]), color: 0xf5dc94 });
+        }
+        if (ms.preview && ms.preview.plan) {
+          const pts = trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id));
+          routes.push({ pts: pts.map((q) => [q.x, q.y]), color: ms.preview.plan.in_range ? 0x62d44e : 0xe0685c });
+        }
+        const rings = ms.reachable ? [...ms.reachable] : [];
+        if (ms.reachFrom) rings.push(ms.reachFrom);
+        ms.m3.setOverlays({ rings, routes });
+        ms.syncing3d = false;
+      };
+
+      const sync3dArmies = (tf) => {
+        if (!ms.m3 || !ms.view3d) return;
+        const list = [];
+        ms.cmd.forEach((c) => {
+          if (c.status !== 'moving') return;
+          const m = ms.mov.get(c.id);
+          if (!m || !commanderSeen(c, tf)) return;
+          const pos = movementPos(m, tf);
+          const friend = isFriend(c.owner_player_id);
+          list.push({ id: c.id, x: pos.x, z: pos.y, heading: -Math.atan2(pos.dy, pos.dx), cols: [color(c.owner_player_id), color2(c.owner_player_id)], troops: friend ? c.troops : '?' });
+        });
+        ms.m3.setArmies(list);
+      };
+
+      const build3d = async () => {
+        const { createMap3D } = await import('./map3d.js');
+        const list = [...ms.t.values()];
+        const idx = new Map(list.map((t, i) => [t.id, i]));
+        ms.m3 = await createMap3D(stage3d, {
+          map_w: ms.game.map_w,
+          art: ms.art,
+          sites: list.map((t) => ({ id: t.id, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false })),
+          edges: ms.edges.filter((e) => idx.has(e.from_territory_id) && idx.has(e.to_territory_id)).map((e) => ({ a: idx.get(e.from_territory_id), b: idx.get(e.to_territory_id), kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path })),
+          lowQuality: window.innerWidth < 900,
+          colors: (pid) => [color(pid), color2(pid)],
+          onSelect: (id) => {
+            if (ms.syncing3d) return;
+            if (id == null) { if (!ms.marching) { ms.sel = null; ms.preview = null; render(); drawSide(); } return; }
+            select('t', id);
+          },
+        });
+      };
+
+      const toggle3D = async () => {
+        if (ms.view3d) {
+          ms.view3d = false;
+          stage3d.style.display = 'none';
+          svg.style.display = '';
+          try { localStorage.setItem('ss-view3d', '0'); } catch {}
+          drawHud();
+          return;
+        }
+        if (!ms.art) { toast('This game has no terrain art for a 3D view'); return; }
+        ms.view3d = true;
+        stage3d.style.display = 'block';
+        svg.style.display = 'none';
+        drawHud();
+        if (!ms.m3) {
+          try { await build3d(); } catch (e) { console.error(e); toast(`The 3D map could not start: ${e.message}`); ms.view3d = false; stage3d.style.display = 'none'; svg.style.display = ''; stage3d.replaceChildren(); drawHud(); return; }
+        }
+        try { localStorage.setItem('ss-view3d', '1'); } catch {}
+        ms.m3.resize();
+        sync3d();
+        sync3dArmies(tickF());
+      };
+      state.cleanup.push(() => { if (ms.m3) ms.m3.dispose(); });
 
       const DIP_NAMES = { allied: 'Allied', truce: 'Truce', proposed: 'Alliance offered', peace_proposed: 'Peace offered', neutral: 'At war' };
 
@@ -2533,6 +2646,7 @@
           g.fog_of_war ? h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null,
           h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.tilt, onchange: (e) => { ms.tilt = e.target.checked; try { localStorage.setItem('ss-tilt', ms.tilt ? '1' : '0'); } catch {} applyTilt(); render(); } }), 'Tilt'),
           h('button', { class: 'ghost', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
+          h('button', { onclick: toggle3D }, ms.view3d ? '2D map' : '3D map'),
           h('button', { class: 'primary', onclick: menuDialog }, 'Menu'),
           h('button', { class: 'ghost', onclick: helpDialog }, 'Help')].filter(Boolean));
         updateCountdown();
@@ -3684,6 +3798,7 @@
         if (animStep === 0) updateCountdown();
       }, 250);
       const loadTimer = setInterval(load, 20000);
+      try { if (localStorage.getItem('ss-view3d') === '1' && ms.art) toggle3D(); } catch {}
       const onKey = (e) => {
         if (e.key !== 'Escape' || document.activeElement instanceof HTMLInputElement) return;
         if (ms.marching) { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); }
