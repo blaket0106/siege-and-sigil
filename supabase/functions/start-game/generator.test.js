@@ -178,7 +178,7 @@ test('invalid settings are rejected', () => {
   const ok = { seed: 1, players: 4, mapSize: 'standard', startingTerritories: 4, style: 'scatter', startingGarrison: 10 };
   assert.throws(() => generateWorld({ ...ok, players: 1 }));
   assert.throws(() => generateWorld({ ...ok, players: 9 }));
-  assert.throws(() => generateWorld({ ...ok, mapSize: 'compact', startingTerritories: 5 }));
+  assert.throws(() => generateWorld({ ...ok, mapSize: 'compact', startingTerritories: 11 }));
   assert.throws(() => generateWorld({ ...ok, startingTerritories: 0 }));
   assert.throws(() => generateWorld({ ...ok, style: 'swamp' }));
 });
@@ -315,4 +315,60 @@ test('shapes differ: ring has a central sea, archipelago is mostly sea', () => {
   const round = generateWorld({ ...base, shape: 'round' });
   assert.ok(heightAt(round.art, round, round.map_w / 2, round.map_w / 2) >= round.art.sea);
   assert.throws(() => generateWorld({ ...base, shape: 'cube' }));
+});
+
+const NEW_BASE = { seed: 5, mapSize: 'standard', startingTerritories: 4, style: 'scatter', startingGarrison: 10, terrain: false };
+
+test('mirrored stars reflect across both axes with equal resources', () => {
+  for (const players of [4, 8]) {
+    const layout = generateWorld({ ...NEW_BASE, players, mirrored: true });
+    const mid = layout.map_w / 2;
+    const neutrals = layout.territories.filter((t) => t.owner_seat === null);
+    const quads = Math.floor(neutrals.length / 4);
+    for (let q = 0; q < quads; q++) {
+      const [a, b, c, d] = neutrals.slice(q * 4, q * 4 + 4);
+      assert.ok(near(a.x - mid, mid - b.x) && near(a.y, b.y), `x mirror ${players}p quad ${q}`);
+      assert.ok(near(a.x, c.x) && near(a.y - mid, mid - c.y), `y mirror ${players}p quad ${q}`);
+      assert.ok(near(a.x - mid, mid - d.x) && near(a.y - mid, mid - d.y), `point mirror ${players}p quad ${q}`);
+      assert.equal(a.natural_resources, b.natural_resources);
+      assert.equal(a.natural_resources, d.natural_resources);
+    }
+  }
+  assert.throws(() => generateWorld({ ...NEW_BASE, players: 3, mirrored: true }));
+  assert.throws(() => generateWorld({ ...NEW_BASE, players: 6, mirrored: true }));
+});
+
+test('twin rings put a third of neutral stars on a rich inner ring', () => {
+  const layout = generateWorld({ ...NEW_BASE, players: 4, starScatter: 'twin_rings' });
+  const neutrals = layout.territories.filter((t) => t.owner_seat === null);
+  const inner = neutrals.filter((t) => t.natural_resources === 45).length;
+  const outer = neutrals.filter((t) => t.natural_resources === 18).length;
+  assert.equal(inner + outer, neutrals.length);
+  assert.ok(Math.abs(inner - neutrals.length / 3) <= 4, `inner ${inner} of ${neutrals.length}`);
+  const mid = layout.map_w / 2;
+  const radius = (t) => Math.hypot(t.x - mid, t.y - mid);
+  const innerMax = Math.max(...neutrals.filter((t) => t.natural_resources === 45).map(radius));
+  const outerMin = Math.min(...neutrals.filter((t) => t.natural_resources === 18).map(radius));
+  assert.ok(innerMax < outerMin);
+});
+
+test('random roads, richness, tiny maps and larger starts', () => {
+  const none = generateWorld({ ...NEW_BASE, players: 4 });
+  assert.equal(none.territories.filter((t) => t.has_road).length, 0);
+  const common = generateWorld({ ...NEW_BASE, players: 4, randomRoads: 'common' });
+  const rare = generateWorld({ ...NEW_BASE, players: 4, randomRoads: 'rare' });
+  const roads = (l) => l.territories.filter((t) => t.has_road).length;
+  assert.ok(roads(common) > roads(rare) && roads(rare) > 0);
+  assert.ok(common.territories.filter((t) => t.has_road).every((t) => t.owner_seat === null));
+
+  const tierShare = (l, tier) => l.territories.filter((t) => t.owner_seat === null && t.tier === tier).length;
+  const sparse = generateWorld({ ...NEW_BASE, players: 4, richness: 'sparse' });
+  const plentiful = generateWorld({ ...NEW_BASE, players: 4, richness: 'plentiful' });
+  assert.ok(tierShare(sparse, 1) > tierShare(plentiful, 1));
+  assert.ok(tierShare(plentiful, 3) > tierShare(sparse, 3));
+
+  assert.equal(generateWorld({ ...NEW_BASE, players: 3, mapSize: 'tiny' }).territories.length, 24);
+  assert.equal(generateWorld({ ...NEW_BASE, players: 2, mapSize: 'small' }).territories.length, 32);
+  const big = generateWorld({ ...NEW_BASE, players: 4, startingTerritories: 8 });
+  assert.equal(big.territories.filter((t) => t.owner_seat === 0).length, 8);
 });

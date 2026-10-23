@@ -201,28 +201,30 @@ export function buildTerrain(o) {
       const i = gy * G + gx;
       const x = cx(gx);
       const y = cx(gy);
-      const cont = fbm(noiseE, x / (spacing * 3.4), y / (spacing * 3.4), 5);
+      const fx = o.mirror ? mapW / 2 + Math.abs(x - mapW / 2) : x;
+      const fy = o.mirror ? mapW / 2 + Math.abs(y - mapW / 2) : y;
+      const cont = fbm(noiseE, fx / (spacing * 3.4), fy / (spacing * 3.4), 5);
       const rad = Math.hypot(x - mapW / 2, y - mapW / 2) / (mapW / 2);
       const cm = cont + 0.55 * Math.min(0, 0.85 - rad);
       const base = o.shapeLand ? o.shapeLand(x, y) : Math.min(1, Math.max(0, (cm - 0.43) * 2.2 + 0.4));
       const p = Math.max(near[i], 0.92 * corr[i], base);
       const fade = smoothstep(0, fadeLen, Math.min(x, y, mapW - x, mapW - y));
-      const n1 = fbm(noiseA, x / (spacing * 1.6), y / (spacing * 1.6), 4);
+      const n1 = fbm(noiseA, fx / (spacing * 1.6), fy / (spacing * 1.6), 4);
       score[i] = (p + 0.42 * (n1 - 0.5)) * (0.3 + 0.7 * fade);
       isLand[i] = score[i] > LAND_T ? 1 : 0;
 
-      const nr = fbm(noiseB, x / (spacing * 1.9), y / (spacing * 1.9), 5);
+      const nr = fbm(noiseB, fx / (spacing * 1.9), fy / (spacing * 1.9), 5);
       const ridge = 1 - Math.abs(2 * nr - 1);
       const mount = smoothstep(0.82, 0.98, ridge);
       const flat = Math.max(near[i], 0.55 * corr[i]);
       const land = smoothstep(LAND_T, LAND_T + 0.12, score[i]);
-      const roll = fbm(noiseC, x / (spacing * 0.9), y / (spacing * 0.9), 3);
+      const roll = fbm(noiseC, fx / (spacing * 0.9), fy / (spacing * 0.9), 3);
       if (isLand[i]) {
         height[i] = SEA + 0.04 * land + land * (0.1 * roll + 0.55 * mount * (1 - 0.9 * flat));
       } else {
         height[i] = SEA * smoothstep(0, LAND_T, score[i]);
       }
-      const wet = fbm(noiseD, x / (spacing * 1.3), y / (spacing * 1.3), 3);
+      const wet = fbm(noiseD, fx / (spacing * 1.3), fy / (spacing * 1.3), 3);
       moist[i] = Math.min(1, Math.max(0, (wet - 0.5) * 2.4 + 0.5 - 0.12 * Math.max(0, height[i] - 0.5)));
     }
   }
@@ -457,13 +459,15 @@ export function buildTerrain(o) {
 
   const edgeInfo = edges.map(([a, b]) => classify(a, b) || { kind: 'land', mult: 1 });
 
+  const baseKeys = new Set(edges.map(([a, b]) => (a < b ? `${a},${b}` : `${b},${a}`)));
   const links = (cap = Infinity) => {
     const out = [];
     for (let a = 0; a < points.length; a++) {
       for (let b = a + 1; b < points.length; b++) {
         const length = Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);
-        if (length > cap) continue;
-        const c = classify(a, b);
+        const base = baseKeys.has(`${a},${b}`);
+        if (length > cap && !base) continue;
+        const c = classify(a, b) || (base ? { kind: 'land', mult: 1 } : null);
         if (c) out.push({ a, b, kind: c.kind, mult: c.mult, length });
       }
     }

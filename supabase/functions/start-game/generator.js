@@ -1,17 +1,19 @@
 import { bestTerrain } from './terrain.js';
 
-export const GENERATOR_VERSION = 3;
+export const GENERATOR_VERSION = 4;
 export const SPACING = 150;
 
 const MARGIN = 60;
 const LINK_CAP = 5;
 const AREA_PER_CASTLE = 2.4;
-const TERRITORIES_PER_PLAYER = { compact: 12, standard: 24, large: 36 };
+const TERRITORIES_PER_PLAYER = { tiny: 8, small: 16, compact: 12, standard: 24, large: 36 };
+const RICHNESS = { sparse: [6, 2, 1], standard: [3, 2, 1], plentiful: [2, 2, 2] };
+const ROAD_CHANCE = { none: 0, rare: 0.1, common: 0.3 };
+const RING_VALUES = { inner: 45, outer: 18 };
 
 export const tierOf = (resources) => (resources <= 20 ? 1 : resources <= 40 ? 2 : 3);
-const START_RESOURCES = [50, 30, 12, 12];
+const START_RESOURCES = [50, 30, 12, 12, 12, 12, 12, 12, 12, 12];
 const TIER_RANGE = { 1: [4, 20], 2: [21, 40], 3: [41, 60] };
-const NEUTRAL_RATIO = [3, 2, 1];
 const RESOURCES_PER_TERRAFORM_LEVEL = 5;
 const START_TERRAFORM_LEVEL = 1;
 const STYLES = {
@@ -302,6 +304,133 @@ function placeClusters({ rng, players, start, shape, minDist, R }) {
   return homes;
 }
 
+
+const quad = (p) => [p, { x: -p.x, y: p.y }, { x: p.x, y: -p.y }, { x: -p.x, y: -p.y }];
+
+function placeMirrored({ rng, players, start, radius, minDist, clump, neutralCount }) {
+  const copies = (p) => (players === 2 ? [p, { x: -p.x, y: -p.y }] : quad(p));
+  const all = [];
+  const minSq = minDist * minDist;
+  const limit = radius * 0.97;
+
+  const tryAdd = (list) => {
+    if (list.some((q) => Math.hypot(q.x, q.y) > limit)) return false;
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if ((list[i].x - list[j].x) ** 2 + (list[i].y - list[j].y) ** 2 < minSq) return false;
+      }
+      if (all.some((o) => (o.x - list[i].x) ** 2 + (o.y - list[i].y) ** 2 < minSq)) return false;
+    }
+    all.push(...list);
+    return true;
+  };
+
+  const clusters = players === 2 ? 1 : players / 4;
+  const clusterCopies = [];
+  for (let ci = 0; ci < clusters; ci++) {
+    let placed = null;
+    for (let t = 0; t < 600 && !placed; t++) {
+      const mark = all.length;
+      const r = radius * (0.45 + 0.25 * rng());
+      const a = ((15 + 60 * rng()) * Math.PI) / 180;
+      const cap = { x: r * Math.cos(a), y: r * Math.sin(a) };
+      const members = [copies(cap)];
+      let ok = tryAdd(members[0]);
+      for (let j = 1; j < start && ok; j++) {
+        let added = null;
+        for (let u = 0; u < 120 && !added; u++) {
+          const ang = rng() * 2 * Math.PI;
+          const d = minDist * (1 + 0.8 * rng());
+          const p = { x: cap.x + d * Math.cos(ang), y: cap.y + d * Math.sin(ang) };
+          if (p.x < minDist * 0.5 || p.y < minDist * 0.5) continue;
+          const list = copies(p);
+          if (tryAdd(list)) added = list;
+        }
+        if (!added) ok = false;
+        else members.push(added);
+      }
+      if (ok) placed = members;
+      else all.length = mark;
+    }
+    if (!placed) return null;
+    clusterCopies.push(placed);
+  }
+
+  const homes = [];
+  for (const members of clusterCopies) {
+    for (let j = 0; j < members[0].length; j++) for (const list of members) homes.push(list[j]);
+  }
+
+  const quads = Math.floor(neutralCount / 4);
+  const blobs = Array.from({ length: 3 + Math.floor(quads / 8) }, () => {
+    const r = radius * 0.8 * Math.sqrt(rng());
+    const a = (Math.PI / 2) * rng();
+    return { x: r * Math.cos(a), y: r * Math.sin(a) };
+  });
+  const sigma = radius * 0.16;
+  const density = (p) => Math.min(1, (clump + blobs.reduce((s, b) => s + Math.exp(-((p.x - b.x) ** 2 + (p.y - b.y) ** 2) / (2 * sigma * sigma)), 0)) / 1.1);
+  const neutrals = [];
+  for (let i = 0; i < quads; i++) {
+    let done = false;
+    for (let t = 0; t < 3000 && !done; t++) {
+      const r = limit * Math.sqrt(rng());
+      const a = (Math.PI / 2) * rng();
+      const p = { x: r * Math.cos(a), y: r * Math.sin(a) };
+      if (rng() > density(p)) continue;
+      if (tryAdd(quad(p))) {
+        neutrals.push(...quad(p));
+        done = true;
+      }
+    }
+    if (!done) return null;
+  }
+  for (let i = quads * 4; i < neutralCount; i++) {
+    let done = false;
+    for (let t = 0; t < 3000 && !done; t++) {
+      const r = limit * Math.sqrt(rng());
+      const a = 2 * Math.PI * rng();
+      const p = { x: r * Math.cos(a), y: r * Math.sin(a) };
+      if (tryAdd([p])) {
+        neutrals.push(p);
+        done = true;
+      }
+    }
+    if (!done) return null;
+  }
+  return { homes, neutrals, quads };
+}
+
+function placeTwinRings({ rng, players, start, radius, wedge, minDist, ringMin, neutralCount }) {
+  const local = placeWedge({ rng, players, start, radius, wedge, minDist, rMin: 0, capRange: [0.55, 0.68] });
+  if (!local) return null;
+  const homePhase = rng() * 2 * Math.PI;
+  const homes = [];
+  for (let k = 0; k < players; k++) for (const l of local) homes.push(rotate(l, homePhase + k * wedge));
+
+  const inner = players * Math.max(1, Math.round(neutralCount / 3 / players));
+  const outer = neutralCount - inner;
+  if (outer < players) return null;
+  const rings = [
+    { n: inner, r: radius * 0.36 },
+    { n: outer, r: radius * 0.86 },
+  ];
+  const out = [];
+  for (const ring of rings) {
+    if ((2 * Math.PI * ring.r) / ring.n < ringMin) return null;
+    let best = null;
+    let bestD = -1;
+    for (let t = 0; t < 36; t++) {
+      const phase = (2 * Math.PI * t) / (36 * ring.n);
+      const pts = Array.from({ length: ring.n }, (_, i) => ({ x: ring.r * Math.cos(phase + (2 * Math.PI * i) / ring.n), y: ring.r * Math.sin(phase + (2 * Math.PI * i) / ring.n) }));
+      const d = Math.min(...pts.map((p) => Math.min(...homes.map((h) => Math.hypot(h.x - p.x, h.y - p.y)))));
+      if (d > bestD) { bestD = d; best = pts; }
+    }
+    if (bestD < ringMin * 0.9) return null;
+    out.push(...best);
+  }
+  return { homes, neutrals: out, inner, outer };
+}
+
 function placeNeutrals({ rng, count, radius, center, minDist, clump, taken, inside }) {
   const blobs = Array.from({ length: 3 + Math.floor(count / 32) }, () => {
     const r = radius * 0.9 * Math.sqrt(rng());
@@ -334,9 +463,9 @@ function placeNeutrals({ rng, count, radius, center, minDist, clump, taken, insi
   return out;
 }
 
-function neutralResources(rng, count) {
-  const total = NEUTRAL_RATIO.reduce((s, v) => s + v, 0);
-  const exact = NEUTRAL_RATIO.map((v) => (count * v) / total);
+function neutralResources(rng, count, ratio) {
+  const total = ratio.reduce((s, v) => s + v, 0);
+  const exact = ratio.map((v) => (count * v) / total);
   const counts = exact.map(Math.floor);
   const order = exact.map((e, i) => i).sort((a, b) => exact[b] - Math.floor(exact[b]) - (exact[a] - Math.floor(exact[a])) || a - b);
   for (let i = 0, rest = count - counts.reduce((x, y) => x + y, 0); rest > 0; i++, rest--) counts[order[i]] += 1;
@@ -352,11 +481,17 @@ function neutralResources(rng, count) {
   return values;
 }
 
-export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false, shape: shapeKind = 'continent' }) {
+export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false, shape: requestedShape = 'continent', richness = 'standard', randomRoads = 'none', starScatter = 'random', mirrored = false }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
   if (!perPlayer) throw new Error(`unknown map size: ${mapSize}`);
-  if (!SHAPES.includes(shapeKind)) throw new Error(`unknown map shape: ${shapeKind}`);
+  if (!SHAPES.includes(requestedShape)) throw new Error(`unknown map shape: ${requestedShape}`);
+  if (!RICHNESS[richness]) throw new Error(`unknown resource richness: ${richness}`);
+  if (!(randomRoads in ROAD_CHANCE)) throw new Error(`unknown random roads setting: ${randomRoads}`);
+  if (starScatter !== 'random' && starScatter !== 'twin_rings') throw new Error(`unknown star scatter: ${starScatter}`);
+  if (mirrored && ![2, 4, 8].includes(players)) throw new Error('mirrored stars need 2, 4 or 8 players');
+  const shapeKind = mirrored || starScatter === 'twin_rings' ? 'round' : requestedShape;
+  const ratio = RICHNESS[richness];
   if (!styleConfig) throw new Error(`unknown map style: ${style}`);
   if (!Number.isInteger(players) || players < 2 || players > 8) throw new Error(`players must be 2 to 8, got ${players}`);
   if (!Number.isInteger(startingTerritories) || startingTerritories < 1 || startingTerritories > START_RESOURCES.length || perPlayer - startingTerritories < 2) {
@@ -381,27 +516,50 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
 
   let locals = null;
   let neutrals = null;
+  let neutralValues = null;
   for (let attempt = 0; attempt < 40 && !neutrals; attempt++) {
     const minDist = spacing * styleConfig.minDist * 0.96 ** attempt;
     const homeDist = Math.max(minDist, spacing * 0.7);
     let homes = [];
-    if (shape.symmetric) {
-      const local = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, rMin: shape.rMin, capRange: shape.capRange });
-      if (!local) continue;
-      for (let k = 0; k < players; k++) {
-        for (const l of local) {
-          const q = rotate(l, phase + k * wedge);
-          homes.push({ x: q.x, y: q.y });
-        }
-      }
+    let placed = null;
+    if (mirrored) {
+      placed = placeMirrored({ rng, players, start: startingTerritories, radius, minDist: homeDist, clump: styleConfig.clump, neutralCount: neutralTotal });
+      if (!placed) continue;
+      homes = placed.homes;
+      neutrals = placed.neutrals;
+    } else if (starScatter === 'twin_rings') {
+      placed = placeTwinRings({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, ringMin: minDist, neutralCount: neutralTotal });
+      if (!placed) continue;
+      homes = placed.homes;
+      neutrals = placed.neutrals;
     } else {
-      homes = placeClusters({ rng, players, start: startingTerritories, shape, minDist: homeDist, R: radius });
-      if (!homes) continue;
+      if (shape.symmetric) {
+        const local = placeWedge({ rng, players, start: startingTerritories, radius, wedge, minDist: homeDist, rMin: shape.rMin, capRange: shape.capRange });
+        if (!local) continue;
+        for (let k = 0; k < players; k++) {
+          for (const l of local) {
+            const q = rotate(l, phase + k * wedge);
+            homes.push({ x: q.x, y: q.y });
+          }
+        }
+      } else {
+        homes = placeClusters({ rng, players, start: startingTerritories, shape, minDist: homeDist, R: radius });
+        if (!homes) continue;
+      }
+      neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center: 0, minDist, clump: styleConfig.clump, taken: homes, inside: (p) => shape.inside(p) });
     }
-    neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center: 0, minDist, clump: styleConfig.clump, taken: homes, inside: (p) => shape.inside(p) });
     if (neutrals) {
       locals = homes.map((p) => ({ x: center + p.x, y: center + p.y }));
       neutrals = neutrals.map((p) => ({ x: center + p.x, y: center + p.y }));
+      if (mirrored) {
+        const valueRng = makeRng(seed, 4);
+        const quarter = neutralResources(valueRng, placed.quads, ratio);
+        neutralValues = [...quarter.flatMap((v) => [v, v, v, v]), ...neutralResources(valueRng, neutralTotal - placed.quads * 4, ratio)];
+      } else if (starScatter === 'twin_rings') {
+        neutralValues = [...Array(placed.inner).fill(RING_VALUES.inner), ...Array(placed.outer).fill(RING_VALUES.outer)];
+      } else {
+        neutralValues = neutralResources(makeRng(seed, 4), neutralTotal, ratio);
+      }
     }
   }
   if (!neutrals) throw new Error('could not place territories for these settings');
@@ -409,8 +567,9 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   const points = [...locals, ...neutrals];
   const resourcesAt = [
     ...Array.from({ length: players }, () => START_RESOURCES.slice(0, startingTerritories)).flat(),
-    ...neutralResources(makeRng(seed, 4), neutralTotal),
+    ...neutralValues,
   ];
+  const roadRng = makeRng(seed, 6);
 
   const names = makeNames(total, makeRng(seed, 2));
   const territories = points.map((p, g) => {
@@ -431,6 +590,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       industry_level: owned ? null : 1,
       prestige_level: owned ? null : 0,
       resources: natural + (owned ? RESOURCES_PER_TERRAFORM_LEVEL * START_TERRAFORM_LEVEL : 0),
+      ...(!owned && roadRng() < ROAD_CHANCE[randomRoads] ? { has_road: true } : {}),
     };
   });
 
@@ -512,6 +672,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       seatOf: territories.map((t) => (t.owner_seat === null ? -1 : t.owner_seat)),
       players,
       shapeLand: shapeKind === 'continent' ? null : shapeAbs.land,
+      mirror: mirrored,
     });
     territories.forEach((t, g) => {
       t.terrain = world.terrain[g];

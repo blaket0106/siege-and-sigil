@@ -88,7 +88,11 @@
     .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 16px; font-size: 0.88rem; }
     .kv b { display: block; color: var(--dim); font-weight: normal; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; }
     .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 12px; overflow-y: auto; z-index: 10; }
-    .modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 6px; padding: 20px; width: 100%; max-width: 520px; }
+    .modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 6px; padding: 20px; width: 100%; max-width: 640px; }
+    .grp { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; margin-top: 10px; }
+    .grp summary { cursor: pointer; color: var(--gold2); letter-spacing: 0.06em; padding: 4px 0; }
+    .tip { color: var(--dim); font-size: 0.76rem; margin-top: 4px; }
+    .techrow { display: grid; grid-template-columns: 1fr 70px 150px; gap: 8px; align-items: center; margin-top: 6px; font-size: 0.85rem; }
     .modal h2 { margin-bottom: 8px; }
     .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.9rem; color: var(--text); }
@@ -153,7 +157,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel';
+    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel';
     const PLAYER_COLS = 'id, game_id, user_id, faction_slug, display_name, is_ai, eliminated_at_tick, created_at';
 
     function watchGame(gameId, onRefresh) {
@@ -169,10 +173,10 @@
       { slug: 'rangers', name: 'Rangers' },
     ];
     const SPEEDS = { slow: 'Slow (2h ticks)', normal: 'Normal (1h)', fast: 'Fast (30m)', quad: 'Quad (15m)', turn_based: 'Turn-based' };
-    const SIZES = { compact: 'Compact', standard: 'Standard', large: 'Large' };
+    const SIZES = { tiny: 'Tiny (8)', compact: 'Compact (12)', small: 'Small (16)', standard: 'Standard (24)', large: 'Large (36)' };
     const STYLES = { scatter: 'Scatter', continents: 'Continents' };
     const SHAPES = { continent: 'Continent', round: 'Round and balanced', ring: 'Ring around a sea', twin: 'Twin continents', archipelago: 'Archipelago', rift: 'Rift (split by a sea)' };
-    const MAX_START = { compact: 4, standard: 7, large: 12 };
+    const MAX_START = { tiny: 6, compact: 10, small: 10, standard: 10, large: 10 };
 
     const state = {
       session: null,
@@ -451,12 +455,12 @@
 
       const mineRow = (r) => {
         const g = r.games;
-        const label = { lobby: 'in lobby', active: 'in progress', finished: 'finished' }[g.status];
+        const label = { lobby: 'in lobby', picking: 'choosing starts', active: 'in progress', finished: 'finished' }[g.status];
         return h('div', { class: 'game' },
           h('div', {},
             h('div', { class: 'name' }, dots(r.faction_slug), g.name, h('span', { class: 'tag' + (g.status === 'active' ? ' gold' : '') }, label)),
             h('div', { class: 'meta' }, `${factionOf(r.faction_slug).name} · ${g.status === 'lobby' ? 'waiting to start' : 'tick ' + g.current_tick}`)),
-          h('button', { class: 'primary', onclick: () => (g.status === 'lobby' ? showRoom(g.id) : showMap(g.id)) }, g.status === 'lobby' ? 'Open lobby' : 'Open map'));
+          h('button', { class: 'primary', onclick: () => openGame(g.id) }, g.status === 'lobby' ? 'Open lobby' : g.status === 'picking' ? 'Choose start' : 'Open map'));
       };
 
       mount(h('div', { class: 'wrap' }, topbar(),
@@ -486,12 +490,13 @@
     function joinDialog(g) {
       let pick = null;
       const picker = factionPicker(g.taken_factions, null, (v) => { pick = v; });
-      modal(`Join ${g.name}`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);font-size:.85rem' }, `Host ${g.host_name} · ${describeGame(g)}`), h('label', {}, 'Faction'), picker), (close) => [
+      const pw = h('input', { type: 'password', placeholder: 'game password' });
+      modal(`Join ${g.name}`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);font-size:.85rem' }, `Host ${g.host_name} · ${describeGame(g)}`), h('label', {}, 'Faction'), picker, g.has_password ? h('div', {}, h('label', {}, 'Password'), pw) : null), (close) => [
         h('button', { onclick: close }, 'Cancel'),
         h('button', {
           class: 'primary',
           onclick: (e) => run(e.currentTarget, async () => {
-            const { error } = await sb.rpc('join_game', { p_game_id: g.id, p_faction_slug: pick });
+            const { error } = await sb.rpc('join_game', { p_game_id: g.id, p_faction_slug: pick, p_password: g.has_password ? pw.value : null });
             if (error) throw error;
             close();
             await showRoom(g.id);
@@ -506,96 +511,202 @@
       return el;
     }
 
+    const TECH_NAMES = { armory: 'Armory (weapons)', stables: 'Stables (range)', mint: 'Mint (banking)', barracks: 'Barracks (manufacturing)', library: 'Library (experimentation)', guildhall: 'Guildhall (terraforming)', watchtowers: 'Watchtowers (scanning)' };
+    const RESEARCH_COSTS = { '0': 'No research', '0.5': 'Cheap', '1': 'Normal', '1.5': 'Expensive', '2.5': 'Very expensive', '4': 'Crazy expensive' };
+    const DEV_COSTS = { '0.5': 'Cheap (half price)', '1': 'Standard', '2': 'Expensive (double)' };
+
     function createDialog() {
       let faction = null;
+      const field = (label, el, tip) => h('div', {}, h('label', {}, label), el, tip ? h('div', { class: 'tip' }, tip) : null);
+      const check = (checked, text) => { const el = h('input', { type: 'checkbox', checked }); return { el, row: h('label', { class: 'check' }, el, text) }; };
+      const group = (title, open, ...kids) => h('details', { class: 'grp', open }, h('summary', {}, title), ...kids);
+      const num = (min, max, value, step) => h('input', { type: 'number', min: String(min), max: String(max), value: String(value), step: step ? String(step) : null });
+
       const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s game` });
-      const players = h('input', { type: 'number', min: '2', max: '8', value: '4' });
-      const style = selectOf(STYLES, 'scatter');
+      const password = h('input', { type: 'text', maxlength: '40', placeholder: 'none' });
+      const players = num(2, 8, 4);
+      const victory = num(10, 100, 50, 5);
+      const decay = selectOf(Object.fromEntries(Array.from({ length: 17 }, (_, i) => [String(i), i === 0 ? 'Disabled' : `${i} castle${i === 1 ? '' : 's'} less per production`])), '0');
+
       const shape = selectOf(SHAPES, 'continent');
+      const scatter = selectOf({ random: 'Random scatter', twin_rings: 'Twin rings (symmetrical)' }, 'random');
+      const mirror = check(false, 'Mirrored stars (2, 4 or 8 players): the map is mirrored on both axes for equal starts');
+      const style = selectOf(STYLES, 'scatter');
       const size = selectOf(SIZES, 'standard');
-      const speed = selectOf(SPEEDS, 'normal');
-      const victory = h('input', { type: 'number', min: '10', max: '100', step: '5', value: '50' });
-      const truce = h('input', { type: 'number', min: '1', max: '500', value: '48' });
-      const grace = h('input', { type: 'number', min: '0', max: '500', value: '24' });
-      const perTurn = h('input', { type: 'number', min: '1', max: '48', value: '6' });
-      const turnMins = h('input', { type: 'number', min: '5', max: '10080', value: '1440' });
-      const limit = h('input', { type: 'number', min: '1', placeholder: 'none' });
-      const starting = h('input', { type: 'number', min: '1', max: '12', value: '4' });
-      const fogSel = h('select', {}, h('option', { value: 'fog' }, 'Fog: whole map visible, enemy activity hidden'), h('option', { value: 'dark' }, 'Dark: map hidden until you explore it'), h('option', { value: 'off' }, 'No fog'));
-      const seasons = h('input', { type: 'checkbox' });
-      const seasonLen = h('input', { type: 'number', min: '12', max: '240', value: '48' });
-      const events = h('input', { type: 'checkbox' });
       const scaleSel = h('select', {}, h('option', { value: '1' }, 'Classic (1x)'), h('option', { value: '2' }, 'Wide (2x)'), h('option', { value: '3' }, 'Vast (3x)'), h('option', { value: '4' }, 'Immense (4x)'));
       scaleSel.value = '3';
-      const freeTravel = h('input', { type: 'checkbox', checked: true });
-      const mercs = h('input', { type: 'checkbox', checked: true });
-      const fill = h('input', { type: 'checkbox' });
-      const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
-      difficulty.value = '3';
-      const picker = factionPicker([], null, (v) => { faction = v; });
-      const hint = h('div', { style: 'color:var(--dim);font-size:.78rem;margin-top:4px' });
+      const freeTravel = check(true, 'Free travel: march to any castle in range (rivers, mountains and sea block; cross at fords and passes)');
+      const richness = selectOf({ sparse: 'Sparse (expensive to build on)', standard: 'Standard', plentiful: 'Plentiful (cheap to build on)' }, 'standard');
+      const fogSel = selectOf({ fog: 'Fog: whole map visible, enemy activity hidden', dark: 'Dark: map hidden until you explore it', off: 'No fog' }, 'fog');
+      const alliances = selectOf({ none: 'No alliances', '0': 'Alliances, no warning when ended', '24': 'Alliances, 24 tick warning', '48': 'Alliances, 48 tick warning' }, '24');
+      const startSel = selectOf({ random: 'Random start locations', choose: 'Players choose their start' }, 'random');
+      const pickMins = num(1, 1440, 15);
+      const roadsMode = selectOf({ cheap: 'Cheap roads', expensive: 'Expensive roads', disabled: 'Roads disabled' }, 'cheap');
+      const randomRoads = selectOf({ none: 'No random roads', rare: 'Rare (10% of neutral castles)', common: 'Common (30%)' }, 'none');
+
+      const starting = num(1, 10, 4);
+      const hint = h('div', { class: 'tip' });
       const syncHint = () => { hint.textContent = `Up to ${MAX_START[size.value]} starting castles on a ${size.value} map.`; };
       size.addEventListener('change', syncHint);
       syncHint();
+      const gold = num(0, 5000, 300, 50);
+      const garrison = num(0, 200, 10, 5);
+      const tLevel = num(0, 20, 1);
+      const iLevel = num(0, 20, 1);
+      const pLevel = num(0, 20, 1);
+      const cmdStart = num(0, 5, 2);
+      const cmdCost = num(0, 1000, 100, 10);
+      const devTreasury = selectOf(DEV_COSTS, '1');
+      const devRecruit = selectOf(DEV_COSTS, '1');
+      const devPrestige = selectOf(DEV_COSTS, '1');
+      const tradeCost = selectOf({ '15': 'Cheap trades ($15 per level)', '25': 'Standard trades ($25 per level)', '50': 'Expensive trades ($50 per level)' }, '25');
+      const tradeScan = check(false, 'Trade with scanned players only');
+
+      const terraforming = check(true, 'Terraforming (Guildhall): upgrades raise a castle\'s natural resources');
+      const experimentation = check(true, 'Experimentation (Library): random research each production');
+      const expBonus = selectOf({ '1': 'Experiment bonus: 72 points', '2': '144 points', '3': '216 points', '4': '288 points' }, '1');
+      const techRows = Object.keys(AREA_NAMES).map((area) => ({ area, level: num(1, 16, 1), cost: selectOf(RESEARCH_COSTS, '1') }));
+
+      const speed = selectOf(SPEEDS, 'normal');
+      const cycle = num(6, 72, 12);
+      const limit = h('input', { type: 'number', min: '1', placeholder: 'none' });
+      const truce = num(1, 500, 48);
+      const perTurn = num(1, 48, 6);
+      const turnDuration = selectOf({ '720': '12 hours', '1080': '18 hours', '1440': '24 hours', '2880': '48 hours' }, '1440');
+      const fixedTurns = check(false, 'Fixed turn deadline: turns always run one duration apart, even when everyone is ready');
+      const seasons = check(false, 'Seasons (winter slows troops and marches)');
+      const seasonLen = num(12, 240, 48);
+      const events = check(false, 'Random events (plague, unrest, harvest, comets)');
+      const mercs = check(true, 'Mercenary companies for hire');
+
+      const fill = check(false, 'Fill empty seats with AI players');
+      const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
+      difficulty.value = '3';
+      const autoStart = check(false, 'Start the game automatically when every seat is taken');
+      const picker = factionPicker([], null, (v) => { faction = v; });
 
       const body = h('div', {},
-        h('label', {}, 'Game name'), name,
-        h('div', { class: 'grid2' },
-          h('div', {}, h('label', {}, 'Players (2 to 8)'), players),
-          h('div', {}, h('label', {}, 'Tick speed'), speed),
-          h('div', {}, h('label', {}, 'Map shape'), shape),
-          h('div', {}, h('label', {}, 'Castle placement'), style),
-          h('div', {}, h('label', {}, 'Map size'), size),
-          h('div', {}, h('label', {}, 'Starting castles'), starting),
-          h('div', {}, h('label', {}, 'Territory % to win'), victory),
-          h('div', {}, h('label', {}, 'Truce length (ticks)'), truce),
-          h('div', {}, h('label', {}, 'Alliance break warning (ticks)'), grace),
-          h('div', {}, h('label', {}, 'Time limit (ticks, optional)'), limit),
-          h('div', {}, h('label', {}, 'Ticks per turn (turn-based)'), perTurn),
-          h('div', {}, h('label', {}, 'Turn timeout, minutes (turn-based)'), turnMins)),
-        hint,
-        h('div', {}, h('label', {}, 'Fog of war'), fogSel),
-        h('div', {}, h('label', {}, 'Map scale (distance between castles)'), scaleSel),
-        h('label', { class: 'check' }, freeTravel, 'Free travel: march to any castle in range (rivers, mountains and sea block; cross at fords and passes)'),
-        h('label', { class: 'check' }, seasons, 'Seasons (winter slows troops and marches)'),
-        h('div', {}, h('label', {}, 'Season length (ticks, 12 to 240)'), seasonLen),
-        h('label', { class: 'check' }, events, 'Random events (plague, unrest, harvest, comets)'),
-        h('label', { class: 'check' }, mercs, 'Mercenary companies for hire'),
-        h('label', { class: 'check' }, fill, 'Fill empty seats with AI players'),
-        h('div', {}, h('label', {}, 'AI difficulty (1 to 5)'), difficulty),
-        h('label', {}, 'Your faction'), picker);
+        group('Basics', true,
+          field('Game name', name),
+          h('div', { class: 'grid2' },
+            field('Players (2 to 8)', players),
+            field('Castles to win (% of all)', victory),
+            field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'),
+            field('Password', password, 'Optional. Players need it to join.'))),
+        group('Galaxy', false,
+          h('div', { class: 'grid2' },
+            field('Map shape', shape),
+            field('Star scatter', scatter),
+            field('Castle placement', style),
+            field('Castles per player', size),
+            field('Map scale', scaleSel),
+            field('Natural resources', richness),
+            field('Roads', roadsMode),
+            field('Random roads', randomRoads),
+            field('Start locations', startSel),
+            field('Time to choose (minutes)', pickMins)),
+          mirror.row, freeTravel.row,
+          field('Fog of war', fogSel),
+          field('Formal alliances', alliances)),
+        group('Players', false,
+          h('div', { class: 'grid2' },
+            field('Starting castles', starting, null),
+            field('Starting gold', gold),
+            field('Troops per starting castle', garrison),
+            field('Starting commanders', cmdStart),
+            field('Treasury level', tLevel),
+            field('Recruitment level', iLevel),
+            field('Prestige level', pLevel),
+            field('Commander hire cost', cmdCost),
+            field('Treasury upgrades', devTreasury),
+            field('Recruitment upgrades', devRecruit),
+            field('Prestige upgrades', devPrestige),
+            field('Technology trades', tradeCost)),
+          hint, tradeScan.row),
+        group('Technology', false,
+          terraforming.row, experimentation.row, field('Experimentation bonus', expBonus),
+          h('label', {}, 'Realm areas: start level and research cost'),
+          techRows.map((r) => h('div', { class: 'techrow' }, h('span', {}, TECH_NAMES[r.area]), r.level, r.cost))),
+        group('Time', false,
+          h('div', { class: 'grid2' },
+            field('Tick speed', speed),
+            field('Production cycle (ticks)', cycle),
+            field('Time limit (ticks)', limit),
+            field('Truce length (ticks)', truce),
+            field('Ticks per turn (turn-based)', perTurn),
+            field('Turn duration (turn-based)', turnDuration)),
+          fixedTurns.row, seasons.row, field('Season length (ticks, 12 to 240)', seasonLen), events.row, mercs.row),
+        group('Admin', false,
+          fill.row, field('AI difficulty (1 to 5)', difficulty), autoStart.row,
+          h('label', {}, 'Your faction'), picker));
 
       modal('Create game', body, (close) => [
         h('button', { onclick: close }, 'Cancel'),
         h('button', {
           class: 'primary',
           onclick: (e) => run(e.currentTarget, async () => {
+            const startLevels = {};
+            const costMults = {};
+            techRows.forEach((r) => {
+              if (Number(r.level.value) > 1) startLevels[r.area] = Number(r.level.value);
+              if (r.cost.value !== '1') costMults[r.area] = Number(r.cost.value);
+            });
             const settings = {
               name: name.value.trim() || 'New Game',
               max_players: Number(players.value),
-              tick_speed: speed.value,
-              map_style: style.value,
-              map_shape: shape.value,
-              map_size: size.value,
-              starting_territories: Number(starting.value),
               victory_pct: Number(victory.value) / 100,
+              victory_decay: Number(decay.value),
+              map_shape: shape.value,
+              star_scatter: scatter.value,
+              start_selection: startSel.value,
+              pick_minutes: Number(pickMins.value),
+              mirrored: mirror.el.checked,
+              map_style: style.value,
+              map_size: size.value,
+              world_scale: Number(scaleSel.value),
+              free_travel: freeTravel.el.checked,
+              resource_richness: richness.value,
+              roads_mode: roadsMode.value,
+              random_roads: randomRoads.value,
               fog_of_war: fogSel.value !== 'off',
               fog_dark: fogSel.value === 'dark',
-              world_scale: Number(scaleSel.value),
-              free_travel: freeTravel.checked,
-              seasons_enabled: seasons.checked,
-              season_length_ticks: Number(seasonLen.value),
-              events_enabled: events.checked,
-              mercenaries_enabled: mercs.checked,
+              allow_alliances: alliances.value !== 'none',
+              grace_period_ticks: alliances.value === 'none' ? 24 : Number(alliances.value),
+              starting_territories: Number(starting.value),
+              starting_gold: Number(gold.value),
+              starting_garrison: Number(garrison.value),
+              starting_commanders: Number(cmdStart.value),
+              starting_treasury_level: Number(tLevel.value),
+              starting_industry_level: Number(iLevel.value),
+              starting_prestige_level: Number(pLevel.value),
+              commander_cost: Number(cmdCost.value),
+              treasury_cost_mult: Number(devTreasury.value),
+              recruitment_cost_mult: Number(devRecruit.value),
+              prestige_cost_mult: Number(devPrestige.value),
+              trade_cost: Number(tradeCost.value),
+              trade_requires_scan: tradeScan.el.checked,
+              terraforming_enabled: terraforming.el.checked,
+              experimentation_enabled: experimentation.el.checked,
+              experiment_bonus_mult: Number(expBonus.value),
+              area_start_levels: startLevels,
+              area_cost_mults: costMults,
+              tick_speed: speed.value,
+              production_cycle_ticks: Number(cycle.value),
               truce_ticks: Number(truce.value),
-              grace_period_ticks: Number(grace.value),
-              fill_with_ai: fill.checked,
+              turn_fixed: fixedTurns.el.checked,
+              seasons_enabled: seasons.el.checked,
+              season_length_ticks: Number(seasonLen.value),
+              events_enabled: events.el.checked,
+              mercenaries_enabled: mercs.el.checked,
+              fill_with_ai: fill.el.checked,
               ai_difficulty: Number(difficulty.value),
+              auto_start: autoStart.el.checked,
             };
+            if (password.value.trim()) settings.password = password.value.trim();
             if (limit.value) settings.time_limit_ticks = Number(limit.value);
             if (speed.value === 'turn_based') {
               settings.ticks_per_turn = Number(perTurn.value);
-              settings.turn_timeout_minutes = Number(turnMins.value);
+              settings.turn_timeout_minutes = Number(turnDuration.value);
             }
             if (faction) settings.faction_slug = faction;
             const { data, error } = await sb.rpc('create_game', { p_settings: settings });
@@ -605,6 +716,78 @@
           }),
         }, 'Create'),
       ]);
+    }
+
+    async function openGame(gameId) {
+      const { data } = await sb.from('games').select('id, status').eq('id', gameId).maybeSingle();
+      if (!data) return showHome();
+      if (data.status === 'lobby') return showRoom(gameId);
+      if (data.status === 'picking') return showPicking(gameId);
+      return showMap(gameId);
+    }
+
+    async function showPicking(gameId) {
+      clearCleanup();
+      state.view = 'picking';
+      state.roomId = gameId;
+      await loadFactions();
+
+      const container = h('div', { class: 'wrap' });
+      mount(container);
+      const countdown = h('span', { style: 'color:var(--gold2)' });
+      let deadline = null;
+      const tickCountdown = () => {
+        if (!deadline) return;
+        const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+        countdown.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left`;
+      };
+
+      const draw = async () => {
+        if (state.view !== 'picking' || state.roomId !== gameId) return;
+        const { data, error } = await sb.rpc('get_start_options', { p_game_id: gameId });
+        if (state.view !== 'picking' || state.roomId !== gameId) return;
+        if (error) { toast(error.message); return; }
+        if (data.status !== 'picking') return openGame(gameId);
+        deadline = data.deadline ? Date.parse(data.deadline) : null;
+        const W = data.map_w;
+        const mine = data.seats.find((x) => x.player_id === data.me);
+        const pick = (seat) => run(null, async () => {
+          const { error: e2 } = await sb.rpc('pick_start', { p_game_id: gameId, p_seat: seat });
+          if (e2) throw e2;
+          await draw();
+        });
+        const svg = sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'width:100%;max-height:70vh;background:#05070c;border:1px solid var(--line);border-radius:4px' },
+          data.castles.map((c) => sv('circle', { cx: c.x, cy: c.y, r: W * 0.004 * (c.tier || 1), fill: '#4a4f5c', style: 'pointer-events:none' })),
+          data.seats.map((x) => {
+            const taken = x.player_id !== null && x.player_id !== undefined;
+            const col = taken ? factionOf(x.faction_slug).color : '#f0cf7d';
+            const r = W * 0.024;
+            return sv('g', { style: 'cursor:pointer', onclick: () => { if (!taken || x.player_id === data.me) pick(x.seat); } },
+              sv('circle', { cx: x.x, cy: x.y, r: r * 1.6, fill: 'transparent' }),
+              sv('circle', { cx: x.x, cy: x.y, r, fill: '#0c0e18', stroke: col, 'stroke-width': r * 0.3, 'stroke-dasharray': taken ? null : `${r * 0.5} ${r * 0.4}` }),
+              sv('text', { x: x.x, y: x.y + r * 0.35, 'text-anchor': 'middle', 'font-size': r, style: 'fill:#fff;pointer-events:none' }, String(x.seat + 1)),
+              sv('text', { x: x.x, y: x.y - r * 1.4, 'text-anchor': 'middle', 'font-size': r * 0.8, style: 'fill:#fff;paint-order:stroke;stroke:#000;stroke-width:' + r * 0.2 + 'px;pointer-events:none' }, taken ? x.display_name : 'free'));
+          }));
+        container.replaceChildren(topbar(),
+          h('div', { class: 'row', style: 'margin-bottom:14px' }, h('button', { onclick: showHome }, 'Back to games')),
+          h('div', { class: 'panel' },
+            h('h2', {}, 'Choose your starting location'),
+            h('div', { style: 'color:var(--dim);font-size:.88rem;margin:6px 0 10px' },
+              data.fog_dark ? 'The galaxy is dark: you can only see where each player could begin. ' : 'Pick the start that suits you. ',
+              'Click a free marker to claim it, or click yours again to keep it. Players who have not chosen when time runs out are assigned the remaining starts at random, and so are AI players.'),
+            h('div', { class: 'row wrap2', style: 'margin-bottom:10px' }, countdown,
+              h('span', { style: 'color:var(--text)' }, mine ? `You chose start ${mine.seat + 1} (${mine.name})` : 'You have not chosen yet')),
+            svg));
+        tickCountdown();
+      };
+
+      await draw();
+      let debounce = null;
+      const kick = () => { clearTimeout(debounce); debounce = setTimeout(draw, 300); };
+      const unwatch = watchGame(gameId, kick);
+      const poll = setInterval(draw, 4000);
+      const clock = setInterval(tickCountdown, 1000);
+      state.cleanup.push(() => { clearTimeout(debounce); clearInterval(poll); clearInterval(clock); unwatch(); });
     }
 
     async function showRoom(gameId) {
@@ -633,6 +816,7 @@
           toast('That game is no longer available.');
           return showHome();
         }
+        if (game.status === 'picking') return showPicking(gameId);
         const players = playersRes.data || [];
         const me = players.find((p) => p.user_id === state.session.user.id);
         if (me) me.starting_schools = schoolsRes.data;
@@ -642,7 +826,7 @@
           h('button', { onclick: showHome }, 'Back to games'))];
 
         parts.push(h('div', { class: 'panel' },
-          h('h2', {}, game.name, h('span', {}, h('span', { class: 'tag' + (game.status === 'active' ? ' gold' : '') }, { lobby: 'lobby', active: 'in progress', finished: 'finished' }[game.status]))),
+          h('h2', {}, game.name, h('span', {}, h('span', { class: 'tag' + (game.status === 'active' ? ' gold' : '') }, { lobby: 'lobby', picking: 'choosing starts', active: 'in progress', finished: 'finished' }[game.status]))),
           h('div', { class: 'kv' },
             kv('Map', `${SHAPES[game.map_shape] || 'Continent'} · ${STYLES[game.map_style]} · ${SIZES[game.map_size]}`),
             kv('Speed', SPEEDS[game.tick_speed] || game.tick_speed),
@@ -654,6 +838,13 @@
             kv('Random events', game.events_enabled ? 'On' : 'Off'),
             kv('Mercenaries', game.mercenaries_enabled ? 'On' : 'Off'),
             kv('Starting castles', game.starting_territories),
+            game.start_selection === 'choose' ? kv('Start locations', `Players choose (${game.pick_minutes} min)`) : null,
+            game.has_password ? kv('Password', 'Required') : null,
+            game.victory_decay ? kv('Victory decay', `${game.victory_decay} castles per production`) : null,
+            kv('Alliances', game.allow_alliances ? `Allowed, ${game.grace_period_ticks} tick warning` : 'Off'),
+            kv('Roads', `${game.roads_mode}${game.random_roads !== 'none' ? `, ${game.random_roads} random` : ''}`),
+            game.mirrored ? kv('Layout', 'Mirrored stars') : game.star_scatter === 'twin_rings' ? kv('Layout', 'Twin rings') : null,
+            game.auto_start ? kv('Auto start', 'When full') : null,
             kv('AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'),
             kv('Truce', `${game.truce_ticks} ticks`),
             kv('Alliance break warning', `${game.grace_period_ticks} ticks`),
@@ -724,7 +915,7 @@
                   throw new Error(detail);
                 }
                 toast('The game has begun', true);
-                await showMap(gameId);
+                await openGame(gameId);
               }),
             }, 'Start game'));
             if (!canStart) actions.push(h('span', { style: 'color:var(--dim);font-size:.85rem' }, 'Needs at least 2 players, or enable AI fill.'));
@@ -1455,7 +1646,7 @@
 
       const drawHud = () => {
         const g = ms.game;
-        const winAt = Math.ceil(ms.t.size * g.victory_pct);
+        const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
         const winner = ms.players.get(g.winner_player_id);
         hud.replaceChildren(...[
           h('button', { onclick: showHome }, 'Back to games'),
@@ -1483,9 +1674,9 @@
       });
 
       const INFRA = [
-        { type: 'treasury', name: 'Treasury', col: 'treasury_level', base: 1250, note: 'gold' },
-        { type: 'recruitment', name: 'Recruitment', col: 'industry_level', base: 2500, note: 'troops' },
-        { type: 'prestige', name: 'Prestige', col: 'prestige_level', base: 10000, note: 'prestige' },
+        { type: 'treasury', name: 'Treasury', col: 'treasury_level', base: 1250, note: 'gold', mult: 'treasury_cost_mult' },
+        { type: 'recruitment', name: 'Recruitment', col: 'industry_level', base: 2500, note: 'troops', mult: 'recruitment_cost_mult' },
+        { type: 'prestige', name: 'Prestige', col: 'prestige_level', base: 10000, note: 'prestige', mult: 'prestige_cost_mult' },
       ];
 
       const buildSection = (t) => {
@@ -1495,7 +1686,7 @@
         const out = [h('b', {}, 'Build')];
         INFRA.forEach((i) => {
           const lvl = t[i.col];
-          const cost = Math.max(1, Math.floor(i.base * (lvl + 1) / t.resources * mult));
+          const cost = Math.max(1, Math.floor(i.base * (lvl + 1) / t.resources * mult * ms.game[i.mult]));
           out.push(h('button', {
             class: 'cmdrow',
             disabled: gold < cost,
@@ -1505,8 +1696,8 @@
         if (t.has_road) {
           out.push(h('button', { class: 'cmdrow', onclick: order('demolish_road', { p_territory_id: t.id }, 'Road demolished') }, 'Demolish road', h('span', { style: 'color:var(--dim);margin-left:auto' }, 'free')));
         } else {
-          const cost = Math.max(1, Math.floor(30 * t.resources * mult));
-          out.push(h('button', { class: 'cmdrow', disabled: gold < cost, onclick: order('build_road', { p_territory_id: t.id }, 'Road built') }, 'Build road', h('span', { style: 'color:var(--dim);margin-left:auto' }, `${cost} gold`)));
+          const cost = Math.max(1, Math.floor(6 * t.resources * mult * (ms.game.roads_mode === 'expensive' ? 3 : 1)));
+          if (ms.game.roads_mode !== 'disabled') out.push(h('button', { class: 'cmdrow', disabled: gold < cost, onclick: order('build_road', { p_territory_id: t.id }, 'Road built') }, 'Build road', h('span', { style: 'color:var(--dim);margin-left:auto' }, `${cost} gold`)));
         }
         if (ms.game.mercenaries_enabled) {
           const size = h('input', { type: 'number', min: '10', max: '60', value: '20', style: 'width:80px' });
@@ -2077,6 +2268,23 @@
         ]);
       };
 
+      const techDialog = (p) => {
+        const mine = ms.areas.filter((a) => a.level > 1 && !(a.area === 'guildhall' && !ms.game.terraforming_enabled) && Number((ms.game.area_cost_mults || {})[a.area] ?? 1) > 0);
+        if (!mine.length) { toast('You have no technology above level 1 to share.'); return; }
+        const sel = h('select', {}, mine.map((a) => h('option', { value: a.area }, `${AREA_NAMES[a.area]} (level ${a.level})`)));
+        modal(`Share technology with ${p.display_name}`, h('div', {},
+          h('div', { style: 'color:var(--dim);font-size:.85rem' }, `Raises their level by one if you are ahead of them, and you keep yours. You pay ${ms.game.trade_cost} gold per level you give, and any progress they had toward that level is lost.`),
+          h('label', {}, 'Technology'), sel), (close) => [
+          h('button', { onclick: close }, 'Cancel'),
+          h('button', { class: 'primary', onclick: (e) => act(e.currentTarget, async () => {
+            const { data, error } = await sb.rpc('gift_tech', { p_game_id: gameId, p_target_player_id: p.id, p_area: sel.value });
+            if (error) throw error;
+            close();
+            toast(`${AREA_NAMES[sel.value]} is now level ${data.level} for ${p.display_name} (fee ${data.fee})`, true);
+          }) }, 'Share'),
+        ]);
+      };
+
       const termsDialog = (p) => {
         const payer = h('select', {}, h('option', { value: 'proposer' }, 'I pay'), h('option', { value: 'target' }, `${p.display_name} pays`));
         const gold = numInput(0, 0, 100000);
@@ -2208,17 +2416,18 @@
         const st = r ? r.status : 'neutral';
         const target = { p_target_player_id: p.id };
         const peaceBtn = h('button', { onclick: order('propose_peace', target, `Peace proposed to ${p.display_name}`) }, 'Propose peace');
-        const tradeBtn = h('button', { onclick: () => tradeDialog(p) }, 'Trade');
+        const tradeBtn = [h('button', { onclick: () => tradeDialog(p) }, 'Trade'), h('button', { onclick: () => techDialog(p) }, 'Share tech')];
+        const allianceBtn = ms.game.allow_alliances ? h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance') : null;
         if (st === 'neutral') {
           return h('div', { class: 'row wrap2' },
-            h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance'),
+            allianceBtn,
             h('button', { onclick: offerCall('propose_nap', { p_game_id: gameId, p_target_player_id: p.id }, `Pact proposed to ${p.display_name}`) }, 'Non-aggression pact'),
             peaceBtn, tradeBtn,
             h('button', { class: 'danger', onclick: (e) => { if (confirm(`Declare war on ${p.display_name}? Everyone will see it.`)) order('declare_war', target, `You declared war on ${p.display_name}`)(e); } }, 'Declare war'));
         }
         if (st === 'nap') {
           return h('div', { class: 'row wrap2' }, h('span', { style: 'color:var(--gold2)' }, 'Non-aggression pact'),
-            h('button', { onclick: order('propose_alliance', target, `Alliance proposed to ${p.display_name}`) }, 'Propose alliance'), tradeBtn,
+            allianceBtn, tradeBtn,
             h('button', { class: 'danger', onclick: (e) => { if (confirm(`Break your pact with ${p.display_name}? War follows after a grace period and costs infamy.`)) order('break_nap', target, 'Pact broken. War follows after the grace period')(e); } }, 'Break pact'));
         }
         if (st === 'proposed') {
@@ -2423,7 +2632,7 @@
           sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(150),
           sb.from('message_threads').select('*').eq('game_id', gameId),
           sb.from('thread_participants').select('*').eq('game_id', gameId),
-          ms.edgesAll ? Promise.resolve({ data: ms.edgesAll }) : sb.from('territory_edges').select('*').eq('game_id', gameId),
+          ms.edgesAll && !ms.fogDark ? Promise.resolve({ data: ms.edgesAll }) : sb.rpc('get_game_edges', { p_game_id: gameId }),
           sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
           sb.rpc('my_world_events', { p_game_id: gameId }),
           sb.rpc('my_council', { p_game_id: gameId }),
@@ -2447,6 +2656,7 @@
         ms.t = new Map(view.territories.map((t) => [t.id, t]));
         ms.standings = view.standings;
         ms.serverSources = view.sources;
+        ms.winAt = view.win_at;
         ms.explored = view.explored || null;
         ms.cmd = view.commanders;
         ms.captives = view.captives || [];
@@ -2492,7 +2702,8 @@
         ms.routes = new Map();
         view.routes.sort((a, b) => a.id - b.id).forEach((r) => ms.routes.set(r.commander_id, r));
         const firstEdges = !ms.edgesAll;
-        if (firstEdges) ms.edgesAll = ed.data;
+        ms.fogDark = !!view.game.fog_dark;
+        if (firstEdges || ms.fogDark) ms.edgesAll = ed.data;
         ms.edges = ms.edgesAll.filter((e) => ms.t.has(e.from_territory_id) && ms.t.has(e.to_territory_id));
         if (firstEdges) {
           const artRow = await sb.from('games').select('map_art').eq('id', gameId).maybeSingle();
