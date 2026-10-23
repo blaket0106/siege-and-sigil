@@ -1423,3 +1423,9 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - The `territory_edges` kind check now allows `wormhole`; `create_game` accepts both settings; the lobby has Home distance and Wormholes selectors; the Articles of war list them.
 - Tests: 31 pass (close < medium < far capital radius on continent and mirrored round maps; wormhole links are neutral, distant, unique, 24 ticks, deterministic, leave every other edge identical, keep the map connected). A sweep of close and far homes with common wormholes over 6 shapes, 4 sizes and 2 seeds built 96 of 96 connected maps (about 9 wormholes each, slowest 0.5 s). A real two-player game (far homes, common wormholes) started through the deployed function with 2 wormholes costing exactly 1260.
 - **Not built:** anonymity (names also appear in chat, so a partial version would mislead) and NP's scan-and-range or banking variants, which our tech tree does not use.
+
+**Map preview in the lobby (client only)**
+
+- The Realm step of the create dialog shows a live preview of the map. It runs the real `generateWorld` from `supabase/functions/start-game/generator.js` in a module Web Worker (so the page stays responsive), then paints it with the in-game terrain painter and overlays trails, wormholes, river castles, passes and each house's castles in its own colour (white ring on capitals). It reruns 450 ms after any relevant setting changes.
+- **New map** picks a new seed. The previewed seed is sent as `world_seed`, so the game generates the same map the host saw. This holds only while the repo's generator matches the deployed edge function (redeploy after any generator change), and the preview assumes every seat fills (with AI fill off and fewer players joining, the map differs).
+- Not built: picking a location on the preview to shape the terrain (the Age of Empires 2 idea); presets stay the way to choose terrain.

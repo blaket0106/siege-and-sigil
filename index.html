@@ -797,7 +797,8 @@
       const field = (label, el, tip) => h('div', {}, h('label', {}, label), el, tip ? h('div', { class: 'tip' }, tip) : null);
       const check = (checked, text) => { const el = h('input', { type: 'checkbox', checked }); return { el, row: h('label', { class: 'check' }, el, text) }; };
       const num = (min, max, value, step) => h('input', { type: 'number', min: String(min), max: String(max), value: String(value), step: step ? String(step) : null });
-      const update = () => paintBlazon();
+      const previewRef = {};
+      const update = () => { paintBlazon(); if (previewRef.schedule) previewRef.schedule(); };
 
       const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s campaign` });
       const password = h('input', { type: 'text', maxlength: '40', placeholder: 'none' });
@@ -892,12 +893,89 @@
           h('div', { class: 'facts' }, facts.map((t) => h('span', { class: 'fact' }, t))));
       }
 
+      const SEAT_COLORS = ['#d94a4a', '#4a8fd9', '#e8c14a', '#58b86a', '#b06ad9', '#e08a3a', '#4ac7c7', '#d96aa8'];
+      const preview = (() => {
+        const stage = h('div', { class: 'mapstage' });
+        const status = h('div', { class: 'tip', style: 'margin:0' }, 'Choose settings to preview the map.');
+        const workerSource = 'self.onmessage = async (e) => { try { const m = await import(e.data.url); self.postMessage({ ok: true, layout: m.generateWorld(e.data.opts) }); } catch (err) { self.postMessage({ ok: false, error: String((err && err.message) || err) }); } };';
+        const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+        const genUrl = new URL('supabase/functions/start-game/generator.js', location.href).href;
+        let seed = Math.floor(Math.random() * 2147483000) + 1;
+        let worker = null;
+        let token = 0;
+        let timer = null;
+        let dirty = true;
+        let visible = false;
+        const opts = () => ({
+          seed, players: Number(players.value), mapSize: size.value, startingTerritories: Number(starting.value), style: style.value,
+          startingGarrison: Number(garrison.value) || 0, scale: Number(scaleSel.value), freeTravel: travelSel.value === 'free', shape: shape.value,
+          richness: richness.value, randomRoads: randomRoads.value, starScatter: scatter.value, mirrored: mirror.el.checked,
+          trails: travelSel.value === 'trails', preset: mapPreset.value, homeDistance: homeSel.value, wormholes: wormSel.value,
+        });
+        const draw = (layout) => {
+          const W = layout.map_w;
+          const terr = paintTerrain(layout.art, W, layout.territories);
+          const capitals = new Set(layout.seats.map((st) => st.capital_idx));
+          const k = W * 0.0085;
+          const edges = layout.edges.map((e) => {
+            const A = layout.territories[e.a];
+            const B = layout.territories[e.b];
+            const pts = (e.path || [[A.x, A.y], [B.x, B.y]]).map((q) => `${q[0]},${q[1]}`).join(' ');
+            return e.kind === 'wormhole'
+              ? sv('polyline', { points: pts, fill: 'none', stroke: '#c9a8ff', 'stroke-width': k * 0.7, 'stroke-dasharray': `${k * 0.3} ${k * 1.6}`, 'stroke-linecap': 'round' })
+              : sv('polyline', { points: pts, fill: 'none', stroke: '#efe4bf', 'stroke-opacity': 0.75, 'stroke-width': k * 0.45, 'stroke-linejoin': 'round' });
+          });
+          const rivers = terr.rivers.map((r) => sv('path', { d: 'M' + r.p.map((q) => `${q[0]} ${q[1]}`).join(' L'), fill: 'none', stroke: '#7fb9ea', 'stroke-width': (1.6 + r.w) * k * 0.28, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9 }));
+          const castles = layout.territories.map((t) => {
+            if (t.crossing) return sv('rect', { x: t.x - k * 0.8, y: t.y - k * 0.8, width: k * 1.6, height: k * 1.6, transform: `rotate(45 ${t.x} ${t.y})`, fill: t.crossing_kind === 'pass' ? '#e8dcc2' : '#7fb9ea', stroke: '#2a2418', 'stroke-width': k * 0.18 });
+            const owned = t.owner_seat !== null && t.owner_seat !== undefined;
+            return sv('circle', { cx: t.x, cy: t.y, r: k * (owned ? 1.15 : 0.7) * (0.8 + 0.15 * t.tier), fill: owned ? SEAT_COLORS[t.owner_seat % SEAT_COLORS.length] : '#cfd3dc', stroke: capitals.has(t.idx) ? '#fff' : '#1a1410', 'stroke-width': capitals.has(t.idx) ? k * 0.4 : k * 0.18 });
+          });
+          stage.replaceChildren(
+            h('img', { src: terr.url, alt: 'Map preview', style: 'position:absolute;inset:0;width:100%;height:100%' }),
+            sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'position:absolute;inset:0;width:100%;height:100%' }, ...rivers, ...edges, ...castles));
+          const count = (kind) => layout.territories.filter((t) => t.crossing_kind === kind).length;
+          const bits = [`${layout.territories.filter((t) => !t.crossing).length} castles`, `${layout.art.rivers.length} rivers`];
+          if (count('river')) bits.push(`${count('river')} river castles`);
+          if (count('pass')) bits.push(`${count('pass')} passes`);
+          const worms = layout.edges.filter((e) => e.kind === 'wormhole').length;
+          if (worms) bits.push(`${worms} wormholes`);
+          status.textContent = `${bits.join(', ')}. Map ${seed}. Assumes every seat is filled.`;
+        };
+        const generate = () => {
+          if (worker) worker.terminate();
+          const mine = ++token;
+          dirty = false;
+          status.textContent = 'Drawing the map...';
+          try { worker = new Worker(workerUrl, { type: 'module' }); } catch { status.textContent = 'The map preview is not available in this browser.'; return; }
+          const done = (fn) => (ev) => { if (mine !== token) return; worker.terminate(); worker = null; fn(ev); };
+          worker.onmessage = done((ev) => {
+            if (!ev.data.ok) { stage.replaceChildren(); status.textContent = ev.data.error; return; }
+            draw(ev.data.layout);
+          });
+          worker.onerror = done(() => { stage.replaceChildren(); status.textContent = 'The map preview could not load.'; });
+          worker.postMessage({ url: genUrl, opts: opts() });
+        };
+        const api = {
+          schedule: () => { dirty = true; if (!visible) return; clearTimeout(timer); timer = setTimeout(generate, 450); },
+          show: (on) => { visible = on; if (on && dirty) generate(); },
+          get seed() { return seed; },
+          el: h('div', { class: 'mappreview' }, stage,
+            h('div', { class: 'row', style: 'align-items:center;gap:12px;margin-top:8px' },
+              h('button', { type: 'button', onclick: () => { seed = Math.floor(Math.random() * 2147483000) + 1; dirty = true; generate(); } }, 'New map'),
+              status)),
+        };
+        Object.assign(previewRef, { schedule: api.schedule });
+        [players, starting, garrison, scaleSel, scatter, style, richness, mapPreset, travelSel, homeSel, wormSel, mirror.el].forEach((el) => { el.addEventListener('input', api.schedule); el.addEventListener('change', api.schedule); });
+        return api;
+      })();
+
       const sec = (...kids) => h('section', {}, ...kids);
       const heading = (title, sub) => h('div', { class: 'sheet-head' }, h('h2', {}, title), sub ? h('p', {}, sub) : null);
       const sections = [
         ['Campaign', sec(heading('Start from a template', 'Pick a template to fill in sensible settings. Every choice can still be changed on the next steps.'), presetEl,
           h('div', { class: 'grid2' }, field('Campaign name', name), field('Houses (2 to 8)', players)))],
-        ['Realm', sec(heading('Shape the realm', 'Where the castles sit and what lies between them.'),
+        ['Realm', sec(heading('Shape the realm', 'Where the castles sit and what lies between them.'), preview.el,
           h('label', {}, 'Land'), shape.el,
           h('label', {}, 'Castles per house'), size.el,
           h('div', { class: 'grid2' }, field('Star scatter', scatter), field('Castle placement', style), field('Map scale', scaleSel), field('Natural resources', richness), field('Roads', roadsMode), field('Random roads', randomRoads), field('Terrain', mapPreset), field('Travel', travelSel), field('Home distance', homeSel, 'Applies to round, continent, ring and mirrored maps.'), field('Wormholes', wormSel, 'Fixed 24 tick links between far castles. Castle trails only.')),
@@ -930,6 +1008,7 @@
       const foot = h('div', { class: 'sheet-foot' });
       const draw = () => {
         sections.forEach(([, el], i) => el.classList.toggle('on', i === stepIndex));
+        preview.show(sections[stepIndex][0] === 'Realm');
         rail.replaceChildren(...sections.map(([title], i) => h('button', { type: 'button', class: i === stepIndex ? 'on' : '', 'aria-current': i === stepIndex ? 'step' : null, onclick: () => { stepIndex = i; draw(); } },
           h('span', { class: 'ico' }, String(i + 1)), title)));
         const last = stepIndex === sections.length - 1;
@@ -963,6 +1042,7 @@
           free_travel: travelSel.value === 'free',
           travel_mode: travelSel.value,
           map_preset: mapPreset.value,
+          world_seed: preview.seed,
           home_distance: homeSel.value,
           wormholes: wormSel.value,
           resource_richness: richness.value,
