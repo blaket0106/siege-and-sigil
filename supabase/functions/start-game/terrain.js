@@ -147,7 +147,7 @@ function decorSeed(parts) {
 
 export const trailDebug = { reason: '' };
 const TRAIL_CAP = 1.9;
-const MAX_DETOUR = 1.45;
+const MAX_DETOUR = 2.4;
 
 function planTrails(c, lenient = 0) {
   const wet = (sc) => (lenient ? sc.oceanFrac > lenient : sc.ocean);

@@ -56,7 +56,7 @@
       { slug: 'university', name: 'University' },
       { slug: 'rangers', name: 'Rangers' },
     ];
-    const SPEEDS = { slow: 'Slow (2h ticks)', normal: 'Normal (1h)', fast: 'Fast (30m)', quad: 'Quad (15m)', turn_based: 'Turn-based' };
+    const SPEEDS = { slow: 'Slow (2h ticks)', normal: 'Normal (1h)', fast: 'Fast (30m)', quad: 'Rapid (15m)', blitz: 'Blitz (5m)', turn_based: 'Turn-based' };
     const SIZES = { tiny: 'Tiny (8)', compact: 'Compact (12)', small: 'Small (16)', standard: 'Standard (24)', large: 'Large (36)' };
     const STYLES = { scatter: 'Scatter', continents: 'Continents' };
     const SHAPES = { continent: 'Continent', round: 'Round and balanced', ring: 'Ring around a sea', twin: 'Twin continents', archipelago: 'Archipelago', rift: 'Rift (split by a sea)' };
@@ -891,10 +891,10 @@
         ]],
         ['h', 'Rules'],
         ['list', [
-          '[[basics#how-time-works|Tick speed]], [[basics#what-wins-the-game|victory share]], [[fog|fog of war]], seasons, events and mercenaries.',
+          '[[basics#how-time-works|Tick speed]], [[basics#what-wins-the-game|victory share]], [[fog|fog of war]], alliances and truces.',
           'Who can join: Open (listed for everyone), Friends only (listed for your [[friends|friends]]) or Invite only (not listed).',
           'Player names: shown, or hidden until the game ends. When hidden, everyone appears under their house name.',
-          'AI players fill any seats left open when the game starts.',
+          'Each seat is a player or an AI with its own strength, from Squire to Warlord. You can switch a seat between player and AI from the lobby until the game starts. A player seat still empty at the start is dropped.',
         ]],
         ['h', 'Inviting players'],
         ['list', [
@@ -1358,7 +1358,7 @@
 
     function gameFacts(g) {
       return [`${SIZES[g.map_size] || g.map_size} castles each`, SPEEDS[g.tick_speed] || g.tick_speed,
-        `${Math.round(g.victory_pct * 100)}% to win`, g.fog_dark ? 'Dark fog' : g.fog_of_war ? 'Fog of war' : 'No fog', g.fill_with_ai ? 'AI fills empty seats' : null].filter(Boolean);
+        `${Math.round(g.victory_pct * 100)}% to win`, g.fog_dark ? 'Dark fog' : g.fog_of_war ? 'Fog of war' : 'No fog'].filter(Boolean);
     }
 
     async function showHome() {
@@ -1535,10 +1535,16 @@
       return el;
     }
 
-    const TECH_NAMES = { armory: 'Armory (weapons)', stables: 'Stables (range)', mint: 'Mint (banking)', barracks: 'Barracks (manufacturing)', library: 'Library (experimentation)', guildhall: 'Guildhall (terraforming)', watchtowers: 'Watchtowers (scanning)' };
-    const RESEARCH_COSTS = { '0': 'No research', '0.5': 'Cheap', '1': 'Normal', '1.5': 'Expensive', '2.5': 'Very expensive', '4': 'Crazy expensive' };
-    const DEV_COSTS = { '0.5': 'Cheap (half price)', '1': 'Standard', '2': 'Expensive (double)' };
-
+    const TECH_NAMES = { armory: 'Armory', stables: 'Stables', mint: 'Mint', barracks: 'Barracks', library: 'Library', guildhall: 'Guildhall', watchtowers: 'Watchtowers' };
+    const AREA_EFFECT = {
+      armory: 'Troops your army kills every round of a battle',
+      mint: 'Gold you earn from Treasury each production',
+      barracks: 'Troops your castles produce',
+      guildhall: 'Makes every upgrade cheaper',
+      watchtowers: 'How far you see, and who strikes first in open fights',
+      library: 'Adds bonus prestige to your other realm areas',
+      stables: 'How far one march order can reach',
+    };
     const PRESET_INFO = {
       continental: 'Continental: rivers, mountain ranges and passes',
       highlands: 'Highlands: tall ranges, many passes, few rivers',
@@ -1547,140 +1553,300 @@
       plains: 'Open plains: no rivers or mountains',
     };
     const HOME_INFO = { close: 'Close: houses start near the middle', medium: 'Medium', far: 'Far: houses start near the edges' };
-    const TRAVEL_INFO = {
-      trails: 'Castle trails: armies follow the trails between castles. Rivers and mountains block except at crossings and passes',
-      free: 'Free travel: march to any castle in range',
-    };
-
     const SIZE_COUNT = { tiny: 8, compact: 12, small: 16, standard: 24, large: 36 };
     const SHAPE_INFO = {
       continent: ['Continent', 'One wild landmass with inland seas and ragged coasts.'],
-      round: ['Round and balanced', 'A near-circular island with even starts. The fair default.'],
+      round: ['Round island', 'A near-circular, even island. The fair default.'],
       ring: ['Ring around a sea', 'Land wraps a central sea, so armies march the long way round.'],
-      twin: ['Twin continents', 'Two landmasses joined by a couple of narrow bridges.'],
-      archipelago: ['Archipelago', 'Big islands joined by thin isthmuses. Many choke points.'],
-      rift: ['Rift', 'One landmass split by a long sea with only a few crossings.'],
+      twin: ['Twin continents', 'Two landmasses joined by a few narrow bridges.'],
+      archipelago: ['Archipelago', 'Islands of every size joined by thin isthmuses. Many choke points.'],
+      rift: ['The Rift', 'One land torn by a long sea, crossed only by a few passes.'],
     };
 
-    function choice(options, initial, onChange) {
+    const dotsMarkup = (n) => {
+      const cols = Math.ceil(Math.sqrt(n * 1.15));
+      const rows = Math.ceil(n / cols);
+      const sx = 34 / cols;
+      const sy = 34 / rows;
+      let out = '';
+      for (let i = 0; i < n; i++) out += `<circle cx="${(7 + sx * (i % cols) + sx / 2).toFixed(1)}" cy="${(7 + sy * Math.floor(i / cols) + sy / 2).toFixed(1)}" r="${Math.min(2.6, sx / 2.6).toFixed(1)}" fill="currentColor" stroke="none"/>`;
+      return out;
+    };
+    const coinsMarkup = (n) => Array.from({ length: n }, (_, i) => `<ellipse cx="24" cy="${36 - i * 8}" rx="13" ry="5"/><path d="M11 ${36 - i * 8}v3.5c0 2.8 5.8 5 13 5s13-2.2 13-5V${36 - i * 8}"/>`).join('');
+    const chevMarkup = (n) => Array.from({ length: n }, (_, i) => `<path d="M${14 + i * 6} 38l5 -4 -5 -4"/>`).join('');
+    const PICT = {
+      shape_continent: '<path fill="currentColor" stroke="none" d="M8 27C6 17 14 9 22 10C26 6 35 8 37 14C44 15 44 23 40 28C42 35 34 41 27 38C22 42 12 41 11 34C8 33 8 30 8 27Z"/>',
+      shape_round: '<circle cx="24" cy="24" r="16" fill="currentColor" stroke="none"/>',
+      shape_ring: '<circle cx="24" cy="24" r="13" stroke-width="8"/>',
+      shape_twin: '<path fill="currentColor" stroke="none" d="M3 24C2 17 8 12 14 13C19 14 21 19 20 24C21 30 16 36 10 35C5 34 3 29 3 24Z"/><path fill="currentColor" stroke="none" d="M28 22C27 16 32 11 38 12C44 13 46 19 45 25C46 31 41 36 35 35C30 34 28 28 28 22Z"/><path d="M20 22h8M20 27h8" stroke-width="2"/>',
+      shape_archipelago: '<ellipse cx="14" cy="15" rx="8" ry="5.5" transform="rotate(-20 14 15)" fill="currentColor" stroke="none"/><ellipse cx="34" cy="13" rx="5" ry="4" fill="currentColor" stroke="none"/><ellipse cx="30" cy="29" rx="9" ry="6" transform="rotate(25 30 29)" fill="currentColor" stroke="none"/><ellipse cx="12" cy="34" rx="6" ry="4.5" fill="currentColor" stroke="none"/><ellipse cx="41" cy="40" rx="3.5" ry="3" fill="currentColor" stroke="none"/>',
+      shape_rift: '<path fill="currentColor" stroke="none" d="M5 10C15 8 22 14 19 22C16 30 23 36 21 43H7C3 36 3 20 5 10Z"/><path fill="currentColor" stroke="none" d="M28 8C33 14 30 22 33 29C36 36 32 40 36 43H44C46 36 46 18 44 8Z"/><path d="M20 20h8M22 31h8" stroke-width="2.4"/>',
+      layout_scatter: '<g fill="currentColor" stroke="none"><circle cx="10" cy="12" r="2.4"/><circle cx="26" cy="9" r="2.4"/><circle cx="38" cy="17" r="2.4"/><circle cx="17" cy="26" r="2.4"/><circle cx="33" cy="32" r="2.4"/><circle cx="9" cy="39" r="2.4"/><circle cx="25" cy="40" r="2.4"/><circle cx="41" cy="40" r="2.4"/></g>',
+      layout_clusters: '<g fill="currentColor" stroke="none"><circle cx="10" cy="11" r="2.4"/><circle cx="16" cy="15" r="2.4"/><circle cx="12" cy="19" r="2.4"/><circle cx="33" cy="12" r="2.4"/><circle cx="39" cy="18" r="2.4"/><circle cx="31" cy="19" r="2.4"/><circle cx="20" cy="35" r="2.4"/><circle cx="27" cy="38" r="2.4"/><circle cx="24" cy="31" r="2.4"/></g>',
+      layout_natural: '<circle cx="24" cy="24" r="17" stroke-dasharray="2 5"/><g fill="currentColor" stroke="none"><circle cx="15" cy="17" r="2.4"/><circle cx="31" cy="14" r="2.4"/><circle cx="35" cy="28" r="2.4"/><circle cx="21" cy="33" r="2.4"/><circle cx="24" cy="23" r="2.4"/></g>',
+      layout_rings: '<circle cx="24" cy="24" r="8"/><circle cx="24" cy="24" r="17"/><g fill="currentColor" stroke="none"><circle cx="24" cy="16" r="2.2"/><circle cx="32" cy="24" r="2.2"/><circle cx="24" cy="32" r="2.2"/><circle cx="16" cy="24" r="2.2"/><circle cx="24" cy="7" r="2.2"/><circle cx="41" cy="24" r="2.2"/><circle cx="24" cy="41" r="2.2"/><circle cx="7" cy="24" r="2.2"/></g>',
+      mirror: '<path d="M24 5v38" stroke-dasharray="3 4"/><path d="M10 14l8 6-8 8zM38 14l-8 6 8 8z" fill="currentColor" stroke="none" opacity=".85"/>',
+      terrain_continental: '<path d="M4 38l11-18 7 10 6-8 16 16z" fill="currentColor" stroke="none" opacity=".85"/><path d="M30 10c-6 6 4 9-1 14" stroke-width="2.4"/>',
+      terrain_highlands: '<path d="M2 40l12-24 9 14 8-18 15 28z" fill="currentColor" stroke="none" opacity=".85"/><path d="M26 12l5-6 4 6" stroke="var(--ink-1)" stroke-width="2"/>',
+      terrain_river_valley: '<path d="M10 4c10 8-8 12 0 20s-6 12-2 20M30 4c8 8-6 12 2 20s-4 12 0 20" stroke-width="3"/>',
+      terrain_forest: '<path d="M12 36l6-14 6 14zM24 38l7-18 7 18zM6 40l5-10 5 10z" fill="currentColor" stroke="none" opacity=".85"/><path d="M18 36v5M31 38v4" stroke-width="2.4"/>',
+      terrain_plains: '<path d="M4 34h40M8 26h32M14 18h20" stroke-width="2.4"/><circle cx="36" cy="10" r="4" fill="currentColor" stroke="none"/>',
+      travel_trails: '<path d="M8 38c8-2 6-10 14-12s6-10 18-16" stroke-dasharray="3 4"/><g fill="currentColor" stroke="none"><circle cx="8" cy="38" r="3.6"/><circle cx="23" cy="25" r="3.6"/><circle cx="40" cy="10" r="3.6"/></g>',
+      travel_free: '<circle cx="24" cy="24" r="16" stroke-dasharray="3 4"/><path d="M24 24l10-10M24 24l-11 6M24 24l2 12" /><circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/>',
+      roads_cheap: '<path d="M6 38c12-4 8-20 20-24l16-4" stroke-width="3.2"/><path d="M6 38c12-4 8-20 20-24l16-4" stroke="var(--ink-1)" stroke-width="1" stroke-dasharray="3 3"/>',
+      roads_expensive: '<path d="M6 38c12-4 8-20 20-24l16-4" stroke-width="3.2"/><circle cx="36" cy="32" r="8" fill="currentColor" stroke="none"/><path d="M36 28v8" stroke="var(--ink-1)" stroke-width="2.2"/>',
+      roads_disabled: '<path d="M6 38c12-4 8-20 20-24l16-4" stroke-width="3.2" opacity=".5"/><path d="M12 12l24 24" stroke-width="3.2"/>',
+      rand_none: '<path d="M4 34h40" opacity=".45"/>',
+      rand_rare: '<path d="M4 34h40" opacity=".45"/><path d="M18 34c0-10 8-10 8-18" stroke-width="3"/>',
+      rand_common: '<path d="M4 34h40" opacity=".45"/><path d="M10 34c0-8 6-8 6-14M22 34c0-12 8-10 8-22M34 34c0-8 6-8 6-12" stroke-width="3"/>',
+      res_sparse: coinsMarkup(1),
+      res_standard: coinsMarkup(2),
+      res_plentiful: coinsMarkup(3),
+      fog_off: '<path d="M3 24C10 12 38 12 45 24C38 36 10 36 3 24Z"/><circle cx="24" cy="24" r="6" fill="currentColor" stroke="none"/>',
+      fog_fog: '<path d="M12 30a8 8 0 0 1 2-15 10 10 0 0 1 19 3 7 7 0 0 1 0 12z" fill="currentColor" stroke="none" opacity=".9"/><path d="M8 38h32M14 43h22" stroke-width="2.4" opacity=".6"/>',
+      fog_dark: '<path d="M32 8a16 16 0 1 0 8 28A14 14 0 0 1 32 8z" fill="currentColor" stroke="none"/><circle cx="40" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="34" cy="38" r="1.4" fill="currentColor" stroke="none"/>',
+      home_close: '<circle cx="24" cy="24" r="6"/><circle cx="24" cy="24" r="12" opacity=".5"/><circle cx="24" cy="24" r="19" opacity=".5"/><circle cx="24" cy="18" r="3" fill="currentColor" stroke="none"/>',
+      home_medium: '<circle cx="24" cy="24" r="6" opacity=".5"/><circle cx="24" cy="24" r="12"/><circle cx="24" cy="24" r="19" opacity=".5"/><circle cx="24" cy="12" r="3" fill="currentColor" stroke="none"/>',
+      home_far: '<circle cx="24" cy="24" r="6" opacity=".5"/><circle cx="24" cy="24" r="12" opacity=".5"/><circle cx="24" cy="24" r="19"/><circle cx="24" cy="5" r="3" fill="currentColor" stroke="none"/>',
+      speed: (n, label) => `<circle cx="24" cy="21" r="14"/><path d="M24 21V12M24 21l6 4"/>${chevMarkup(n)}`,
+      speed_turn: '<path d="M14 6h20M14 42h20M16 6c0 10 16 10 16 18S16 32 16 42M32 6c0 10-16 10-16 18s16 8 16 18" />',
+      alliance_none: '<path d="M10 24h10M28 24h10" stroke-width="3"/><path d="M14 14l20 20" stroke-width="3"/>',
+      alliance_open: '<rect x="4" y="18" width="20" height="12" rx="6"/><rect x="24" y="18" width="20" height="12" rx="6"/>',
+      alliance_warn: '<rect x="4" y="12" width="20" height="12" rx="6"/><rect x="24" y="12" width="20" height="12" rx="6"/><path d="M18 32h12l-2 10H20z" fill="currentColor" stroke="none" opacity=".8"/>',
+      names_shown: '<circle cx="24" cy="16" r="8"/><path d="M8 42c2-12 30-12 32 0"/>',
+      names_hidden: '<path d="M8 14c8-6 24-6 32 0v12c0 8-8 14-16 16C16 40 8 34 8 26z"/><path d="M15 22l6 2M33 22l-6 2" stroke-width="3"/>',
+      vis_open: '<circle cx="24" cy="24" r="17"/><path d="M7 24h34M24 7c-8 8-8 26 0 34M24 7c8 8 8 26 0 34"/>',
+      vis_friends: '<circle cx="17" cy="16" r="6"/><circle cx="33" cy="16" r="6"/><path d="M5 40c1-10 18-10 20 0M23 40c1-10 20-10 20 0"/>',
+      vis_invite: '<rect x="5" y="11" width="38" height="26" rx="3"/><path d="M6 13l18 14 18-14"/>',
+      seat_human: '<circle cx="24" cy="15" r="8" fill="currentColor" stroke="none"/><path d="M8 42c1-14 31-14 32 0z" fill="currentColor" stroke="none"/>',
+      seat_ai: '<rect x="9" y="14" width="30" height="24" rx="6"/><circle cx="19" cy="26" r="3" fill="currentColor" stroke="none"/><circle cx="29" cy="26" r="3" fill="currentColor" stroke="none"/><path d="M24 14V6M20 6h8M6 24v6M42 24v6"/>',
+      cost_cheap: coinsMarkup(1),
+      cost_standard: coinsMarkup(2),
+      cost_expensive: coinsMarkup(3),
+      turn12: '<circle cx="24" cy="24" r="16"/><path d="M24 24V12M24 24h7" /><text x="24" y="42" font-size="9" text-anchor="middle" fill="currentColor" stroke="none">12h</text>',
+      turn18: '<circle cx="24" cy="24" r="16"/><path d="M24 24V12M24 24h7" /><text x="24" y="42" font-size="9" text-anchor="middle" fill="currentColor" stroke="none">18h</text>',
+      turn24: '<circle cx="24" cy="24" r="16"/><path d="M24 24V12M24 24h7" /><text x="24" y="42" font-size="9" text-anchor="middle" fill="currentColor" stroke="none">24h</text>',
+      turn48: '<circle cx="24" cy="24" r="16"/><path d="M24 24V12M24 24h7" /><text x="24" y="42" font-size="9" text-anchor="middle" fill="currentColor" stroke="none">48h</text>',
+      swords: '<path d="M10 38L34 10l4 4L14 42zM38 38L14 10l-4 4 24 28z" />',
+      castle: '<path d="M8 40V18h6v-4h4v4h4v-4h4v4h4v-4h4v4h6v22z" /><path d="M20 40v-8a4 4 0 0 1 8 0v8"/>',
+      crown: '<path d="M8 36l-2-20 10 8 8-14 8 14 10-8-2 20z"/>',
+      bell: '<path d="M12 34V22a12 12 0 0 1 24 0v12l3 4H9z"/><path d="M20 42a4 4 0 0 0 8 0"/>',
+      flag: '<path d="M12 6v38M12 8h26l-6 9 6 9H12"/>',
+      sun: '<circle cx="24" cy="24" r="8"/><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/>',
+      snow: '<path d="M24 5v38M7 14l34 20M41 14L7 34M18 8l6 5 6-5M18 40l6-5 6 5"/>',
+      comet: '<circle cx="34" cy="14" r="6" fill="currentColor" stroke="none"/><path d="M30 18L8 40M34 22L18 44M26 12L6 28" stroke-width="2.2" opacity=".7"/>',
+      hire: '<circle cx="18" cy="14" r="6"/><path d="M6 38c1-12 22-12 24 0"/><path d="M34 22v14M27 29h14" stroke-width="3"/>',
+      clockface: '<circle cx="24" cy="24" r="17"/><path d="M24 24V12M24 24l8 5"/>',
+      hourglass: '<path d="M12 6h24M12 42h24M14 6c0 12 20 12 20 18S14 30 14 42M34 6c0 12-20 12-20 18s20 6 20 18"/>',
+      truce: '<path d="M8 30c6-10 14-10 16-4 2 6 10 6 16-4"/><path d="M24 8v12"/><circle cx="24" cy="8" r="3" fill="currentColor" stroke="none"/>',
+      gold: coinsMarkup(2),
+      troops: '<circle cx="14" cy="14" r="5" fill="currentColor" stroke="none"/><circle cx="34" cy="14" r="5" fill="currentColor" stroke="none"/><circle cx="24" cy="26" r="5" fill="currentColor" stroke="none"/><path d="M4 42c1-8 20-8 22 0M22 42c1-8 22-8 22 0" />',
+    };
+    const pictCache = document.createElement('template');
+    function pict(name, size = 44, ...args) {
+      const inner = typeof PICT[name] === 'function' ? PICT[name](...args) : PICT[name] || '';
+      pictCache.innerHTML = `<svg class="pict" viewBox="0 0 48 48" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+      return pictCache.content.firstElementChild;
+    }
+    const rawPict = (innerMarkup, size = 44) => { pictCache.innerHTML = `<svg class="pict" viewBox="0 0 48 48" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${innerMarkup}</svg>`; return pictCache.content.firstElementChild; };
+
+    function cards(items, initial, onChange, opts = {}) {
       let value = initial;
-      const el = h('div', { class: 'choices' });
-      const draw = () => el.replaceChildren(...options.map(([key, title, desc]) => h('button', {
-        type: 'button', class: 'choice' + (key === value ? ' on' : ''), 'aria-pressed': key === value ? 'true' : 'false',
-        onclick: () => { value = key; draw(); onChange(); },
-      }, h('b', {}, title), desc ? h('span', {}, desc) : null)));
+      const el = h('div', { class: 'sx-cards' + (opts.compact ? ' compact' : ''), role: 'radiogroup', style: opts.min ? `--card-min:${opts.min}px` : null });
+      const draw = () => el.replaceChildren(...items.map(([key, title, desc, icon]) => h('button', {
+        type: 'button', class: 'sx-card' + (key === value ? ' on' : ''), role: 'radio', 'aria-checked': key === value ? 'true' : 'false', title: desc || title,
+        onclick: () => { if (value === key) return; value = key; draw(); onChange(key); },
+      }, icon ? (typeof icon === 'string' ? pict(icon, opts.compact ? 34 : 44) : icon) : null, h('b', {}, title), desc ? h('span', {}, desc) : null)));
       draw();
       return { el, get value() { return value; }, set value(v) { value = v; draw(); } };
     }
 
+    function stepper({ min, max, value, step = 1, unit = '', onChange, placeholder = '' }) {
+      const input = h('input', { type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: String(step), value: String(value), placeholder });
+      const clamp = (n) => Math.min(max, Math.max(min, n));
+      const set = (n) => { input.value = String(clamp(n)); onChange(); };
+      const minus = h('button', { type: 'button', 'aria-label': 'Decrease', onclick: () => set((Number(input.value) || 0) - step) }, '−');
+      const plus = h('button', { type: 'button', 'aria-label': 'Increase', onclick: () => set((Number(input.value) || 0) + step) }, '+');
+      input.addEventListener('change', () => { if (input.value === '') { onChange(); return; } input.value = String(clamp(Number(input.value) || min)); onChange(); });
+      input.addEventListener('input', () => onChange());
+      const el = h('div', { class: 'sx-stepper' }, minus, input, unit ? h('span', { class: 'unit' }, unit) : null, plus);
+      return { el, input, get value() { return input.value; }, set value(v) { input.value = String(v); }, get number() { return Number(input.value); } };
+    }
+
+    function toggle({ icon, title, help, checked = false, onChange }) {
+      let on = checked;
+      const sw = h('span', { class: 'sx-switch' }, h('i', {}));
+      const el = h('button', { type: 'button', class: 'sx-toggle' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(on), onclick: () => { on = !on; paint(); onChange(on); } },
+        icon ? pict(icon, 34) : h('span'), h('span', { class: 'txt' }, h('b', {}, title), help ? h('span', {}, help) : null), sw);
+      const paint = () => { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); };
+      return { el, get checked() { return on; }, set checked(v) { on = !!v; paint(); } };
+    }
+
+    const sxNode = (c) => (c && c.el ? c.el : c);
+    const sxField = (label, control, help) => h('div', { class: 'sx-field' }, h('label', {}, label), sxNode(control), help ? h('p', { class: 'sx-help' }, help) : null);
+    const sxGroup = (title, help, ...kids) => h('div', { class: 'sx-group' }, h('h3', {}, title), help ? h('p', { class: 'sx-help' }, help) : null, ...kids.map(sxNode));
+    const sxRow = (...kids) => h('div', { class: 'sx-row' }, ...kids.map(sxNode));
+
+    const AI_LEVELS = [
+      ['Squire', 'Cautious. Waits for a big advantage before attacking and accepts most treaties.'],
+      ['Knight', 'Wants a clear edge before it attacks and often accepts peace.'],
+      ['Baron', 'Balanced. Attacks on a fair edge and weighs treaties on their merits.'],
+      ['Duke', 'Attacks on a small edge, fields more commanders and often breaks pacts.'],
+      ['Warlord', 'Attacks on any edge, spends most of its gold at once and usually betrays allies.'],
+    ];
+    const SPEED_CARDS = [
+      ['slow', 'Slow', 'A tick every 2 hours', 120],
+      ['normal', 'Normal', 'A tick every hour', 60],
+      ['fast', 'Fast', 'A tick every 30 minutes', 30],
+      ['quad', 'Rapid', 'A tick every 15 minutes', 15],
+      ['blitz', 'Blitz', 'A tick every 5 minutes', 5],
+      ['turn_based', 'Turn-based', 'Advances when everyone ends their turn', 0],
+    ];
+    const lengthText = (mins) => {
+      if (mins < 90) return `${Math.round(mins)} minutes`;
+      const hrs = mins / 60;
+      if (hrs < 36) return `${Number.isInteger(hrs) ? hrs : hrs.toFixed(1)} hours`;
+      const days = hrs / 24;
+      return `${Number.isInteger(days) ? days : days.toFixed(1)} days`;
+    };
+
     function createDialog() {
       clearCleanup();
       state.view = 'create';
-      let faction = null;
       let stepIndex = 0;
-      const field = (label, el, tip) => h('div', {}, h('label', {}, label), el, tip ? h('div', { class: 'tip' }, tip) : null);
-      const check = (checked, text) => { const el = h('input', { type: 'checkbox', checked }); return { el, row: h('label', { class: 'check' }, el, text) }; };
-      const num = (min, max, value, step) => h('input', { type: 'number', min: String(min), max: String(max), value: String(value), step: step ? String(step) : null });
-      const previewRef = {};
-      const update = () => { paintBlazon(); if (previewRef.schedule) previewRef.schedule(); };
+      let preview = null;
+      const changed = () => { syncRules(); updateSummary(); if (preview) preview.schedule(); };
 
-      const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s campaign` });
-      const password = h('input', { type: 'text', maxlength: '40', placeholder: 'none' });
-      const players = num(2, 8, 4);
-      const victory = num(10, 100, 50, 5);
-      const decay = selectOf(Object.fromEntries(Array.from({ length: 17 }, (_, i) => [String(i), i === 0 ? 'Disabled' : `${i} castle${i === 1 ? '' : 's'} less per production`])), '0');
+      const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s campaign`, 'aria-label': 'Campaign name' });
+      name.addEventListener('input', () => updateSummary());
+      const password = h('input', { type: 'text', maxlength: '40', placeholder: 'No password', 'aria-label': 'Password' });
+      const seats = [{ kind: 'human', faction: null }, { kind: 'human', faction: null }, { kind: 'ai', faction: null, level: 3 }, { kind: 'ai', faction: null, level: 3 }];
+      const seatsEl = h('div', { class: 'sx-seats' });
+      const seatCount = stepper({ min: 2, max: 8, value: seats.length, onChange: () => {
+        const n = Math.min(8, Math.max(2, seatCount.number || 2));
+        while (seats.length < n) seats.push({ kind: 'human', faction: null });
+        while (seats.length > n) seats.pop();
+        paintSeats(); changed();
+      } });
 
-      const shape = choice(Object.entries(SHAPE_INFO).map(([k, [t, d]]) => [k, t, d]), 'continent', update);
-      const scatter = selectOf({ random: 'Random scatter', twin_rings: 'Twin rings (symmetrical)' }, 'random');
-      const mirror = check(false, 'Mirrored stars (2, 4 or 8 players): the map is mirrored on both axes for equal starts');
-      const style = selectOf(STYLES, 'scatter');
-      const size = choice([['tiny', 'Tiny', '8 castles per house'], ['compact', 'Compact', '12 per house'], ['small', 'Small', '16 per house'], ['standard', 'Standard', '24 per house'], ['large', 'Large', '36 per house']], 'standard', () => { syncHint(); update(); });
-      const scaleSel = h('select', {}, h('option', { value: '1' }, 'Classic (1x)'), h('option', { value: '2' }, 'Wide (2x)'), h('option', { value: '3' }, 'Vast (3x)'), h('option', { value: '4' }, 'Immense (4x)'), h('option', { value: '5' }, 'Colossal (5x)'), h('option', { value: '6' }, 'Titanic (6x)'));
-      scaleSel.value = '5';
-      const travelSel = selectOf(TRAVEL_INFO, 'trails');
-      const mapPreset = selectOf(PRESET_INFO, 'continental');
-      const anonSel = selectOf({ normal: 'Names shown', extra: 'Names hidden until the game ends' }, 'normal');
-      const visSel = selectOf({ open: 'Open: anyone can find it', friends: 'Friends only: your friends can find it', invite: 'Invite only: needs a code, link or invitation' }, 'open');
-      const homeSel = selectOf(HOME_INFO, 'medium');
-      const richness = selectOf({ sparse: 'Sparse (expensive to build on)', standard: 'Standard', plentiful: 'Plentiful (cheap to build on)' }, 'standard');
-      const fog = choice([['fog', 'Fog', 'The whole map is visible. Enemy troops and upgrades are hidden outside your scan range.'], ['dark', 'Dark', 'The map is black until you explore it. Explored ground stays visible.'], ['off', 'No fog', 'Everything is visible to everyone.']], 'fog', update);
-      const alliances = selectOf({ none: 'No alliances', '0': 'Alliances, no warning when ended', '24': 'Alliances, 24 tick warning', '48': 'Alliances, 48 tick warning' }, '24');
-      const startSel = choice([['random', 'Random starts', 'Each house is placed for you.'], ['choose', 'Houses choose', 'Everyone picks a starting location before play begins.']], 'random', update);
-      const pickMins = num(1, 1440, 15);
-      const roadsMode = selectOf({ cheap: 'Cheap roads', expensive: 'Expensive roads', disabled: 'Roads disabled' }, 'cheap');
-      const randomRoads = selectOf({ none: 'No random roads', rare: 'Rare (10% of neutral castles)', common: 'Common (30%)' }, 'none');
+      const pickHouse = (i) => {
+        const taken = seats.map((s, j) => (j !== i ? s.faction : null)).filter(Boolean);
+        let closeFn = null;
+        const picker = factionPicker(taken, seats[i].faction, (v) => { seats[i].faction = v; paintSeats(); changed(); if (closeFn) closeFn(); });
+        closeFn = modal(i === 0 ? 'Choose your house' : `Choose a house for seat ${i + 1}`, picker, (close) => [h('button', { onclick: close }, 'Close')]);
+      };
+      const paintSeats = () => {
+        seatsEl.replaceChildren(...seats.map((seat, i) => {
+          const houseBtn = h('button', { type: 'button', class: 'sx-house', onclick: () => pickHouse(i), title: 'Choose a house' },
+            seat.faction ? sigil(seat.faction, 38) : rawPict('<path d="M8 8h32v18c0 10-8 15-16 18C16 41 8 36 8 26z"/><text x="24" y="31" font-size="18" text-anchor="middle" fill="currentColor" stroke="none">?</text>', 38),
+            h('span', {}, h('b', {}, seat.faction ? `House ${factionOf(seat.faction).name}` : 'Random house'), h('small', {}, i === 0 ? 'Your house. Click to change' : 'Click to choose')));
+          let detail;
+          if (seat.kind === 'ai') {
+            const lv = AI_LEVELS[seat.level - 1];
+            detail = h('div', { class: 'sx-ai' },
+              h('div', { class: 'sx-pips', role: 'radiogroup', 'aria-label': 'AI difficulty' }, [1, 2, 3, 4, 5].map((n) => h('button', { type: 'button', class: n <= seat.level ? 'on' : '', role: 'radio', 'aria-checked': String(n === seat.level), title: AI_LEVELS[n - 1][0], onclick: () => { seat.level = n; paintSeats(); } }, h('i', {})))),
+              h('div', { class: 'sx-ai-name' }, h('b', {}, lv[0]), h('small', {}, lv[1])));
+          } else if (i === 0) {
+            detail = h('p', { class: 'sx-help' }, 'You sit here as host. Your friends take the other player seats.');
+          } else {
+            detail = h('p', { class: 'sx-help' }, 'A player joins by code, link or the lobby list, and chooses their own house.');
+          }
+          return h('div', { class: 'sx-seat' + (i === 0 ? ' host' : '') + (seat.kind === 'ai' ? ' ai' : '') },
+            h('div', { class: 'sx-seat-head' },
+              h('b', {}, i === 0 ? 'Seat 1 · You' : `Seat ${i + 1}`),
+              i === 0 ? h('span', { class: 'tag gold', style: 'margin:0' }, 'Host') : h('div', { class: 'sx-seg', role: 'radiogroup' },
+                h('button', { type: 'button', class: seat.kind === 'human' ? 'on' : '', role: 'radio', 'aria-checked': String(seat.kind === 'human'), onclick: () => { seat.kind = 'human'; paintSeats(); changed(); } }, pict('seat_human', 18), 'Player'),
+                h('button', { type: 'button', class: seat.kind === 'ai' ? 'on' : '', role: 'radio', 'aria-checked': String(seat.kind === 'ai'), onclick: () => { seat.kind = 'ai'; seat.level = seat.level || 3; paintSeats(); changed(); } }, pict('seat_ai', 18), 'AI'))),
+            (i === 0 || seat.kind === 'ai') ? houseBtn : null,
+            detail);
+        }));
+      };
 
-      const starting = num(1, 10, 4);
-      const hint = h('div', { class: 'tip' });
-      const syncHint = () => { hint.textContent = `Up to ${MAX_START[size.value]} starting castles on a ${size.value} map.`; };
-      syncHint();
-      const gold = num(0, 5000, 300, 50);
-      const garrison = num(0, 200, 10, 5);
-      const tLevel = num(0, 20, 1);
-      const iLevel = num(0, 20, 1);
-      const pLevel = num(0, 20, 1);
-      const cmdStart = num(0, 5, 2);
-      const cmdCost = num(0, 1000, 100, 10);
-      const devTreasury = selectOf(DEV_COSTS, '1');
-      const devRecruit = selectOf(DEV_COSTS, '1');
-      const devPrestige = selectOf(DEV_COSTS, '1');
-      const tradeCost = selectOf({ '15': 'Cheap trades ($15 per level)', '25': 'Standard trades ($25 per level)', '50': 'Expensive trades ($50 per level)' }, '25');
-      const tradeScan = check(false, 'Trade with scanned players only');
-      const terraforming = check(true, 'Terraforming (Guildhall): upgrades raise a castle\'s natural resources');
-      const experimentation = check(true, 'Experimentation (Library): random research each production');
-      const expBonus = selectOf({ '1': 'Experiment bonus: 72 points', '2': '144 points', '3': '216 points', '4': '288 points' }, '1');
-      const techRows = Object.keys(AREA_NAMES).map((area) => ({ area, level: num(1, 16, 1), cost: selectOf(RESEARCH_COSTS, '1') }));
+      const visibility = cards([['open', 'Open', 'Listed for everyone in Open lobbies.', 'vis_open'], ['friends', 'Friends only', 'Listed only for your friends.', 'vis_friends'], ['invite', 'Invite only', 'Not listed. Players need a code, link or invitation.', 'vis_invite']], 'open', changed);
+      const autoStart = toggle({ icon: 'bell', title: 'Start automatically', help: 'Begin the campaign as soon as every seat is taken.', onChange: changed });
 
-      const speed = choice(Object.entries(SPEEDS).map(([k, v]) => [k, v.replace(/ \(.*\)/, ''), v.includes('(') ? `Ticks every ${v.match(/\((.*)\)/)[1].replace(' ticks', '')}` : 'Advances when everyone ends their turn']), 'normal', update);
-      const cycle = num(6, 72, 12);
-      const limit = h('input', { type: 'number', min: '1', placeholder: 'none' });
-      const truce = num(1, 500, 48);
-      const perTurn = num(1, 48, 6);
-      const turnDuration = selectOf({ '720': '12 hours', '1080': '18 hours', '1440': '24 hours', '2880': '48 hours' }, '1440');
-      const fixedTurns = check(false, 'Fixed turn deadline: turns always run one duration apart, even when everyone is ready');
-      const seasons = check(false, 'Seasons (winter slows troops and marches)');
-      const seasonLen = num(12, 240, 48);
-      const events = check(false, 'Random events (plague, unrest, harvest, comets)');
-      const mercs = check(true, 'Mercenary companies for hire');
+      const shape = cards(Object.entries(SHAPE_INFO).map(([k, [t, d]]) => [k, t, d, `shape_${k}`]), 'continent', changed, { min: 140 });
+      const size = cards(Object.entries(SIZE_COUNT).map(([k, n]) => [k, { tiny: 'Tiny', compact: 'Compact', small: 'Small', standard: 'Standard', large: 'Large' }[k], `${n} castles per house`, rawPict(dotsMarkup(n))]), 'standard', changed, { compact: true, min: 130 });
+      const scaleMarkup = (k) => { const s = 8 + 5 * k; return `<rect x="${24 - s / 2}" y="${24 - s / 2}" width="${s}" height="${s}" rx="2"/><circle cx="${24 - s / 4}" cy="${24 - s / 4}" r="1.8" fill="currentColor" stroke="none"/><circle cx="${24 + s / 4}" cy="${24 + s / 5}" r="1.8" fill="currentColor" stroke="none"/>`; };
+      const scale = cards([['1', 'Classic', 'Castles close together', 1], ['2', 'Wide', 'More room to maneuver', 2], ['3', 'Vast', 'Long marches', 3], ['4', 'Immense', 'A true expanse', 4], ['5', 'Colossal', 'Weeks of marching', 5], ['6', 'Titanic', 'Enormous', 6]].map(([k, t, d, n]) => [k, t, d, rawPict(scaleMarkup(n))]), '5', changed, { compact: true, min: 130 });
+      const style = cards([['scatter', 'Scattered', 'Castles spread evenly across the land.', 'layout_scatter'], ['continents', 'Clustered', 'Castles gather in regions with open ground between.', 'layout_clusters']], 'scatter', changed, { compact: true, min: 220 });
+      const pattern = cards([['random', 'Natural', 'Neutral castles sit wherever the land allows.', 'layout_natural'], ['twin_rings', 'Twin rings', 'Two rings of neutral castles, a rich inner ring and a poorer outer one. Perfectly symmetrical.', 'layout_rings']], 'random', changed, { compact: true, min: 220 });
+      const mirror = toggle({ icon: 'mirror', title: 'Mirrored lands', help: 'The map is mirrored on both axes so every house starts on identical ground. Needs 2, 4 or 8 seats.', onChange: changed });
+      const mapPreset = cards(Object.entries(PRESET_INFO).map(([k, v]) => [k, v.split(':')[0], v.split(':')[1].trim().replace(/^./, (c) => c.toUpperCase()), `terrain_${k}`]), 'continental', changed, { compact: true, min: 150 });
+      const travel = cards([['trails', 'Castle trails', 'Armies follow trails between castles. Rivers and mountains block except at crossings and passes.', 'travel_trails'], ['free', 'Free travel', 'March to any castle in range. Ground in between sets the time.', 'travel_free']], 'trails', changed, { compact: true, min: 240 });
+      const roads = cards([['cheap', 'Cheap roads', 'Roads cost little and triple march speed between built castles.', 'roads_cheap'], ['expensive', 'Costly roads', 'Roads are an investment.', 'roads_expensive'], ['disabled', 'No roads', 'Armies always march at base speed.', 'roads_disabled']], 'cheap', changed, { compact: true, min: 150 });
+      const randomRoads = cards([['none', 'None', 'Every road is built by players.', 'rand_none'], ['rare', 'Rare', 'About 1 in 10 neutral castles starts with a road.', 'rand_rare'], ['common', 'Common', 'About 3 in 10 neutral castles start with a road.', 'rand_common']], 'none', changed, { compact: true, min: 150 });
+      const richness = cards([['sparse', 'Sparse', 'Upgrades are expensive. Wealth is rare.', 'res_sparse'], ['standard', 'Standard', 'A balanced spread of rich and poor castles.', 'res_standard'], ['plentiful', 'Plentiful', 'Most castles are rich and cheap to build on.', 'res_plentiful']], 'standard', changed, { compact: true, min: 150 });
+      const home = cards([['close', 'Close', 'Houses start near the middle and meet early.', 'home_close'], ['medium', 'Medium', 'Houses start at a comfortable distance.', 'home_medium'], ['far', 'Far', 'Houses start near the edges, with room to grow.', 'home_far']], 'medium', changed, { compact: true, min: 150 });
 
-      const fill = check(false, 'Fill empty seats with AI players');
-      const difficulty = h('select', {}, [1, 2, 3, 4, 5].map((n) => h('option', { value: n }, n === 3 ? '3 (default)' : String(n))));
-      difficulty.value = '3';
-      const autoStart = check(false, 'Start the campaign automatically when every seat is taken');
-      const picker = factionPicker([], null, (v) => { faction = v; });
+      const fog = cards([['off', 'Clear', 'Everything is visible to everyone.', 'fog_off'], ['fog', 'Fog', 'The whole map is visible, but armies, troop counts and upgrades are hidden outside your scan range.', 'fog_fog'], ['dark', 'Dark', 'You begin knowing only your own castles and what is inside their scan range. Ground you explore stays on your map, but activity outside scan range is hidden.', 'fog_dark']], 'fog', changed, { min: 200 });
+      const victory = h('input', { type: 'range', min: '10', max: '100', step: '5', value: '50', 'aria-label': 'Castles needed to win' });
+      const victoryOut = h('output', {});
+      victory.addEventListener('input', changed);
+      const decay = stepper({ min: 0, max: 16, value: 0, unit: 'castles', onChange: changed });
+      const alliances = cards([['none', 'No alliances', 'Every house plays alone.', 'alliance_none'], ['0', 'No warning', 'Alliances can end instantly.', 'alliance_open'], ['24', '24 tick warning', 'Ending an alliance gives allies 24 ticks notice.', 'alliance_warn'], ['48', '48 tick warning', 'Ending an alliance gives allies 48 ticks notice.', 'alliance_warn']], '24', changed, { compact: true, min: 150 });
+      const anon = cards([['normal', 'Names shown', 'Everyone sees real display names.', 'names_shown'], ['extra', 'Names hidden', 'Players appear under their house name until the game ends.', 'names_hidden']], 'normal', changed, { compact: true, min: 220 });
 
-      const PRESETS = [
-        ['duel', 'Duel', 'Two houses on a compact round island. Fast ticks, over in a day or two.', () => { players.value = 2; size.value = 'compact'; shape.value = 'round'; speed.value = 'fast'; fog.value = 'fog'; fill.el.checked = false; startSel.value = 'random'; }],
-        ['skirmish', 'Skirmish', 'Four houses, a small map and AI to fill empty seats. A good first campaign.', () => { players.value = 4; size.value = 'small'; shape.value = 'continent'; speed.value = 'fast'; fog.value = 'fog'; fill.el.checked = true; startSel.value = 'random'; }],
-        ['grand', 'Grand campaign', 'Eight houses across a large continent at a steady pace. Plays out over days.', () => { players.value = 8; size.value = 'large'; shape.value = 'continent'; speed.value = 'normal'; fog.value = 'fog'; fill.el.checked = true; startSel.value = 'random'; }],
-        ['blind', 'Blind kingdoms', 'Dark fog on an archipelago, and every house chooses where to begin.', () => { players.value = 4; size.value = 'standard'; shape.value = 'archipelago'; speed.value = 'normal'; fog.value = 'dark'; fill.el.checked = true; startSel.value = 'choose'; }],
-      ];
-      let presetKey = null;
-      const presetEl = h('div', { class: 'presets' });
-      const paintPresets = () => presetEl.replaceChildren(...PRESETS.map(([key, title, desc, apply]) => h('button', {
-        type: 'button', class: 'preset' + (presetKey === key ? ' on' : ''),
-        onclick: () => { presetKey = key; apply(); syncHint(); paintPresets(); update(); },
-      }, h('b', {}, title), h('span', {}, desc))));
-      paintPresets();
+      const starting = stepper({ min: 1, max: 10, value: 4, onChange: changed });
+      const startHint = h('p', { class: 'sx-help' });
+      const gold = stepper({ min: 0, max: 5000, value: 300, step: 50, unit: 'gold', onChange: changed });
+      const garrison = stepper({ min: 0, max: 200, value: 10, step: 5, unit: 'troops', onChange: changed });
+      const cmdStart = stepper({ min: 0, max: 5, value: 2, onChange: changed });
+      const cmdCost = stepper({ min: 0, max: 1000, value: 100, step: 10, unit: 'gold', onChange: changed });
+      const costCards = () => cards([['0.5', 'Cheap', 'Half price', 'cost_cheap'], ['1', 'Standard', 'Full price', 'cost_standard'], ['2', 'Costly', 'Double price', 'cost_expensive']], '1', changed, { compact: true, min: 110 });
+      const devTreasury = costCards();
+      const devRecruit = costCards();
+      const devPrestige = costCards();
+      const tradeCost = cards([['15', 'Cheap', '15 gold per level', 'cost_cheap'], ['25', 'Standard', '25 gold per level', 'cost_standard'], ['50', 'Costly', '50 gold per level', 'cost_expensive']], '25', changed, { compact: true, min: 140 });
+      const tradeScan = toggle({ icon: 'clockface', title: 'Trade only with houses you can see', help: 'When on, you can only teach realm area levels to houses inside your scan range.', onChange: changed });
+      const areaCosts = { '0': 'No research', '0.5': 'Cheap', '1': 'Normal', '1.5': 'Costly', '2.5': 'Very costly', '4': 'Extreme' };
+      const OPTIONAL_AREAS = { guildhall: true, watchtowers: true };
+      const techRows = Object.keys(TECH_NAMES).map((area) => {
+        const row = { area, level: stepper({ min: 1, max: 16, value: 1, onChange: changed }), cost: (() => { const s = selectOf(areaCosts, '1'); s.addEventListener('change', changed); return s; })() };
+        if (OPTIONAL_AREAS[area]) {
+          row.opt = toggle({ title: 'Optional', checked: true, onChange: () => { row.el.classList.toggle('disabled', !row.opt.checked); changed(); } });
+          row.opt.el.classList.add('sx-opt');
+        }
+        return row;
+      });
 
-      const blazon = h('div', { class: 'panel blazon' });
-      function paintBlazon() {
-        const count = SIZE_COUNT[size.value] * Number(players.value || 0);
-        const fogText = { fog: 'Fog hides what is happening across the map', dark: 'The map is dark until you explore it', off: 'Nothing is hidden' }[fog.value];
-        const facts = [SHAPE_INFO[shape.value][0], `${SIZE_COUNT[size.value]} castles per house`, SPEEDS[speed.value.replace('turn_based', 'turn_based')] || speed.value];
-        if (startSel.value === 'choose') facts.push('Houses choose their start');
-        if (fill.el.checked) facts.push('AI fills empty seats');
-        if (password.value.trim()) facts.push('Password protected');
-        if (mirror.el.checked) facts.push('Mirrored lands');
-        blazon.replaceChildren(
-          h('h3', {}, 'Your campaign'),
-          h('p', {}, `${players.value} houses contest ${count} castles. ${fogText}. The first house to hold ${victory.value}% of them wins${Number(decay.value) ? ', and that bar falls every production' : ''}.`),
-          h('div', { class: 'facts' }, facts.map((t) => h('span', { class: 'fact' }, t))));
-      }
+      const speed = cards(SPEED_CARDS.map(([k, t, d, mins]) => [k, t, d, k === 'turn_based' ? pict('speed_turn') : pict('speed', 44, ({ slow: 1, normal: 2, fast: 3, quad: 4, blitz: 5 })[k])]), 'normal', () => { syncRules(); changed(); }, { min: 160 });
+      const cycle = stepper({ min: 6, max: 72, value: 24, unit: 'ticks', onChange: changed });
+      const cycleHelp = h('p', { class: 'sx-help' });
+      const truce = stepper({ min: 1, max: 500, value: 48, unit: 'ticks', onChange: changed });
+      const limit = stepper({ min: 1, max: 100000, value: '', unit: 'ticks', placeholder: 'No limit', onChange: changed });
+      limit.input.value = '';
+      const perTurn = stepper({ min: 1, max: 48, value: 6, unit: 'ticks', onChange: changed });
+      const turnDuration = cards([['720', '12 hours', 'Quick turns', 'turn12'], ['1080', '18 hours', 'A day, nearly', 'turn18'], ['1440', '24 hours', 'One turn a day', 'turn24'], ['2880', '48 hours', 'A relaxed pace', 'turn48']], '1440', changed, { compact: true, min: 120 });
+      const fixedTurns = toggle({ icon: 'hourglass', title: 'Fixed turn deadline', help: 'Turns always last the full duration, even when everyone is ready.', onChange: changed });
+      const turnBlock = h('div', { class: 'sx-sub', hidden: true }, sxGroup('Turn-based settings', 'These only apply to turn-based games.',
+        sxRow(sxField('Ticks per turn', perTurn, 'How many ticks pass each time a turn resolves.'), sxField('Turn deadline', turnDuration, 'How long houses have to take their turn.')), fixedTurns.el));
 
-      const preview = (() => {
+      const summaryEl = h('div', { class: 'sx-summary' });
+      const updateSummary = () => {
+        const castles = SIZE_COUNT[size.value] * seats.length;
+        const ai = seats.filter((s) => s.kind === 'ai').length;
+        const chips = [`${seats.length} houses${ai ? ` (${ai} AI)` : ''}`, `${castles} castles`, SHAPE_INFO[shape.value][0], SPEED_CARDS.find((c) => c[0] === speed.value)[1], { open: 'Open game', friends: 'Friends only', invite: 'Invite only' }[visibility.value]];
+        summaryEl.replaceChildren(h('b', {}, name.value.trim() || 'New campaign'), ...chips.map((c) => h('span', { class: 'chip' }, c)));
+        victoryOut.textContent = `${victory.value}% of castles (${Math.ceil((castles * Number(victory.value)) / 100)} of ${castles})`;
+      };
+      const syncRules = () => {
+        starting.input.max = String(MAX_START[size.value]);
+        startHint.textContent = `Up to ${MAX_START[size.value]} on a ${size.value} map. Each house begins with this many castles.`;
+        const okMirror = [2, 4, 8].includes(seats.length);
+        if (!okMirror && mirror.checked) mirror.checked = false;
+        mirror.el.disabled = !okMirror;
+        mirror.el.classList.toggle('off', !okMirror);
+        const mins = (SPEED_CARDS.find((c) => c[0] === speed.value) || [])[3];
+        cycleHelp.textContent = mins
+          ? `Gold is paid and troops arrive in full every ${cycle.value || 24} ticks. At this speed that is every ${lengthText((cycle.value || 24) * mins)}.`
+          : `Gold is paid and troops arrive in full every ${cycle.value || 24} ticks.`;
+        turnBlock.hidden = speed.value !== 'turn_based';
+      };
+
+      preview = (() => {
         const stage = h('div', { class: 'mapstage' });
-        const status = h('div', { class: 'tip', style: 'margin:0' }, 'Choose settings to preview the map.');
+        const status = h('div', { class: 'sx-help', style: 'margin:0' }, 'Choose settings to preview the land.');
         const workerSource = 'self.onmessage = async (e) => { try { const m = await import(e.data.url); self.postMessage({ ok: true, layout: m.generateWorld(e.data.opts) }); } catch (err) { self.postMessage({ ok: false, error: String((err && err.message) || err) }); } };';
         const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
         const genUrl = new URL('supabase/functions/start-game/generator.js', location.href).href;
@@ -1691,10 +1857,10 @@
         let dirty = true;
         let visible = false;
         const opts = () => ({
-          seed, players: Number(players.value), mapSize: size.value, startingTerritories: Number(starting.value), style: style.value,
-          startingGarrison: Number(garrison.value) || 0, scale: Number(scaleSel.value), freeTravel: travelSel.value === 'free', shape: shape.value,
-          richness: richness.value, randomRoads: randomRoads.value, starScatter: scatter.value, mirrored: mirror.el.checked,
-          trails: travelSel.value === 'trails', preset: mapPreset.value, homeDistance: homeSel.value,
+          seed, players: seats.length, mapSize: size.value, startingTerritories: Number(starting.value) || 1, style: style.value,
+          startingGarrison: Number(garrison.value) || 0, scale: Number(scale.value), freeTravel: travel.value === 'free', shape: shape.value,
+          richness: richness.value, randomRoads: randomRoads.value, starScatter: pattern.value, mirrored: mirror.checked,
+          trails: travel.value === 'trails', preset: mapPreset.value, homeDistance: home.value,
         });
         const draw = (layout) => {
           const W = layout.map_w;
@@ -1704,70 +1870,72 @@
           stage.replaceChildren(
             h('img', { src: terr.url, alt: 'Terrain preview', style: 'position:absolute;inset:0;width:100%;height:100%' }),
             sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'position:absolute;inset:0;width:100%;height:100%' }, ...rivers));
-          status.textContent = `${layout.territories.filter((t) => !t.crossing).length} castles on this land, ${layout.art.rivers.length} rivers. Map ${seed}. Castle positions are a surprise. Assumes every seat is filled.`;
+          status.textContent = `${layout.territories.filter((t) => !t.crossing).length} castles on this land, ${layout.art.rivers.length} rivers. Castle positions are a surprise. Assumes every seat is filled.`;
         };
         const generate = () => {
           if (worker) worker.terminate();
           const mine = ++token;
           dirty = false;
-          status.textContent = 'Drawing the map...';
-          try { worker = new Worker(workerUrl, { type: 'module' }); } catch { status.textContent = 'The map preview is not available in this browser.'; return; }
+          status.textContent = 'Drawing the land...';
+          try { worker = new Worker(workerUrl, { type: 'module' }); } catch { status.textContent = 'The preview is not available in this browser.'; return; }
           const done = (fn) => (ev) => { if (mine !== token) return; worker.terminate(); worker = null; fn(ev); };
           worker.onmessage = done((ev) => {
-            if (!ev.data.ok) { stage.replaceChildren(); status.textContent = ev.data.error.includes('dynamically imported') ? 'The map preview could not load the map generator. Reload the page and try again.' : ev.data.error; return; }
+            if (!ev.data.ok) { stage.replaceChildren(); status.textContent = ev.data.error.includes('dynamically imported') ? 'The preview could not load the map generator. Reload the page and try again.' : `${ev.data.error}. Try New map.`; return; }
             draw(ev.data.layout);
           });
-          worker.onerror = done(() => { stage.replaceChildren(); status.textContent = 'The map preview could not load.'; });
+          worker.onerror = done(() => { stage.replaceChildren(); status.textContent = 'The preview could not load.'; });
           worker.postMessage({ url: genUrl, opts: opts() });
         };
         const api = {
           schedule: () => { dirty = true; if (!visible) return; clearTimeout(timer); timer = setTimeout(generate, 450); },
           show: (on) => { visible = on; if (on && dirty) generate(); },
           get seed() { return seed; },
-          el: h('div', { class: 'mappreview' }, stage,
-            h('div', { class: 'row', style: 'align-items:center;gap:12px;margin-top:8px' },
-              h('button', { type: 'button', onclick: () => { seed = Math.floor(Math.random() * 2147483000) + 1; dirty = true; generate(); } }, 'New map'),
-              status)),
+          el: h('aside', { class: 'sx-preview' }, h('h3', {}, 'Realm preview'), stage, h('button', { type: 'button', class: 'sx-newmap', onclick: () => { seed = Math.floor(Math.random() * 2147483000) + 1; dirty = true; generate(); } }, pict('shape_continent', 18), 'New map'), status),
         };
-        Object.assign(previewRef, { schedule: api.schedule });
-        [players, starting, garrison, scaleSel, scatter, style, richness, mapPreset, travelSel, homeSel, mirror.el].forEach((el) => { el.addEventListener('input', api.schedule); el.addEventListener('change', api.schedule); });
         return api;
       })();
 
-      const sec = (...kids) => h('section', {}, ...kids);
+      const sec = (cls, ...kids) => h('section', { class: cls || '' }, ...kids);
       const heading = (title, sub) => h('div', { class: 'sheet-head' }, h('h2', {}, title), sub ? h('p', {}, sub) : null);
       const sections = [
-        ['Campaign', sec(heading('Start from a template', 'Pick a template to fill in sensible settings. Every choice can still be changed on the next steps.'), presetEl,
-          h('div', { class: 'grid2' }, field('Campaign name', name), field('Houses (2 to 8)', players)))],
-        ['Realm', sec(heading('Shape the realm', 'Where the castles sit and what lies between them.'), preview.el,
-          h('label', {}, 'Land'), shape.el,
-          h('label', {}, 'Castles per house'), size.el,
-          h('div', { class: 'grid2' }, field('Star scatter', scatter), field('Castle placement', style), field('Map scale', scaleSel), field('Natural resources', richness), field('Roads', roadsMode), field('Random roads', randomRoads), field('Terrain', mapPreset), field('Travel', travelSel), field('Home distance', homeSel, 'Applies to round, continent, ring and mirrored maps.')),
-          mirror.row)],
-        ['Rules', sec(heading('Set the rules', 'How the war is won and what each house can see.'),
-          h('label', {}, 'Fog of war'), fog.el,
-          h('div', { class: 'grid2' }, field('Castles to win (% of all)', victory), field('Victory decay', decay, 'Castles needed to win drop on every production, ending stalled games.'), field('Formal alliances', alliances), field('Player names', anonSel, 'Hidden names show only each house\'s faction. Real names return when the game ends.'), field('Who can join', visSel, 'You can share a code or link, or invite friends, whatever you choose.')),
-          h('label', {}, 'Starting locations'), startSel.el,
-          h('div', { class: 'grid2' }, field('Time to choose (minutes)', pickMins)),
-          seasons.row, field('Season length (ticks, 12 to 240)', seasonLen), events.row, mercs.row)],
-        ['Houses', sec(heading('Equip the houses', 'What every house begins with, and what upgrades cost.'),
-          h('div', { class: 'grid2' },
-            field('Starting castles', starting), field('Starting gold', gold), field('Troops per starting castle', garrison), field('Starting commanders', cmdStart),
-            field('Treasury level', tLevel), field('Recruitment level', iLevel), field('Prestige level', pLevel), field('Commander hire cost', cmdCost),
-            field('Treasury upgrades', devTreasury), field('Recruitment upgrades', devRecruit), field('Prestige upgrades', devPrestige), field('Technology trades', tradeCost)),
-          hint, tradeScan.row, terraforming.row, experimentation.row, field('Experimentation bonus', expBonus),
-          h('label', {}, 'Realm areas: start level and research cost'),
-          techRows.map((r) => h('div', { class: 'techrow' }, h('span', {}, TECH_NAMES[r.area]), r.level, r.cost)))],
-        ['Time', sec(heading('Set the pace', 'How fast the world moves.'),
-          h('label', {}, 'Tick speed'), speed.el,
-          h('div', { class: 'grid2' }, field('Production cycle (ticks)', cycle), field('Time limit (ticks)', limit), field('Truce length (ticks)', truce), field('Ticks per turn (turn-based)', perTurn), field('Turn duration (turn-based)', turnDuration)),
-          fixedTurns.row)],
-        ['Table', sec(heading('Seat the table', 'Who plays and how the campaign begins.'),
-          h('div', { class: 'grid2' }, field('Password', password, 'Optional. Players need it to join.'), field('AI difficulty (1 to 5)', difficulty)),
-          fill.row, autoStart.row, h('label', {}, 'Your house'), picker)],
+        ['Table', sec('', heading('Gather your table', 'Name the campaign and decide who sits at it: players, or AI opponents.'),
+          sxGroup('Campaign', null, sxRow(sxField('Name', name, 'Shown in the lobby list and to everyone you invite.'), sxField('Seats at the table', seatCount.el, 'One seat per house, 2 to 8. You can change any seat between player and AI later, from the lobby.'))),
+          sxGroup('Seats', 'Seat 1 is yours. Make each other seat a player (you will invite or wait for someone) or an AI opponent with its own strength.', seatsEl),
+          sxGroup('Who can join', 'You can always share the game code or link, or invite friends, whichever you choose.', visibility.el, sxRow(sxField('Password', password, 'Optional. Players must enter it to take a seat.'), h('div', { class: 'sx-field' }, h('label', {}, 'Start'), autoStart.el))))],
+        ['Realm', sec('realm-sec', heading('Shape the realm', 'Everything about the land: its shape, how many castles it holds, and what lies between them.'),
+          h('div', { class: 'sx-realm' },
+            h('div', { class: 'sx-realm-main' },
+              sxGroup('Land shape', 'The outline of the land. Seas shape how armies move.', shape.el),
+              sxGroup('Castles per house', 'The total number of castles on the map is this number times the number of houses.', size.el),
+              sxGroup('Map scale', 'How far apart the castles sit. Larger maps mean longer marches and slower games.', scale.el),
+              sxGroup('Terrain', 'The mix of rivers, ranges and forests.', mapPreset.el),
+              sxGroup('Castle layout', 'How the castles are placed on the land.', style.el, pattern.el, mirror.el),
+              sxGroup('Travel', 'How armies move between castles.', travel.el),
+              sxGroup('Roads', null, roads.el, sxField('Roads already built', randomRoads.el, 'Some neutral castles can start with a road.')),
+              sxGroup('Natural wealth', 'How rich the castles are. Wealthier castles make every upgrade cheaper.', richness.el),
+              sxGroup('Starting distance', 'Where the houses begin. Applies to round, continent, ring and mirrored lands.', home.el)),
+            preview.el))],
+        ['Rules', sec('', heading('Write the rules', 'How the war is won, what each house can see, and how alliances and names work.'),
+          sxGroup('Fog of war', 'What a house can see of its rivals.', fog.el),
+          sxGroup('Victory', 'The first house to hold this share of all castles wins.', sxField('Castles needed to win', h('div', { class: 'sx-range' }, victory, victoryOut)), sxField('Victory decay', decay.el, 'Each production, the share needed drops by this many castles, so stalled games end. 0 turns it off.')),
+          sxGroup('Alliances', 'Houses can ally, share victory conditions and fight together.', alliances.el),
+          sxGroup('Player names', null, anon.el),
+          )],
+        ['Houses', sec('', heading('Equip the houses', 'What every house begins with, what upgrades cost, and which realm areas start ahead.'),
+          sxGroup('Starting estate', null, sxRow(sxField('Starting castles', starting, null), sxField('Starting gold', gold, 'Gold each house begins with.')), startHint,
+            sxRow(sxField('Troops per castle', garrison, 'Troops in every starting castle. Neutral castles are garrisoned in proportion.'), sxField('Starting commanders', cmdStart, 'Besides the king, each house starts with this many commanders.')),
+            sxField('Commander hire price', cmdCost, 'What it costs to hire another commander later.')),
+          sxGroup('Upgrade prices', 'How much each kind of upgrade costs.', sxField('Treasury upgrades', devTreasury.el), sxField('Recruitment upgrades', devRecruit.el), sxField('Prestige upgrades', devPrestige.el)),
+          sxGroup('Teaching other houses', 'Houses can teach each other realm area levels for gold.', tradeCost.el, tradeScan.el),
+          sxGroup('Realm areas', 'Seven areas improve the whole realm. Set the level each house starts with and how costly each is to research.',
+            h('div', { class: 'sx-areas' }, techRows.map((r) => (r.el = h('div', { class: 'sx-area' }, h('div', { class: 'nm' }, h('b', {}, TECH_NAMES[r.area]), h('small', {}, AREA_EFFECT[r.area]), r.opt ? r.opt.el : null), h('div', { class: 'lv' }, h('small', {}, 'Start level'), r.level.el), h('div', { class: 'cs' }, h('small', {}, 'Research'), r.cost)))))))],
+        ['Time', sec('', heading('Set the pace', 'How quickly the world turns, and how long a campaign can last.'),
+          sxGroup('Tick speed', 'A tick is one beat of the world. Everything happens in ticks: marches, battles and production.', speed.el),
+          sxGroup('Production', null, sxField('Production cycle', cycle.el), cycleHelp),
+          sxGroup('Truces and limits', null, sxRow(sxField('Truce length', truce, 'After peace is made, attacks are blocked for this many ticks.'), sxField('Time limit', limit, 'Optional. Leave empty for no limit. At the limit, the leader wins.'))),
+          turnBlock)],
       ];
 
-      sections.find(([title]) => title === 'Realm')[1].classList.add('realm-sec');
       const body = h('div', { class: 'stepbody' }, sections.map(([, el]) => el));
       const rail = h('nav', { class: 'rail', 'aria-label': 'Setup steps' });
       const foot = h('div', { class: 'sheet-foot' });
@@ -1778,7 +1946,7 @@
           h('span', { class: 'ico' }, String(i + 1)), title)));
         const last = stepIndex === sections.length - 1;
         foot.replaceChildren(
-          stepIndex > 0 ? h('button', { type: 'button', class: 'ghost', onclick: () => { stepIndex -= 1; draw(); } }, 'Back') : h('button', { type: 'button', class: 'ghost', onclick: showHome }, 'Cancel'),
+          stepIndex > 0 ? h('button', { type: 'button', class: 'ghost', onclick: () => { stepIndex -= 1; draw(); window.scrollTo(0, 0); } }, 'Back') : h('button', { type: 'button', class: 'ghost', onclick: showHome }, 'Cancel'),
           last
             ? h('button', { type: 'button', class: 'primary', onclick: (e) => submit(e.currentTarget) }, 'Raise campaign')
             : h('button', { type: 'button', class: 'primary', onclick: () => { stepIndex += 1; draw(); window.scrollTo(0, 0); } }, 'Continue'));
@@ -1789,83 +1957,81 @@
         const costMults = {};
         techRows.forEach((r) => {
           if (Number(r.level.value) > 1) startLevels[r.area] = Number(r.level.value);
-          if (r.cost.value !== '1') costMults[r.area] = Number(r.cost.value);
+          if (r.opt && !r.opt.checked) costMults[r.area] = 0;
+          else if (r.cost.value !== '1') costMults[r.area] = Number(r.cost.value);
         });
         const settings = {
           name: name.value.trim() || 'New campaign',
-          max_players: Number(players.value),
+          max_players: seats.length,
           victory_pct: Number(victory.value) / 100,
-          victory_decay: Number(decay.value),
+          victory_decay: Number(decay.value) || 0,
           map_shape: shape.value,
-          star_scatter: scatter.value,
-          start_selection: startSel.value,
-          pick_minutes: Number(pickMins.value),
-          mirrored: mirror.el.checked,
+          star_scatter: pattern.value,
+          start_selection: 'random',
+          mirrored: mirror.checked,
           map_style: style.value,
           map_size: size.value,
-          world_scale: Number(scaleSel.value),
-          free_travel: travelSel.value === 'free',
-          travel_mode: travelSel.value,
+          world_scale: Number(scale.value),
+          free_travel: travel.value === 'free',
+          travel_mode: travel.value,
           map_preset: mapPreset.value,
           world_seed: preview.seed,
-          home_distance: homeSel.value,
-          anonymity: anonSel.value,
-          visibility: visSel.value,
+          home_distance: home.value,
+          anonymity: anon.value,
+          visibility: visibility.value,
           resource_richness: richness.value,
-          roads_mode: roadsMode.value,
+          roads_mode: roads.value,
           random_roads: randomRoads.value,
           fog_of_war: fog.value !== 'off',
           fog_dark: fog.value === 'dark',
           allow_alliances: alliances.value !== 'none',
           grace_period_ticks: alliances.value === 'none' ? 24 : Number(alliances.value),
-          starting_territories: Number(starting.value),
-          starting_gold: Number(gold.value),
-          starting_garrison: Number(garrison.value),
-          starting_commanders: Number(cmdStart.value),
-          starting_treasury_level: Number(tLevel.value),
-          starting_industry_level: Number(iLevel.value),
-          starting_prestige_level: Number(pLevel.value),
-          commander_cost: Number(cmdCost.value),
+          starting_territories: Number(starting.value) || 1,
+          starting_gold: Number(gold.value) || 0,
+          starting_garrison: Number(garrison.value) || 0,
+          starting_commanders: Number(cmdStart.value) || 0,
+          commander_cost: Number(cmdCost.value) || 0,
           treasury_cost_mult: Number(devTreasury.value),
           recruitment_cost_mult: Number(devRecruit.value),
           prestige_cost_mult: Number(devPrestige.value),
           trade_cost: Number(tradeCost.value),
-          trade_requires_scan: tradeScan.el.checked,
-          terraforming_enabled: terraforming.el.checked,
-          experimentation_enabled: experimentation.el.checked,
-          experiment_bonus_mult: Number(expBonus.value),
+          trade_requires_scan: tradeScan.checked,
+          terraforming_enabled: techRows.find((r) => r.area === 'guildhall').opt.checked,
           area_start_levels: startLevels,
           area_cost_mults: costMults,
           tick_speed: speed.value,
-          production_cycle_ticks: Number(cycle.value),
-          truce_ticks: Number(truce.value),
-          turn_fixed: fixedTurns.el.checked,
-          seasons_enabled: seasons.el.checked,
-          season_length_ticks: Number(seasonLen.value),
-          events_enabled: events.el.checked,
-          mercenaries_enabled: mercs.el.checked,
-          fill_with_ai: fill.el.checked,
-          ai_difficulty: Number(difficulty.value),
-          auto_start: autoStart.el.checked,
+          production_cycle_ticks: Number(cycle.value) || 24,
+          truce_ticks: Number(truce.value) || 48,
+          turn_fixed: fixedTurns.checked,
+          seasons_enabled: false,
+          events_enabled: false,
+          mercenaries_enabled: false,
+          fill_with_ai: false,
+          auto_start: autoStart.checked,
         };
         if (password.value.trim()) settings.password = password.value.trim();
         if (limit.value) settings.time_limit_ticks = Number(limit.value);
         if (speed.value === 'turn_based') {
-          settings.ticks_per_turn = Number(perTurn.value);
+          settings.ticks_per_turn = Number(perTurn.value) || 6;
           settings.turn_timeout_minutes = Number(turnDuration.value);
         }
-        if (faction) settings.faction_slug = faction;
+        if (seats[0].faction) settings.faction_slug = seats[0].faction;
         const { data, error } = await sb.rpc('create_game', { p_settings: settings });
         if (error) throw error;
+        for (let i = 1; i < seats.length; i++) {
+          if (seats[i].kind !== 'ai') continue;
+          const r = await sb.rpc('add_ai_seat', { p_game_id: data, p_difficulty: seats[i].level, p_faction: seats[i].faction });
+          if (r.error) { toast(`Seat ${i + 1}: ${r.error.message}`); }
+        }
         await showRoom(data);
       });
 
-      body.addEventListener('input', update);
-      body.addEventListener('change', update);
+      paintSeats();
+      syncRules();
+      updateSummary();
       draw();
-      paintBlazon();
       mount(h('div', { class: 'wrap' }, topbar(),
-        h('div', { class: 'sheet' }, rail, h('div', { class: 'panel' }, body, foot), blazon)));
+        h('div', { class: 'sheet' }, rail, h('div', { class: 'sx-main' }, summaryEl, h('div', { class: 'panel' }, body, foot)))));
     }
 
     async function openGame(gameId) {
@@ -1989,7 +2155,12 @@
           h('div', {},
             h('div', { class: 'nm' }, p.display_name, p.is_host ? h('span', { class: 'tag gold' }, 'host') : null, p.is_me ? h('span', { class: 'tag green' }, 'you') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
             h('div', { class: 'fn' }, factionOf(p.faction_slug).name + (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? ' · eliminated' : '')),
-            game.status === 'lobby' && isHost && !p.is_me
+            p.is_ai && game.status === 'lobby' && isHost
+              ? h('div', { class: 'row', style: 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap' },
+                (() => { const sel = selectOf(Object.fromEntries(AI_LEVELS.map(([n], i) => [String(i + 1), `${n}`])), String(p.ai_difficulty || 3)); sel.style.cssText = 'width:auto;padding:3px 26px 3px 8px;font-size:.85rem'; sel.title = 'AI strength'; sel.addEventListener('change', () => run(sel, async () => { const { error } = await sb.rpc('set_ai_seat', { p_game_id: gameId, p_player_id: p.id, p_difficulty: Number(sel.value), p_faction: null }); if (error) throw error; await draw(); })); return sel; })(),
+                h('button', { class: 'small', title: 'Remove this AI and leave the seat open for a player', onclick: (e) => run(e.currentTarget, async () => { const { error } = await sb.rpc('remove_ai_seat', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }) }, 'Open to a player'))
+              : null,
+            game.status === 'lobby' && isHost && !p.is_me && !p.is_ai
               ? h('button', {
                 style: 'padding:2px 8px;font-size:.78rem;margin-top:4px',
                 onclick: (e) => { if (confirm(`Remove ${p.display_name} from the lobby?`)) run(e.currentTarget, async () => { const { error } = await sb.rpc('kick_player', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }); },
@@ -1997,7 +2168,7 @@
               : null)));
         if (game.status === 'lobby') {
           for (let i = players.length; i < game.max_players; i++) {
-            slots.push(h('div', { class: 'slot empty' }, game.fill_with_ai ? 'AI player at start' : 'Open seat'));
+            slots.push(h('div', { class: 'slot empty' }, h('div', {}, h('div', {}, 'Open seat'), isHost ? h('button', { class: 'small', style: 'margin-top:6px', title: 'Fill this seat with an AI opponent', onclick: (e) => run(e.currentTarget, async () => { const { error } = await sb.rpc('add_ai_seat', { p_game_id: gameId, p_difficulty: 3, p_faction: null }); if (error) throw error; await draw(); }) }, 'Fill with AI') : null)));
           }
         }
         parts.push(h('div', { class: 'panel' }, h('h2', {}, 'The table'), h('div', { class: 'slots' }, slots)));
@@ -2046,7 +2217,7 @@
 
         const actions = [];
         if (game.status === 'lobby') {
-          const canStart = isHost && (players.length >= 2 || game.fill_with_ai);
+          const canStart = isHost && players.length >= 2;
           if (isHost) {
             actions.push(h('button', {
               class: 'primary',
@@ -2062,7 +2233,7 @@
                 await openGame(gameId);
               }),
             }, 'Start game'));
-            if (!canStart) actions.push(h('span', { style: 'color:var(--dim);font-size:.85rem' }, 'Needs at least 2 players, or enable AI fill.'));
+            if (!canStart) actions.push(h('span', { style: 'color:var(--dim);font-size:.85rem' }, 'Needs at least 2 players. Fill an open seat with an AI to start alone.'));
             actions.push(h('button', {
               class: 'danger',
               onclick: (e) => { if (confirm('Cancel this game for everyone?')) run(e.currentTarget, async () => {
@@ -2135,7 +2306,7 @@
     }
 
 
-    const TICK_MS = { slow: 7200000, normal: 3600000, fast: 1800000, quad: 900000 };
+    const TICK_MS = { slow: 7200000, normal: 3600000, fast: 1800000, quad: 900000, blitz: 300000 };
     const ABILITY_NAMES = { valor: 'Valor', tactics: 'Tactics', siegecraft: 'Siegecraft', bulwark: 'Bulwark', muster: 'Muster', steward: 'Steward', scholar: 'Scholar', pace: 'Pace', scout: 'Scout', plunder: 'Plunder' };
     const AREA_NAMES = { armory: 'Armory', mint: 'Mint', barracks: 'Barracks', guildhall: 'Guildhall', watchtowers: 'Watchtowers', library: 'Library', stables: 'Stables' };
 
@@ -2578,15 +2749,11 @@
             ['Speed', SPEEDS[game.tick_speed] || game.tick_speed],
             game.tick_speed === 'turn_based' ? ['Turns', `${game.ticks_per_turn} ticks, ${game.turn_timeout_minutes} min timeout`] : null,
             ['Truce', `${game.truce_ticks} ticks`],
-            ['Seasons', game.seasons_enabled ? `On (${game.season_length_ticks} ticks each)` : 'Off'],
             game.status !== 'lobby' ? ['Tick', game.current_tick] : null),
           art('Houses',
             ['Seats', `${seats}/${game.max_players}`],
             ['Starting castles', game.starting_territories],
             ['Alliances', game.allow_alliances ? `Allowed, ${game.grace_period_ticks} tick warning` : 'Off'],
-            ['Random events', game.events_enabled ? 'On' : 'Off'],
-            ['Mercenaries', game.mercenaries_enabled ? 'On' : 'Off'],
-            ['AI fill', game.fill_with_ai ? `On (difficulty ${game.ai_difficulty})` : 'Off'],
             game.auto_start ? ['Auto start', 'When full'] : null));
     }
 
@@ -4616,7 +4783,7 @@
         return;
       }
       if (state.view === 'recovery') return;
-      if (state.view === 'home' || state.view === 'room' || state.view === 'map') return;
+      if (['home', 'room', 'map', 'create', 'picking'].includes(state.view)) return;
       await loadProfile();
       await showHome();
     }

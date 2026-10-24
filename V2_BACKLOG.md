@@ -18,9 +18,9 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - Smoother army movement between ticks.
 
 ### World
-- Seasons (winter penalties, autumn gold bonus).
-- Mercenary companies.
-- Random event deck (plague, unrest, harvest, comet) with optional responses.
+- Seasons (winter penalties, autumn gold bonus). Built but hidden from setup for now.
+- Mercenary companies. Built but hidden from setup for now.
+- Random event deck (plague, unrest, harvest, comet) with optional responses. Built but hidden from setup for now.
 
 ### Council
 - Named council seat characters: seven seats, seven named councillors per player, deployable to the field (seat bonus lost while away) or killable (seat vacant until a replacement is recruited).

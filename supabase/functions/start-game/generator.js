@@ -209,13 +209,51 @@ export function assignSeats(seed, playerIds) {
 
 export const SHAPES = ['continent', 'round', 'ring', 'twin', 'archipelago', 'rift'];
 const AREA_FRAC = { continent: 1, round: 1, ring: 0.78, twin: 0.5, archipelago: 0.42, rift: 0.8 };
-const CROSS_CAP = { twin: 2, archipelago: 2, rift: 3 };
+const CROSS_CAP = { twin: 3, archipelago: 2, rift: 5 };
 const RING_INNER = 0.46;
 
 const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
+
+function latticeNoise(rng) {
+  const seed = Math.floor(rng() * 2 ** 30);
+  const corner = (ix, iy) => {
+    let n = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + seed) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  };
+  return (x, y) => {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const fx = x - ix;
+    const fy = y - iy;
+    const u = fx * fx * (3 - 2 * fx);
+    const v = fy * fy * (3 - 2 * fy);
+    return corner(ix, iy) * (1 - u) * (1 - v) + corner(ix + 1, iy) * u * (1 - v) + corner(ix, iy + 1) * (1 - u) * v + corner(ix + 1, iy + 1) * u * v;
+  };
+}
+
+function ellDist(q, m) {
+  const dx = q.x - m.x;
+  const dy = q.y - m.y;
+  const cs = Math.cos(-m.rot);
+  const sn = Math.sin(-m.rot);
+  return Math.hypot((dx * cs - dy * sn) / m.a, (dx * sn + dy * cs) / m.b);
+}
+
+function blobOf(rng, cx, cy, rx, ry, extra) {
+  const els = [{ x: cx, y: cy, a: rx, b: ry, rot: Math.PI * rng() }];
+  for (let i = 0; i < extra; i++) {
+    const ang = 2 * Math.PI * rng();
+    const d = 0.5 * ((rx + ry) / 2) * (0.7 + 0.6 * rng());
+    els.push({ x: cx + d * Math.cos(ang), y: cy + d * Math.sin(ang), a: rx * (0.42 + 0.3 * rng()), b: ry * (0.42 + 0.3 * rng()), rot: Math.PI * rng() });
+  }
+  return els;
+}
+
+const blobMin = (q, els) => Math.min(...els.map((m) => ellDist(q, m)));
 
 function makeShape(kind, R, rng, players) {
   const phi = rng() * 2 * Math.PI;
@@ -236,41 +274,64 @@ function makeShape(kind, R, rng, players) {
     out.inside = (p) => dist(p) <= 0.97 * R && dist(p) >= RING_INNER * R * 1.12;
     out.land = (p) => Math.min(1 - smooth(0.88 * R, 1.08 * R, dist(p)), smooth(RING_INNER * R * 0.85, RING_INNER * R * 1.08, dist(p)));
   } else if (kind === 'twin') {
-    const c = [{ x: -0.52 * R, y: 0 }, { x: 0.52 * R, y: 0 }];
-    const rr = 0.5 * R;
-    out.inside = (p) => { const q = rot(p); return c.some((m) => disc(q, m, rr * 0.95)); };
-    out.land = (p) => { const q = rot(p); return Math.max(...c.map((m) => discLand(q, m, rr))); };
-    out.label = (p) => (rot(p).x < 0 ? 0 : 1);
+    const nx = latticeNoise(rng);
+    const ny = latticeNoise(rng);
+    const warp = (p) => ({ x: p.x + 0.1 * R * (nx(p.x / (0.35 * R) + 3.1, p.y / (0.35 * R)) - 0.5), y: p.y + 0.1 * R * (ny(p.x / (0.35 * R), p.y / (0.35 * R) + 7.7) - 0.5) });
+    const gap = 0.52 + 0.06 * rng();
+    const lobes = [
+      blobOf(rng, -gap * R, 0.1 * R * (rng() - 0.5), (0.5 + 0.1 * rng()) * R, (0.4 + 0.12 * rng()) * R, 3),
+      blobOf(rng, gap * R, 0.1 * R * (rng() - 0.5), (0.5 + 0.1 * rng()) * R, (0.4 + 0.12 * rng()) * R, 3),
+    ];
+    out.inside = (p) => { const q = warp(rot(p)); return lobes.some((els) => blobMin(q, els) <= 0.93); };
+    out.land = (p) => { const q = warp(rot(p)); return Math.max(...lobes.map((els) => 1 - smooth(0.86, 1.08, blobMin(q, els)))); };
+    out.label = (p) => (warp(rot(p)).x < 0 ? 0 : 1);
     out.homeLabel = (k) => k % 2;
   } else if (kind === 'archipelago') {
+    const nx = latticeNoise(rng);
+    const ny = latticeNoise(rng);
+    const warp = (p) => ({ x: p.x + 0.08 * R * (nx(p.x / (0.3 * R) + 1.3, p.y / (0.3 * R)) - 0.5), y: p.y + 0.08 * R * (ny(p.x / (0.3 * R), p.y / (0.3 * R) + 4.9) - 0.5) });
     const n = players <= 4 ? 5 : players <= 6 ? 7 : 9;
     const islands = [];
-    for (let tries = 0; islands.length < n && tries < 4000; tries++) {
-      const r = R * (0.17 + 0.1 * rng());
+    for (let tries = 0; islands.length < n && tries < 6000; tries++) {
+      const r = R * (0.15 + 0.13 * rng() * rng() + 0.05 * rng());
+      const asp = 1 + 0.7 * rng();
       const a = 2 * Math.PI * rng();
-      const d = (0.78 * R - r) * Math.sqrt(rng());
-      const c = { x: d * Math.cos(a), y: d * Math.sin(a), r };
-      if (islands.every((o) => Math.hypot(o.x - c.x, o.y - c.y) > (o.r + c.r) * 1.2)) islands.push(c);
+      const reach = r * asp * 1.25;
+      const d = Math.max(0, 0.8 * R - reach) * Math.sqrt(rng());
+      const cx = d * Math.cos(a);
+      const cy = d * Math.sin(a);
+      if (islands.every((o) => Math.hypot(o.cx - cx, o.cy - cy) > (o.reach + reach) * 0.9)) {
+        islands.push({ cx, cy, reach, els: blobOf(rng, cx, cy, r * Math.sqrt(asp), r / Math.sqrt(asp), r > 0.22 * R ? 3 : 2) });
+      }
     }
     out.islands = islands;
-    out.inside = (p) => islands.some((m) => disc(p, m, m.r * 0.95));
-    out.land = (p) => Math.max(...islands.map((m) => discLand(p, m, m.r)));
+    out.inside = (p) => { const q = warp(p); return islands.some((m) => blobMin(q, m.els) <= 0.93); };
+    out.land = (p) => { const q = warp(p); return Math.max(...islands.map((m) => 1 - smooth(0.86, 1.08, blobMin(q, m.els)))); };
     out.label = (p) => {
+      const q = warp(p);
       let best = 0;
       let bd = Infinity;
-      islands.forEach((m, i) => { const d = Math.hypot(p.x - m.x, p.y - m.y) / m.r; if (d < bd) { bd = d; best = i; } });
+      islands.forEach((m, i) => { const d = blobMin(q, m.els); if (d < bd) { bd = d; best = i; } });
       return best;
     };
   } else {
-    const amp = 0.14 * R;
+    const nx = latticeNoise(rng);
+    const ny = latticeNoise(rng);
+    const warp = (p) => ({ x: p.x + 0.1 * R * (nx(p.x / (0.4 * R) + 2.2, p.y / (0.4 * R)) - 0.5), y: p.y + 0.1 * R * (ny(p.x / (0.4 * R), p.y / (0.4 * R) + 5.5) - 0.5) });
+    const mass = blobOf(rng, 0, 0, 1.08 * R, 0.9 * R, 5);
+    const amp = (0.12 + 0.05 * rng()) * R;
+    const amp2 = 0.05 * R;
     const k = (2 * Math.PI * (1 + Math.floor(rng() * 2))) / (2 * R);
+    const k2 = k * (2.3 + rng());
     const ph = rng() * 2 * Math.PI;
-    const hw = 0.09 * R;
-    const off = (p) => { const q = rot(p); return q.y - amp * Math.sin(k * q.x + ph); };
-    out.inside = (p) => dist(p) <= 0.97 * R && Math.abs(off(p)) >= hw * 1.5;
-    out.land = (p) => Math.min(1 - smooth(0.88 * R, 1.08 * R, dist(p)), smooth(hw * 0.7, hw * 1.3, Math.abs(off(p))));
+    const ph2 = rng() * 2 * Math.PI;
+    const hwBase = 0.085 * R;
+    const hwAt = (q) => hwBase * (0.8 + 0.45 * Math.sin(k * 1.7 * q.x + ph2 * 0.7));
+    const off = (p) => { const q = rot(p); return q.y - amp * Math.sin(k * q.x + ph) - amp2 * Math.sin(k2 * q.x + ph2); };
+    out.inside = (p) => dist(p) <= 0.97 * R && blobMin(warp(p), mass) <= 0.93 && Math.abs(off(p)) >= hwAt(rot(p)) * 1.5;
+    out.land = (p) => Math.min(1 - smooth(0.86, 1.08, blobMin(warp(p), mass)), smooth(hwAt(rot(p)) * 0.7, hwAt(rot(p)) * 1.3, Math.abs(off(p))));
     out.label = (p) => (off(p) < 0 ? 0 : 1);
-    out.homeLabel = (k2) => k2 % 2;
+    out.homeLabel = (k2b) => k2b % 2;
   }
   return out;
 }
@@ -492,8 +553,8 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   if (!(homeDistance in HOME_SHIFT)) throw new Error(`unknown home distance: ${homeDistance}`);
   if (!RICHNESS[richness]) throw new Error(`unknown resource richness: ${richness}`);
   if (!(randomRoads in ROAD_CHANCE)) throw new Error(`unknown random roads setting: ${randomRoads}`);
-  if (starScatter !== 'random' && starScatter !== 'twin_rings') throw new Error(`unknown star scatter: ${starScatter}`);
-  if (mirrored && ![2, 4, 8].includes(players)) throw new Error('mirrored stars need 2, 4 or 8 players');
+  if (starScatter !== 'random' && starScatter !== 'twin_rings') throw new Error(`unknown castle layout: ${starScatter}`);
+  if (mirrored && ![2, 4, 8].includes(players)) throw new Error('mirrored lands need 2, 4 or 8 players');
   const shapeKind = mirrored || starScatter === 'twin_rings' ? 'round' : requestedShape;
   const ratio = RICHNESS[richness];
   if (!styleConfig) throw new Error(`unknown map style: ${style}`);

@@ -1108,7 +1108,7 @@ All numbers live in the table `xp_config` (key / value, readable by signed-in us
 
 ### 20t. AI players (implemented)
 
-AI players (`is_ai`, no user) play through the same internal rules as humans. `run_ai_players` is the first step of every tick (`resolve_tick_events`); each AI acts when `(tick + player id) % interval = 0`, where interval is 6 / 4 / 3 / 2 / 1 ticks for `ai_difficulty` 1 to 5. An error in one AI's turn is logged as an `ai_error` event and rolled back without affecting the tick.
+AI players (`is_ai`, no user) play through the same internal rules as humans. `run_ai_players` is the first step of every tick (`resolve_tick_events`); every AI acts on every tick. `ai_difficulty` 1 to 5 changes how it decides (attack thresholds, gold spending, treaties, betrayal), not how often it moves. An error in one AI's turn is logged as an `ai_error` event and rolled back without affecting the tick.
 
 A turn, in order:
 1. **Active area:** the lowest-level of Mint, Barracks, Armory, Guildhall, Stables, Watchtowers, Library (in that preference order).
@@ -1476,3 +1476,12 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - `join_game` now refuses non-open games unless the caller is the host, was invited, is a friend (friends games) or arrived through `join_game_by_code`. The code path sets a transaction-local setting that clients cannot set.
 - `list_open_games` honours visibility. Share links look like `#join=ABC-123`; the client keeps the code across sign-in and opens the join dialog on the home screen.
 - Wrong-code guesses are limited: more than 15 misses in 10 minutes blocks `lookup_game_by_code` and `join_game_by_code` for that user. A miss returns an error object (lookup) or null (join) instead of raising, so the failure is recorded in `join_code_failures` (no client access). Friend codes use the same generator.
+
+**Setup overhaul** (migration `setup_overhaul`, start-game v15)
+- Setup is five steps: Table (name, seats, who can join), Realm (with a live preview), Rules, Houses, Time. Every option has helper text and picture cards, steppers and switches replace most drop-downs. No templates.
+- Seats: each seat is a player or an AI. AI seats are real `game_players` rows created at setup (`add_ai_seat`, `set_ai_seat`, `remove_ai_seat`; host only, lobby only), each with its own `ai_difficulty` 1 to 5 (Squire, Knight, Baron, Duke, Warlord: every AI acts every tick; strength sets decision quality). `run_ai_players` and `ai_take_turn` read the per-seat value. The host can change seats from the lobby; an empty player seat at start is dropped. `fill_with_ai` is no longer used.
+- Defaults: production cycle 24 ticks, season length 96 ticks. New tick speed `blitz` (5 minutes); `quad` is shown as Rapid. Starting-location choosing is removed from the UI (starts are preset). Experimentation is always on; Terraforming is shown as "Land improvement".
+- Shapes: twin continents, archipelago and the rift are built from lumpy overlapping blobs instead of circles, and the rift allows 5 crossings. The start-game function retries up to 6 seeds if a map cannot be connected.
+- Fixed: an auth event while the setup form was open sent the user home and wiped the form.
+
+- Setup hides seasons, random events and mercenaries: new games always send them off. The mechanics remain in the engine for a later release. Starting upgrade levels are no longer set in setup (castles keep their own levels). Guildhall and Watchtowers carry an Optional switch in the Realm areas list; off sets that area's research cost multiplier to 0, and Guildhall off also turns off terraforming.

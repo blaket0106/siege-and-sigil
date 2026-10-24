@@ -54,34 +54,38 @@ Deno.serve(async (req: Request) => {
   if (user && game.created_by !== user.id && !autoStart) return respond({ error: 'only the game creator can start the game' }, 403);
 
   const total = game.fill_with_ai ? game.max_players : humans.length;
-  if (total < 2) return respond({ error: 'a game needs at least 2 players: enable AI fill or wait for more players' }, 422);
+  if (total < 2) return respond({ error: 'a game needs at least 2 players: add an AI to an open seat or wait for more players' }, 422);
 
   const aiSlots = Array.from({ length: total - humans.length }, (_, i) => -(i + 1));
   const seed = Number(game.world_seed);
 
   let layout;
-  try {
-    layout = generateWorld({
-      seed,
-      players: total,
-      mapSize: game.map_size,
-      startingTerritories: game.starting_territories,
-      style: game.map_style,
-      startingGarrison: game.starting_garrison,
-      scale: Number(game.world_scale) || 1,
-      freeTravel: !!game.free_travel,
-      shape: game.map_shape || 'continent',
-      richness: game.resource_richness || 'standard',
-      randomRoads: game.random_roads || 'none',
-      starScatter: game.star_scatter || 'random',
-      mirrored: !!game.mirrored,
-      trails: game.travel_mode === 'trails',
-      preset: game.map_preset || 'continental',
-      homeDistance: game.home_distance || 'medium',
-    });
-  } catch (error) {
-    return respond({ error: (error as Error).message }, 422);
+  let lastError = 'could not generate the map';
+  for (let attempt = 0; attempt < 6 && !layout; attempt++) {
+    try {
+      layout = generateWorld({
+        seed: seed + attempt * 7919,
+        players: total,
+        mapSize: game.map_size,
+        startingTerritories: game.starting_territories,
+        style: game.map_style,
+        startingGarrison: game.starting_garrison,
+        scale: Number(game.world_scale) || 1,
+        freeTravel: !!game.free_travel,
+        shape: game.map_shape || 'continent',
+        richness: game.resource_richness || 'standard',
+        randomRoads: game.random_roads || 'none',
+        starScatter: game.star_scatter || 'random',
+        mirrored: !!game.mirrored,
+        trails: game.travel_mode === 'trails',
+        preset: game.map_preset || 'continental',
+        homeDistance: game.home_distance || 'medium',
+      });
+    } catch (error) {
+      lastError = (error as Error).message;
+    }
   }
+  if (!layout) return respond({ error: lastError }, 422);
 
   const payload = {
     ...layout,
