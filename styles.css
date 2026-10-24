@@ -1160,3 +1160,8 @@ svg.mk-on .terrain-layer { filter: saturate(0.6) brightness(0.82); }
 .chatline { white-space: pre-wrap; }
 
 svg.mk-far .mk-nt { display: none; }
+
+@media (max-width: 760px) {
+  .hud > .hud-id { flex: 0 0 auto; min-width: 150px; max-width: 190px; }
+  .hud-id .sub { overflow: hidden; text-overflow: ellipsis; }
+}
