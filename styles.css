@@ -1057,3 +1057,15 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .council-row { display: flex; gap: 10px; align-items: flex-start; }
 .council-row .ccard.s { width: 44px; height: 58px; }
 .council-row .ccard.s .cart img { transform: scale(1.6); }
+
+.sg-fire { transform-box: fill-box; transform-origin: 50% 100%; animation: sgFlicker .45s ease-in-out infinite alternate; }
+.sg-smoke { transform-box: fill-box; transform-origin: 50% 100%; opacity: 0; animation: sgSmoke 3.4s ease-out infinite; }
+.sg-smoke.slow { animation-duration: 4.6s; }
+.sg-smoke.slow2 { animation-duration: 5.4s; animation-delay: 1.5s; }
+.sg-arm { animation: sgArm 5s ease-in-out infinite; }
+.sg-stone { opacity: 0; animation: sgStone 5s linear infinite; }
+@keyframes sgFlicker { from { transform: scale(.85, .8); } to { transform: scale(1.1, 1.25); } }
+@keyframes sgSmoke { 0% { opacity: 0; transform: translateY(0) scale(.5); } 15% { opacity: .55; } 100% { opacity: 0; transform: translateY(-26px) scale(2); } }
+@keyframes sgArm { 0%, 55% { transform: rotate(-24deg); } 62% { transform: rotate(-24deg); } 70% { transform: rotate(80deg); } 100% { transform: rotate(-24deg); } }
+@keyframes sgStone { 0%, 62% { opacity: 0; transform: translate(0, 0); } 64% { opacity: 1; transform: translate(0, 0); } 78% { opacity: 1; transform: translate(calc(var(--dx) * .55), -38px); } 90% { opacity: 1; transform: translate(var(--dx), -6px); } 92%, 100% { opacity: 0; transform: translate(var(--dx), -6px); } }
+@media (prefers-reduced-motion: reduce) { .sg-fire, .sg-smoke, .sg-arm, .sg-stone { animation: none; } .sg-smoke { opacity: .3; } }

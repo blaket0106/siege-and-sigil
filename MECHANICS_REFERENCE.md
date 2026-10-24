@@ -1598,3 +1598,17 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - **Battle animation:** when a new battle report arrives (the 3 newest per refresh), the map plays a 5 second skirmish at the battle location: advance, clash with sparks and dust, losers fall, winner raises a banner. 3D uses `playBattle` in `map3d.js` (max 4 at once); 2D uses `battleFx2d` driven by a 90 ms timer. Skipped when `prefers-reduced-motion` is set. Purely cosmetic; combat still resolves instantly in the tick.
 - **Council faces:** `council_members.profile` holds a generated commander profile (school from the area: armory and barracks battleschool, watchtowers and stables rangers, others university). New members get one on creation, existing ones were backfilled, and `deploy_councillor` copies it onto the commander. `my_council` returns `member_id` and `profile`; the council list shows the face.
 - **AI crown logging:** `ai_crown` now writes a `crowned` chronicle entry for the new king.
+
+## 28. Siege Visuals (client only)
+
+- **Camp:** every castle with at least one visible sieging commander shows the besiegers' camp: 3, 5 or 8 tents by the same army tiers (total besieging troops, 30 assumed for hidden counts), a campfire with smoke, their banner and, in 3D, 2, 4 or 6 men. The 3D camp stands on a fixed side of the castle chosen from the castle id.
+- **Trebuchets (3D):** 1 for small and medium camps, 2 for large. Each winds up, fires every 6.4 seconds and lands a stone on the castle wall with a flash, dust and debris. In 2D a trebuchet silhouette and stone arc are drawn with CSS animation (disabled under reduced motion).
+- **Damage smoke:** smoke from the castle and up to 3 fires on the walls, scaled by siege age. The client starts counting when it first sees the siege (level 0.2) and reaches the maximum after about 20 ticks. A page reload restarts the count.
+- **No effect on rules.** Starvation (3% of troops per tick) is unchanged.
+
+## 29. Map Size Rebase and 3D Load (migration 20261024180000)
+
+- **Rebase:** the lobby map sizes are now Classic 3, Wide 6, Vast 9, Immense 12, Colossal 15 and Titanic 18 (the stored `world_scale`), so even Classic has three times the castle spacing the old Classic had (450 instead of 150). The default is Colossal (15, spacing 2250). All rules that scale with `world_scale` (march speed, scan range, intercept distance) are unchanged in form, so travel takes about the same number of ticks. `games.world_scale` now allows 1 to 18 (it was capped at 5, which silently broke the old Titanic option). Existing games keep their stored scale.
+- **3D load at large scale:** trees were placed on a fixed grid over the whole map, so cost grew with the square of map width. Tree chunks are now at most 1600 units wide, so distance culling works at any size; full tree models show only within about 1000 + 0.3 x camera distance of the view centre, with cheap cone trees beyond; far cone trees thin out in proportion to map width; and the broadleaf tree models drop one level of detail when the map is wider than 20000. At scale 15 this measured 10 fps before and about 50 after on the test machine (scale 5 measures about 70).
+- **Camera:** the first view centres on your first castle when your starting castles are more than 1500 units from their centre; otherwise on their centre as before.
+- **Siege camps:** placed on the side away from the nearest other castle. Camps, smoke and trebuchets beyond 5000 units from the camera stop animating, and beyond 9000 they are hidden.
