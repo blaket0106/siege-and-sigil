@@ -776,7 +776,27 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
           river_idx: c.pass ? null : c.ri,
         });
       });
-      layout.edges = tr.edges.map((e) => ({ a: Math.min(e.a, e.b), b: Math.max(e.a, e.b), kind: e.kind, length: round4(e.length), move_cost_mult: e.mult, defense_mult: e.a >= base || e.b >= base ? 1.25 : 1, path: e.a < e.b ? e.path : [...e.path].reverse() }));
+      tr.junctions.forEach((j, k) => {
+        territories.push({
+          idx: j.idx,
+          name: 'Crossroads',
+          slug: `crossroads-${k + 1}`,
+          tier: 1,
+          natural_resources: 1,
+          x: round4(j.x),
+          y: round4(j.y),
+          owner_seat: null,
+          troops: 0,
+          treasury_level: 0,
+          industry_level: 0,
+          prestige_level: 0,
+          resources: 1,
+          terrain: 'plains',
+          junction: true,
+        });
+      });
+      const crossEnd = base + tr.crossings.length;
+      layout.edges = tr.edges.map((e) => ({ a: Math.min(e.a, e.b), b: Math.max(e.a, e.b), kind: e.kind, length: round4(e.length), move_cost_mult: e.mult, defense_mult: (e.a >= base && e.a < crossEnd) || (e.b >= base && e.b < crossEnd) ? 1.25 : 1, path: e.a < e.b ? e.path : [...e.path].reverse() }));
       layout.trails = true;
     } else if (freeTravel) {
       layout.edges = world.links(LINK_CAP * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));

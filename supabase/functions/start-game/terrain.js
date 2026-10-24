@@ -495,18 +495,19 @@ function planTrails(c, lenient = 0) {
     return null;
   };
 
-  const finals = [];
-  const cellPaths = [];
+  const pending = [];
   const edgeKind = (e) => {
-    const ends = [e.a, e.b].filter((n) => n >= N0).map((n) => crossings[n - N0]);
+    const ends = [e.a, e.b].filter((n) => n >= N0 && n < N0 + crossings.length).map((n) => crossings[n - N0]);
     if (!ends.length) return 'land';
     return ends.every((c) => c.pass) ? 'pass' : 'river';
   };
+  const plen = (poly) => poly.reduce((s, p, k) => (k ? s + Math.hypot(p[0] - poly[k - 1][0], p[1] - poly[k - 1][1]) : 0), 0);
   for (const e of out) {
     const A = nodes[e.a];
     const B = nodes[e.b];
     const straight = dist(A, B);
     let pts = null;
+    let usedCells = null;
     const cells = astar(A, B);
     if (cells) {
       const raw = [[A.x, A.y], ...cells.slice(1, -1).map((k) => [((k % G) + 0.5) * cell, (((k / G) | 0) + 0.5) * cell]), [B.x, B.y]];
@@ -522,10 +523,9 @@ function planTrails(c, lenient = 0) {
       }
       return false;
     };
-    const plen = (poly) => poly.reduce((s, p, k) => (k ? s + Math.hypot(p[0] - poly[k - 1][0], p[1] - poly[k - 1][1]) : 0), 0);
     if (pts && (crosses(pts) || plen(pts) > 2.1 * straight)) pts = null;
     if (pts && cells) {
-      cellPaths.push(cells);
+      usedCells = cells;
       for (const k of cells) used[k] = 1;
     }
     if (!pts) {
@@ -534,6 +534,114 @@ function planTrails(c, lenient = 0) {
       if (!wet(scD) && !scD.runs.length && !crosses(direct)) pts = direct;
     }
     if (!pts) continue;
+    pending.push({ a: e.a, b: e.b, pts, cells: usedCells });
+  }
+
+  const nbr = new Map();
+  for (const p of pending) {
+    if (!p.cells) continue;
+    const cs = p.cells;
+    for (let k = 0; k < cs.length; k++) {
+      const set = nbr.get(cs[k]) || new Set();
+      if (k) set.add(cs[k - 1]);
+      if (k < cs.length - 1) set.add(cs[k + 1]);
+      nbr.set(cs[k], set);
+    }
+  }
+  const cellXY = (k) => ({ x: ((k % G) + 0.5) * cell, y: (((k / G) | 0) + 0.5) * cell });
+  const stops = [...points, ...crossings];
+  const reps = [];
+  for (const [k, set] of nbr) {
+    if (set.size < 3) continue;
+    const q = cellXY(k);
+    if (stops.some((s) => Math.hypot(s.x - q.x, s.y - q.y) < spacing * 0.35)) continue;
+    if (reps.some((r) => Math.hypot(r.x - q.x, r.y - q.y) < spacing * 0.3)) continue;
+    reps.push({ x: q.x, y: q.y });
+  }
+  const J0 = N0 + crossings.length;
+  const repCache = new Map();
+  const repOf = (k, active) => {
+    let v = repCache.get(k);
+    if (v === undefined) {
+      const q = cellXY(k);
+      v = -1;
+      let bd = spacing * 0.3;
+      reps.forEach((r, i) => {
+        const d = Math.hypot(r.x - q.x, r.y - q.y);
+        if (d < bd) {
+          bd = d;
+          v = i;
+        }
+      });
+      repCache.set(k, v);
+    }
+    return v >= 0 && active[v] ? v : -1;
+  };
+  const nodeXY = (n) => (n >= J0 ? reps[n - J0] : nodes[n]);
+  const build = (active) => {
+    const segs = new Map();
+    const loose = [];
+    for (const p of pending) {
+      if (!p.cells) {
+        loose.push({ a: p.a, b: p.b, pts: p.pts });
+        continue;
+      }
+      const cs = p.cells;
+      const hits = [{ node: p.a, idx: 0 }];
+      for (let i = 1; i < cs.length - 1; i++) {
+        const r = repOf(cs[i], active);
+        if (r < 0) continue;
+        let j = i;
+        while (j + 1 < cs.length - 1 && repOf(cs[j + 1], active) === r) j++;
+        if (hits[hits.length - 1].node !== J0 + r) hits.push({ node: J0 + r, idx: Math.round((i + j) / 2) });
+        i = j;
+      }
+      hits.push({ node: p.b, idx: cs.length - 1 });
+      for (let h = 0; h < hits.length - 1; h++) {
+        const h0 = hits[h];
+        const h1 = hits[h + 1];
+        if (h0.node === h1.node) continue;
+        const key2 = key(h0.node, h1.node);
+        if (segs.has(key2)) continue;
+        const P = nodeXY(h0.node);
+        const Q = nodeXY(h1.node);
+        const mid = cs.slice(h0.idx + 1, h1.idx).map((k) => [cellXY(k).x, cellXY(k).y]);
+        segs.set(key2, { a: h0.node, b: h1.node, pts: chaikin([[P.x, P.y], ...mid, [Q.x, Q.y]], 2) });
+      }
+    }
+    return { segs: [...segs.values(), ...loose] };
+  };
+  const active = reps.map(() => true);
+  let built = build(active);
+  for (let guard = 0; guard < 10; guard++) {
+    const deg = reps.map(() => 0);
+    for (const sg of built.segs) {
+      if (sg.a >= J0) deg[sg.a - J0] += 1;
+      if (sg.b >= J0) deg[sg.b - J0] += 1;
+    }
+    let dropped = false;
+    reps.forEach((_, i) => {
+      if (active[i] && deg[i] < 3) {
+        active[i] = false;
+        dropped = true;
+      }
+    });
+    if (!dropped) break;
+    built = build(active);
+  }
+  const junctions = [];
+  const jmap = new Map();
+  reps.forEach((r, i) => {
+    if (!active[i]) return;
+    jmap.set(J0 + i, J0 + junctions.length);
+    junctions.push({ idx: J0 + junctions.length, x: r.x, y: r.y });
+  });
+  const remap = (n) => (n >= J0 ? jmap.get(n) : n);
+  const finals = [];
+  for (const sg of built.segs) {
+    const pts = sg.pts;
+    const a = remap(sg.a);
+    const b = remap(sg.b);
     const length = plen(pts);
     let costSum = 0;
     let count = 0;
@@ -552,10 +660,10 @@ function planTrails(c, lenient = 0) {
       }
     }
     const mult = Math.round(Math.min(2.6, costSum / Math.max(1, count)) * 100) / 100;
-    finals.push({ a: e.a, b: e.b, kind: edgeKind(e), length, mult, path: pts.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]) });
+    finals.push({ a, b, kind: edgeKind({ a, b }), length, mult, path: pts.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]) });
   }
-
-  const par2 = Array.from({ length: nodes.length }, (_, i) => i);
+  const total = nodes.length + junctions.length;
+  const par2 = Array.from({ length: total }, (_, i) => i);
   const root2 = (i) => {
     while (par2[i] !== i) {
       par2[i] = par2[par2[i]];
@@ -564,32 +672,10 @@ function planTrails(c, lenient = 0) {
     return i;
   };
   for (const e of finals) par2[root2(e.a)] = root2(e.b);
-  const rs = new Set(nodes.map((_, i) => root2(i)));
+  const rs = new Set(par2.map((_, i) => root2(i)));
   if (rs.size > 1) {
     trailDebug.reason = `paths left ${rs.size} components`;
     return null;
-  }
-  const nbr = new Map();
-  for (const cs of cellPaths) {
-    for (let k = 0; k < cs.length; k++) {
-      const set = nbr.get(cs[k]) || new Set();
-      if (k) set.add(cs[k - 1]);
-      if (k < cs.length - 1) set.add(cs[k + 1]);
-      nbr.set(cs[k], set);
-    }
-  }
-  const stops = [...points, ...crossings];
-  const rawJ = [];
-  for (const [k, set] of nbr) {
-    if (set.size < 3) continue;
-    const jx = ((k % G) + 0.5) * cell;
-    const jy = (((k / G) | 0) + 0.5) * cell;
-    if (stops.some((q) => Math.hypot(q.x - jx, q.y - jy) < spacing * 0.35)) continue;
-    rawJ.push({ x: jx, y: jy });
-  }
-  const junctions = [];
-  for (const j of rawJ) {
-    if (!junctions.some((q) => Math.hypot(q.x - j.x, q.y - j.y) < spacing * 0.3)) junctions.push(j);
   }
   const at = (q) => ({ x: q.x, y: q.y });
   return { junctions, crossings, edges: finals, passes: crossings.filter((q) => q.pass).map(at), fords: crossings.filter((q) => !q.pass).map(at) };
@@ -990,7 +1076,6 @@ export function buildTerrain(o) {
       m: mStr.join(''),
       rivers: riverPolys,
       fords: (trails ? trails.fords : fords).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
-      junctions: trails ? trails.junctions.map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]) : [],
       passes: (trails ? trails.passes.filter((p, i, arr) => arr.findIndex((q) => Math.hypot(q.x - p.x, q.y - p.y) < spacing * 0.15) === i) : passes).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
     },
     stats: {

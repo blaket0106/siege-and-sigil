@@ -546,3 +546,34 @@ test('trails: legacy free travel layouts are unchanged when trails are off', () 
   assert.ok(a.edges.every((e) => !e.path));
   assert.ok(a.territories.every((t) => !t.crossing));
 });
+
+test('trails: junction nodes are neutral, ownerless, have three or more roads and keep the graph connected', () => {
+  let total = 0;
+  for (const seed of [1, 2, 3, 4]) {
+    const layout = trailLayout({ players: 4, mapSize: 'standard', seed, scale: 3 });
+    const n = layout.territories.length;
+    const deg = new Array(n).fill(0);
+    const adj = Array.from({ length: n }, () => []);
+    for (const e of layout.edges) {
+      assert.ok(e.a < e.b && e.length > 0);
+      deg[e.a]++;
+      deg[e.b]++;
+      adj[e.a].push(e.b);
+      adj[e.b].push(e.a);
+    }
+    layout.territories.forEach((t, i) => {
+      assert.equal(t.idx, i);
+      if (!t.junction) return;
+      total += 1;
+      assert.equal(t.owner_seat, null);
+      assert.equal(t.troops, 0);
+      assert.ok(!t.crossing);
+      assert.ok(deg[i] >= 3, `junction ${i} has ${deg[i]} roads`);
+    });
+    const seen = new Set([0]);
+    const stack = [0];
+    while (stack.length) for (const v of adj[stack.pop()]) if (!seen.has(v)) { seen.add(v); stack.push(v); }
+    assert.equal(seen.size, n);
+  }
+  assert.ok(total > 0);
+});

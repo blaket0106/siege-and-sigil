@@ -446,15 +446,12 @@ function village(cx0, cz0, n, S) { for (let i = 0; i < n; i++) { const a = rnd()
   const g = mergeGeometries(parts), im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95, side: THREE.DoubleSide }), PASS.length), d = new THREE.Object3D();
   PASS.forEach((p, i) => { d.position.set(p.x, hAt(p.x, p.z) - 1, p.z); d.rotation.y = hash(i, 4) * 6; d.scale.setScalar(.95); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }); im.castShadow = true; im.receiveShadow = true; scene.add(im); scene.userData.pass = im;
 }
-{
-  const J = art.junctions || [];
-  if (J.length) {
-    const parts = [], post = new THREE.CylinderGeometry(.7, .8, 16, 5); post.translate(0, 8, 0); parts.push(paint(post, () => [.3, .21, .12]));
-    for (const [yy, rot] of [[13, .4], [9.5, -.5]]) { const arm = new THREE.BoxGeometry(11, 2.4, .8); arm.translate(5.5, 0, 0); arm.rotateY(rot); arm.translate(0, yy, 0); parts.push(paint(arm, () => [.62, .5, .3])); }
-    const im = new THREE.InstancedMesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 }), J.length), d = new THREE.Object3D();
-    J.forEach(([x, z], i) => { d.position.set(x, hAt(x, z), z); d.rotation.y = hash(i, 9) * 6; d.scale.setScalar(1); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }); im.castShadow = true; scene.add(im);
-  }
-}
+const makeSign = () => {
+  const parts = [], post = new THREE.CylinderGeometry(.7, .8, 16, 5); post.translate(0, 8, 0); parts.push(paint(post, () => [.3, .21, .12]));
+  for (const [yy, rot] of [[13, .4], [9.5, -.5]]) { const arm = new THREE.BoxGeometry(11, 2.4, .8); arm.translate(5.5, 0, 0); arm.rotateY(rot); arm.translate(0, yy, 0); parts.push(paint(arm, () => [.62, .5, .3])); }
+  const m = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 })); m.castShadow = true; m.scale.setScalar(2.2);
+  const g = new THREE.Group(); g.add(m); g.userData = { radius: 22, hgt: 36 }; return g;
+};
 const flags = [];
 const mEarth = new THREE.MeshStandardMaterial({ color: 0xb08c5c, roughness: 1, map: thatchTex, bumpMap: thatchTex, bumpScale: 1 });
 const mCobble = new THREE.MeshStandardMaterial({ map: stoneTex, bumpMap: stoneTex, bumpScale: 2.5, color: 0x7e776a, roughness: 1 });
@@ -626,6 +623,13 @@ const shield = (c, c2) => `<svg class="sh" viewBox="0 0 64 72"><path d="M4 4H60V
 await stage('Raising castles');
 const castles = [], DOCKS = [];
 sites.forEach((s, i) => {
+  if (s.junction) {
+    const g = makeSign(); g.position.set(s.x, s.gy, s.y); g.rotation.y = hash(i, 9) * 6; scene.add(g);
+    const el = document.createElement('div'); el.className = 'bn'; el.style.display = 'none'; labels.appendChild(el); s.cols = ['#8a8478', '#5a574f'];
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(4, 4, 4), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(s.x, s.gy + 20, s.y); hit.userData.i = i; scene.add(hit);
+    castles.push({ s, g, el, hit, top: new THREE.Vector3(s.x, s.gy + 40, s.y), junction: true });
+    return;
+  }
   const c = s.owner == null ? ['#8a8478', '#5a574f'] : spec.colors(s.owner);
   const near = sites.filter((o) => o !== s).sort((p, q) => Math.hypot(p.x - s.x, p.y - s.y) - Math.hypot(q.x - s.x, q.y - s.y))[0];
   const face = Math.atan2(near.x - s.x, near.y - s.y);
@@ -732,7 +736,7 @@ $('bshadow').onclick = (e) => { sun.castShadow = !sun.castShadow; e.target.class
 $('bao').onclick = (e) => { sao.enabled = !sao.enabled; e.target.classList.toggle('on', sao.enabled); };
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let down = null;
 renderer.domElement.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
-renderer.domElement.addEventListener('pointerup', (e) => { if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return; const rc = renderer.domElement.getBoundingClientRect(); mouse.set((e.clientX - rc.left) / rc.width * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1); ray.setFromCamera(mouse, cam); const hit = ray.intersectObjects(castles.map((c) => c.hit))[0]; if (hit) select(hit.object.userData.i); else clearSel(); });
+renderer.domElement.addEventListener('pointerup', (e) => { if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return; const rc = renderer.domElement.getBoundingClientRect(); mouse.set((e.clientX - rc.left) / rc.width * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1); ray.setFromCamera(mouse, cam); const hit = ray.intersectObjects(castles.map((c) => c.hit))[0]; if (hit && !castles[hit.object.userData.i].junction) select(hit.object.userData.i); else clearSel(); });
 
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(host.clientWidth, host.clientHeight, { samples: LO ? 0 : 2, type: THREE.HalfFloatType }));
 composer.addPass(new RenderPass(scene, cam));
@@ -767,7 +771,7 @@ function frame() {
   const flat = controls.getPolarAngle() < .35, dist = cam.position.distanceTo(controls.target), far = dist > 5200;
   const pl = (el, p) => { v.copy(p).project(cam); if (v.z > 1) { el.style.display = 'none'; return; } el.style.display = ''; el.style.transform = `translate(${(v.x * .5 + .5) * host.clientWidth}px,${(-v.y * .5 + .5) * host.clientHeight}px) translate(-10px,-100%)`; };
   { const boxes = [], hit = (b) => boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]); const big = far || flat;
-    castles.map((c, i) => { v.copy(flat ? new THREE.Vector3(c.s.x, c.s.gy + 40, c.s.y) : c.top).project(cam); return { c, i, ok: v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1, x: (v.x * .5 + .5) * host.clientWidth, y: (-v.y * .5 + .5) * host.clientHeight, pri: (i === sel ? 1000 : 0) + (c.s.mine ? 100 : 0) + (c.s.tier || 1) * 5 }; }).sort((p, q) => q.pri - p.pri).forEach((o) => { const el = o.c.el; if (!o.ok) { el.style.display = 'none'; return; } const sw = big ? 32 : 21, h = big ? 37 : 24, fw = sw + (o.c.s.name.length * (big ? 6.6 : 5.4) + 34) * (big ? 1.15 : 1); const bf = [o.x - 10, o.y - h, o.x - 10 + fw, o.y], bs = [o.x - 10, o.y - h, o.x - 10 + sw, o.y]; el.classList.toggle('big', big); el.style.transform = `translate(${o.x}px,${o.y}px) translate(-10px,-100%)`; if (!hit(bf)) { el.style.display = ''; el.classList.remove('compact'); boxes.push(bf); } else if (!hit(bs)) { el.style.display = ''; el.classList.add('compact'); boxes.push(bs); } else el.style.display = 'none'; }); }
+    castles.map((c, i) => { v.copy(flat ? new THREE.Vector3(c.s.x, c.s.gy + 40, c.s.y) : c.top).project(cam); return { c, i, ok: v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1, x: (v.x * .5 + .5) * host.clientWidth, y: (-v.y * .5 + .5) * host.clientHeight, pri: (i === sel ? 1000 : 0) + (c.s.mine ? 100 : 0) + (c.s.tier || 1) * 5 }; }).sort((p, q) => q.pri - p.pri).forEach((o) => { const el = o.c.el; if (o.c.junction || !o.ok) { el.style.display = 'none'; return; } const sw = big ? 32 : 21, h = big ? 37 : 24, fw = sw + (o.c.s.name.length * (big ? 6.6 : 5.4) + 34) * (big ? 1.15 : 1); const bf = [o.x - 10, o.y - h, o.x - 10 + fw, o.y], bs = [o.x - 10, o.y - h, o.x - 10 + sw, o.y]; el.classList.toggle('big', big); el.style.transform = `translate(${o.x}px,${o.y}px) translate(-10px,-100%)`; if (!hit(bf)) { el.style.display = ''; el.classList.remove('compact'); boxes.push(bf); } else if (!hit(bs)) { el.style.display = ''; el.classList.add('compact'); boxes.push(bs); } else el.style.display = 'none'; }); }
   armyList.forEach((a) => pl(a.el, a.top));
   composer.render();
 }
@@ -777,7 +781,7 @@ const armyList = [], armyById = new Map(), siteIdx = new Map(sites.map((s, i) =>
 const bannerHtml = (s, c) => shield(c[0], c[1]) + `<div class="rb"><span>${s.name}</span><b>${s.troops ?? '?'}</b></div>`;
 const recolor = (c, cols) => { const t = c.g.userData.tint; if (!t) return; t.cloth.color.set(cols[0]); t.flag.color.set(cols[0]); t.stripe.color.set(cols[1]); };
 const api = {
-  update(list) { if (!focused && list.some((x) => x.mine)) { focused = true; const ms2 = list.filter((x) => x.mine).map((x) => castles[siteIdx.get(x.id)].s), fx0 = ms2.reduce((a, q) => a + q.x, 0) / ms2.length, fz0 = ms2.reduce((a, q) => a + q.y, 0) / ms2.length; controls.target.set(fx0, 80, fz0); setView(1.0, Math.min(2600, Math.max(1500, W * .38))); } list.forEach(({ id, owner, troops, mine }) => { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i], s = c.s; const cols = owner == null ? ['#8a8478', '#5a574f'] : spec.colors(owner); const changed = s.owner !== owner || s.troops !== troops || s.mine !== !!mine; s.owner = owner; s.troops = troops; s.mine = !!mine; if (changed) { c.el.style.setProperty('--c', cols[0]); c.el.innerHTML = bannerHtml(s, cols); recolor(c, cols); } }); },
+  update(list) { if (!focused && list.some((x) => x.mine)) { focused = true; const ms2 = list.filter((x) => x.mine).map((x) => castles[siteIdx.get(x.id)].s), fx0 = ms2.reduce((a, q) => a + q.x, 0) / ms2.length, fz0 = ms2.reduce((a, q) => a + q.y, 0) / ms2.length; controls.target.set(fx0, 80, fz0); setView(1.0, Math.min(2600, Math.max(1500, W * .38))); } list.forEach(({ id, owner, troops, mine }) => { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i], s = c.s; if (c.junction) return; const cols = owner == null ? ['#8a8478', '#5a574f'] : spec.colors(owner); const changed = s.owner !== owner || s.troops !== troops || s.mine !== !!mine; s.owner = owner; s.troops = troops; s.mine = !!mine; if (changed) { c.el.style.setProperty('--c', cols[0]); c.el.innerHTML = bannerHtml(s, cols); recolor(c, cols); } }); },
   setArmies(list) {
     const keep = new Set(list.map((a) => a.id));
     armyById.forEach((a, id) => { if (!keep.has(id)) { scene.remove(a.g); a.el.remove(); armyList.splice(armyList.indexOf(a), 1); armyById.delete(id); } });

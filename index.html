@@ -526,7 +526,7 @@
         const { createMap3D } = await import('./map3d.js');
         if (!alive()) return;
         const seats = ['kaldran', 'veyra', 'thornwick'];
-        const sites = layout.territories.map((t, i) => ({ id: i, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false }));
+        const sites = layout.territories.map((t, i) => ({ id: i, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, junction: !!t.junction, owner: null, troops: null, mine: false }));
         const edges = layout.edges.map((e) => ({ a: e.a, b: e.b, kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path }));
         let track = null;
         let castles = [];
@@ -567,7 +567,7 @@
         api = made;
         if (!alive()) { try { made.dispose(); } catch {} api = null; return; }
         made.update(layout.territories.map((t, i) => ({ id: i, owner: t.owner_seat, troops: t.owner_seat != null ? 10 + (i % 7) * 3 : 12, mine: false })));
-        castles = made.sites().filter((s) => !sites[s.id].crossing_kind);
+        castles = made.sites().filter((s) => !sites[s.id].crossing_kind && !sites[s.id].junction);
         track = flightTrack(made, castles, FLIGHT.alt);
         host.classList.add('on');
       } catch (err) {
@@ -725,6 +725,7 @@
         ['diagram', 'map'],
         ['h', 'Trails and free travel'],
         ['p', 'The host chooses how armies travel ([[hosting#realm|Realm settings]]). In trail games armies walk the trails between castles and never cross country. In free-travel games an army can march straight to any castle within range, and the ground in between decides how long it takes: forest, hills and high ground slow a march.'],
+        ['p', 'Where three or more trails meet away from a castle, the map shows a crossroads. An army marching through passes straight over it without stopping, so the route between two castles can bend at a crossroads to the shortest way. Most castles have one or two trails, and a few at a crossroads have more. A crossroads cannot be held or attacked and does not count toward victory.'],
         ['h', 'Rivers and mountains'],
         ['list', [
           'Rivers and mountain ranges cannot be crossed on open ground.',
@@ -940,6 +941,7 @@
           ['Tick', 'The unit of game time ([[basics#how-time-works|How time works]]).'],
           ['Tier', 'A castle\'s wealth class, 1 to 3 ([[map#natural-wealth|Natural wealth]]).'],
           ['Trail', 'A route armies walk between castles ([[map#trails-and-free-travel|Trails and free travel]]).'],
+          ['Crossroads', 'A meeting of three or more trails away from any castle. Armies pass straight through and can take any trail from it. It cannot be held, fought over or counted toward victory.'],
           ['Valor', 'The commander ability that adds battle damage ([[commanders|Commanders]]).'],
           ['Watchtowers', 'The realm area that sets sight range and open-field initiative ([[areas|Realm areas]]).'],
         ] }],
@@ -1870,7 +1872,7 @@
           stage.replaceChildren(
             h('img', { src: terr.url, alt: 'Terrain preview', style: 'position:absolute;inset:0;width:100%;height:100%' }),
             sv('svg', { viewBox: `0 0 ${W} ${W}`, style: 'position:absolute;inset:0;width:100%;height:100%' }, ...rivers));
-          status.textContent = `${layout.territories.filter((t) => !t.crossing).length} castles on this land, ${layout.art.rivers.length} rivers. Castle positions are a surprise. Assumes every seat is filled.`;
+          status.textContent = `${layout.territories.filter((t) => !t.crossing && !t.junction).length} castles on this land, ${layout.art.rivers.length} rivers. Castle positions are a surprise. Assumes every seat is filled.`;
         };
         const generate = () => {
           if (worker) worker.terminate();
@@ -2938,6 +2940,30 @@
         ms.adjFor = ms.edges;
         return adj;
       };
+      const castleLinks = (tid) => {
+        const adj = new Map();
+        ms.edges.forEach((e) => {
+          if (!adj.has(e.from_territory_id)) adj.set(e.from_territory_id, []);
+          if (!adj.has(e.to_territory_id)) adj.set(e.to_territory_id, []);
+          adj.get(e.from_territory_id).push({ to: e.to_territory_id, len: e.length, cost: e.length * e.move_cost_mult, kind: e.kind });
+          adj.get(e.to_territory_id).push({ to: e.from_territory_id, len: e.length, cost: e.length * e.move_cost_mult, kind: e.kind });
+        });
+        const rank = { land: 0, river: 1, pass: 2 };
+        const out = new Map();
+        const walk = (id, len, cost, kind, seen) => {
+          (adj.get(id) || []).forEach((n) => {
+            if (seen.has(n.to)) return;
+            const nl = len + n.len;
+            const nc = cost + n.cost;
+            const nk = (rank[n.kind] || 0) > (rank[kind] || 0) ? n.kind : kind;
+            const tt = ms.t.get(n.to);
+            if (tt && tt.is_junction) walk(n.to, nl, nc, nk, new Set([...seen, n.to]));
+            else if (tt && !out.has(n.to)) out.set(n.to, { t: tt, len: nl, kind: nk, mult: nc / nl });
+          });
+        };
+        walk(tid, 0, 0, 'land', new Set([tid]));
+        return [...out.values()];
+      };
       const trailReach = (fromId) => {
         const adj = adjacency();
         const range = rangeOf(myStables());
@@ -2951,17 +2977,17 @@
           if (u === null) break;
           done.add(u);
           const tu = ms.t.get(u);
-          if (u !== fromId && !(tu && isFriend(tu.owner_player_id))) continue;
+          if (u !== fromId && !(tu && (tu.is_junction || isFriend(tu.owner_player_id)))) continue;
           (adj.get(u) || []).forEach(({ to, w }) => {
             if (!done.has(to) && best + w < (cost.get(to) ?? Infinity)) { cost.set(to, best + w); prev.set(to, u); }
           });
         }
         const out = new Map();
         cost.forEach((c, id) => {
-          if (id === fromId) return;
+          if (id === fromId || (ms.t.get(id) && ms.t.get(id).is_junction)) return;
           const path = [id];
           while (path[0] !== fromId) path.unshift(prev.get(path[0]));
-          if (path.length === 2 || c <= range) out.set(id, { cost: c, path });
+          if (path.filter((n) => !(ms.t.get(n) && ms.t.get(n).is_junction)).length === 2 || c <= range) out.set(id, { cost: c, path });
         });
         return out;
       };
@@ -3112,7 +3138,7 @@
       };
 
       const initTerrain = () => {
-        const sites = [...ms.t.values()];
+        const sites = [...ms.t.values()].filter((t) => !t.is_junction);
         ms.terr = paintTerrain(ms.art, ms.game.map_w, sites);
         const W = ms.game.map_w;
         L.terrain.replaceChildren(sv('image', { x: 0, y: 0, width: W, height: W, href: ms.terr.url, preserveAspectRatio: 'none', style: 'pointer-events:none;filter:brightness(0.92) saturate(0.92)' }));
@@ -3132,7 +3158,7 @@
           sv('circle', { r: 5, fill: '#c9a46a', stroke: '#2a2418', 'stroke-width': 1.2 }),
           sv('path', { d: 'M-3,0 H3 M0,-3 V3', stroke: '#2a2418', 'stroke-width': 1.1 }));
         L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])));
-        L.junctions.replaceChildren(...(ms.art.junctions || []).map((f) => cross(f[0], f[1])));
+        L.junctions.replaceChildren(...[...ms.t.values()].filter((t) => t.is_junction).map((t) => cross(t.x, t.y)));
         svg.parentElement.style.background = ms.game.fog_dark ? '#000' : '#0e2f4f';
         if (!svg.parentElement.querySelector('.legend')) {
           const dot = (style) => h('span', { class: 'ldot', style });
@@ -3179,6 +3205,7 @@
         const cells = [];
         const castles = [];
         ms.t.forEach((t) => {
+          if (t.is_junction) return;
           const seen = ms.vis.has(t.id);
           const owner = ms.replay ? (ms.replay.owners.get(t.id) ?? null) : seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
           const selected = ms.sel && ms.sel.type === 't' && ms.sel.id === t.id;
@@ -3406,12 +3433,13 @@
         ms.m3 = await createMap3D(stage3d, {
           map_w: ms.game.map_w,
           art: ms.art,
-          sites: list.map((t) => ({ id: t.id, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, owner: null, troops: null, mine: false })),
+          sites: list.map((t) => ({ id: t.id, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, junction: !!t.is_junction, owner: null, troops: null, mine: false })),
           edges: ms.edges.filter((e) => idx.has(e.from_territory_id) && idx.has(e.to_territory_id)).map((e) => ({ a: idx.get(e.from_territory_id), b: idx.get(e.to_territory_id), kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path })),
           lowQuality: window.innerWidth < 900 || list.length > 200,
           colors: (pid) => [color(pid), color2(pid)],
           onSelect: (id) => {
             if (ms.syncing3d) return;
+            if (id != null && ms.t.get(id) && ms.t.get(id).is_junction) return;
             if (id == null) { if (!ms.marching) { ms.sel = null; ms.preview = null; render(); drawSide(); } return; }
             select('t', id);
           },
@@ -3846,7 +3874,7 @@
           const eta = interval ? ` (about ${fmtDuration((plan.arrival_tick - tickF()) * interval)})` : '';
           out.push(h('div', {},
             line('Destination', dest.name),
-            line('Route', plan.path.map((id) => ms.t.get(id).name).join(' > ')),
+            line('Route', plan.path.filter((id) => !ms.t.get(id).is_junction).map((id) => ms.t.get(id).name).join(' > ')),
             line('Travel', `${plan.travel_ticks} ticks`),
             line('Arrives', `tick ${plan.arrival_tick}${eta}`),
             line('Distance / range', `${Math.round(plan.raw_length)} / ${plan.range}`),
@@ -4505,9 +4533,7 @@
               : 'River crossing. Armies cross the river only through this castle, and a march stops here unless you or an ally hold it.'));
           }
           const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
-          const links = ms.edges.filter((e) => (e.from_territory_id === t.id || e.to_territory_id === t.id) && e.length <= reachRange)
-            .map((e) => ({ t: ms.t.get(e.from_territory_id === t.id ? e.to_territory_id : e.from_territory_id), len: e.length, kind: e.kind, mult: e.move_cost_mult }))
-            .sort((a, b) => a.len - b.len);
+          const links = castleLinks(t.id).filter((l) => l.len <= reachRange).sort((a, b) => a.len - b.len);
           parts.push(h('div', { class: 'sec' }, h('b', {}, ms.game.free_travel ? 'Within your range' : trailsOn() ? 'Trails to' : 'Roads to'), links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${l.mult > 1.05 ? 'slow ×' + l.mult.toFixed(1) + ' · ' : ''}${Math.round(l.len)}`)))));
         } else if (sel && sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === sel.id);
@@ -4725,7 +4751,7 @@
           const artRow = await sb.from('games').select('map_art').eq('id', gameId).maybeSingle();
           ms.art = artRow.data && artRow.data.map_art ? artRow.data.map_art : null;
           if (ms.art) initTerrain();
-          else ms.cells = voronoiCells([...ms.t.values()], view.game.map_w, view.game.map_h);
+          else ms.cells = voronoiCells([...ms.t.values()].filter((t) => !t.is_junction), view.game.map_w, view.game.map_h);
         }
         if (firstLoad) {
           firstLoad = false;
