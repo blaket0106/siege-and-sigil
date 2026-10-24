@@ -824,7 +824,7 @@ const fogPlane = new THREE.Mesh(new THREE.PlaneGeometry(W, W), new THREE.MeshBas
 const controls = new OrbitControls(cam, renderer.domElement);
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
-controls.screenSpacePanning = false; controls.enableDamping = true; controls.dampingFactor = .09; controls.minDistance = 230; controls.maxDistance = Math.max(16000, W * 1.5); controls.maxPolarAngle = 1.35; controls.panSpeed = 1.1;
+controls.screenSpacePanning = false; controls.enableDamping = true; controls.dampingFactor = .09; controls.minDistance = 230; controls.maxDistance = Math.max(22000, W * 2.2); controls.maxPolarAngle = 1.35; controls.panSpeed = 1.1;
 controls.target.set(mapCenter[0], 80, mapCenter[1]);
 const setView = (polar, dist) => { const t = controls.target, az = controls.getAzimuthalAngle(); cam.position.set(t.x + dist * Math.sin(polar) * Math.sin(az), t.y + dist * Math.cos(polar), t.z + dist * Math.sin(polar) * Math.cos(az)); };
 setView(1.0, 2600); let tween = null;

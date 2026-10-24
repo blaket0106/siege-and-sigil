@@ -41,6 +41,7 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - **Supply-line helper for players (parked)** — a one-click looping route builder and map flow arrows. Parked until after the AI balance and end-game work.
 - **Commander fate and capture (parking lot)** — how commanders are treated after a lost battle (today they die with the army) and whether commanders can be captured, ransomed or spared on a first loss. Decided October 2026 to leave the current rule (they die) until this is designed as one system.
 - **Territory shading (watch)** — a region tint for ownership. Not built; revisit if testing shows ownership is still hard to read with the castle glow and ring. Neptune's Pride does not tint regions, so this is not required to match it.
+- **AI attitude indicator (parking lot)** — show how each AI feels about you in Standings, with what raises or lowers it, like Neptune's Pride's regard meter. Needs AI diplomacy to react to player behaviour first. Decided October 2026 to revisit later.
 
 ---
 

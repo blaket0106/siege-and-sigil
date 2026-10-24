@@ -441,7 +441,7 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .stat { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; padding: 3px 14px; background: var(--recess); border: 1px solid var(--gilt-lo); border-radius: 2px; box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55); }
 .stat span { color: var(--gilt); font-family: var(--font-display); font-weight: 600; letter-spacing: 0.1em; font-size: 0.6rem; }
 .stat b { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--gilt-hi); }
-.stat span.sub { letter-spacing: 0.04em; font-weight: 500; color: var(--dim); }
+.stat span.sub { letter-spacing: 0.02em; font-weight: 500; color: var(--dim); font-size: 0.72rem; text-transform: none; }
 .hud label.check { margin: 0; display: flex; align-items: center; gap: 6px; color: #ecdfc2; font-weight: 400; font-family: var(--font-ui); font-size: 0.98rem; letter-spacing: 0; text-shadow: none; }
 .hud label input { width: auto; }
 .hud .tag { color: var(--gilt-hi); }
@@ -1133,3 +1133,30 @@ svg.mk-on .terrain-layer { filter: saturate(0.6) brightness(0.82); }
   .mapwrap { flex: 1 1 54vh; min-height: 46vh; }
   .side { flex: 0 0 auto; max-height: 36vh; }
 }
+
+@media (min-width: 900px) {
+  .hud-id .sub { white-space: nowrap; }
+  .hud-id > div:last-child { min-width: 150px; }
+}
+@media (min-width: 900px) and (max-width: 1400px) {
+  .hud .hud-opt { display: none; }
+}
+@media (max-width: 760px) {
+  .hud .hud-opt { display: none; }
+  .hud-id b { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hud-id .sub { white-space: nowrap; }
+  .hud .hud-menu { position: sticky; right: 0; z-index: 2; }
+}
+
+.legend { z-index: 6; }
+.legend .lhead { display: block; margin: 0 0 4px auto; padding: 1px 8px; font-size: 0.72rem; background: transparent; border: 1px solid var(--gilt-lo); color: #ecdfc2; cursor: pointer; }
+.legend.collapsed > div { display: none; }
+
+.banner { position: relative; }
+.bunread { position: absolute; top: 8px; right: 10px; min-width: 22px; padding: 1px 6px; border-radius: 11px; background: #b4442f; color: #fff; font: 700 0.8rem var(--font-display); text-align: center; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5); }
+
+.tsubj { font-family: var(--font-display); font-weight: 700; color: var(--gilt-hi); margin-bottom: 2px; }
+.composer textarea { flex: 1; resize: none; }
+.chatline { white-space: pre-wrap; }
+
+svg.mk-far .mk-nt { display: none; }
