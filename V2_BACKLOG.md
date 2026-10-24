@@ -36,6 +36,9 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - **AI council advisor** — per-seat AI voice answering live game state in character. Needs an Anthropic API key, a server-side call and a per-question cost budget.
 - **Character personalities in the intel system** — procedurally generated traits for named commanders and council members, used by the advisor and AI-written whispers (councillors are ready to carry them). Councillors now exist, so this depends only on the advisor.
 
+- **House boosts (parking lot)** — each house gets a real gameplay identity that matches its lore `known_for` line (Kaldran stronger walls and watchtowers, Veyra alliances and learning, Dravos arms and siege engines, Halcyr fast marches and stables, Mereth gold and hired captains, Ostrand river crossings and coastal levies, Thornwick scouts and patient defence, Brannoch large cheap levies). Step one is a design doc proposing one boost per house for review, then balancing with sims. `factions.modifier` (jsonb) is reserved for it.
+- **Supply-line helper for players (parked)** — a one-click looping route builder and map flow arrows. Parked until after the AI balance and end-game work.
+
 ---
 
 *Added October 2026. V1 is pure PvP, single index.html, no co-op.*

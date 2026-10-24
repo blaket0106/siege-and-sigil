@@ -1033,3 +1033,27 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .fallen-row ul { margin: 4px 0; padding-left: 18px; color: var(--dim); }
 .fallen-meta { color: var(--dim); font-size: 0.88rem; margin-top: 2px; }
 .fallen-epi { color: #d98a80; font-style: italic; margin-top: 4px; }
+
+.story { max-height: 68vh; overflow-y: auto; min-width: min(640px, 82vw); padding-right: 6px; }
+.story-banner { display: flex; align-items: center; gap: 18px; padding: 16px 18px; margin-bottom: 12px; border-radius: 10px; border-left: 5px solid var(--hc1, var(--gilt)); background: linear-gradient(90deg, color-mix(in srgb, var(--hc1, #d6ab52) 32%, transparent), transparent 80%); }
+.story-banner h2 { margin: 0 0 4px; font-size: 1.45rem; }
+.story-sub { color: var(--dim); line-height: 1.35; }
+.story-intro { line-height: 1.5; margin: 0 0 12px; }
+.story-chapter h3 { margin: 14px 0 4px; }
+.story-chapter h3 small { color: var(--faint, #7e7259); font-weight: 400; font-size: 0.72rem; letter-spacing: 0.04em; }
+.story-chapter p { margin: 0 0 4px; line-height: 1.45; }
+.story-chapter ul { margin: 4px 0 0; padding-left: 0; list-style: none; color: var(--dim); }
+.story-chapter li { display: flex; gap: 10px; padding: 3px 0; line-height: 1.35; }
+.story-chapter .ct { flex: none; width: 58px; color: var(--faint, #7e7259); font-size: 0.82rem; padding-top: 2px; }
+.story-h { margin: 18px 0 6px; padding-top: 10px; border-top: 1px solid var(--rule-soft, rgba(214, 171, 82, 0.25)); }
+.story-heroes { display: grid; gap: 12px; }
+.story-hero { display: flex; gap: 14px; align-items: flex-start; }
+.story-hero .ccard.l { width: 96px; height: 128px; }
+.story-hero ul { margin: 4px 0 0; padding-left: 18px; color: var(--dim); }
+.story-meta { color: var(--dim); font-size: 0.9rem; line-height: 1.35; margin-top: 2px; }
+.story-houses { display: grid; gap: 8px; }
+.story-house { display: flex; gap: 12px; align-items: center; }
+
+.council-row { display: flex; gap: 10px; align-items: flex-start; }
+.council-row .ccard.s { width: 44px; height: 58px; }
+.council-row .ccard.s .cart img { transform: scale(1.6); }

@@ -704,14 +704,25 @@ function select(i) { selectRing(i); if (spec.onSelect) spec.onSelect(castles[i].
 const clearSel = () => { sel = -1; ring.visible = false; castles.forEach((c) => c.el.classList.remove('sel')); if (spec.onSelect) spec.onSelect(null); };
 
 const armies = [];
-function makeArmy(col, col2, n) {
+function manFigure(body, skin, steel, dk, k, helm) {
+  const m = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, 11, 8), body); b.position.y = 8; b.castShadow = true; m.add(b);
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(2.6, 8, 6), helm ? steel : skin); hd.position.y = 15.5; hd.castShadow = true; m.add(hd);
+  const sp = new THREE.Mesh(new THREE.CylinderGeometry(.35, .35, 24, 4), dk); sp.position.set(3.5, 14, 0); m.add(sp);
+  m.userData.phase = hash(k, 7) * 6.28; m.userData.spear = sp; return m;
+}
+function makeArmy(col, col2, n, tier = 1) {
   const g = new THREE.Group(); const dk = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: .9 });
-  const p = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 74, 6), dk); p.position.y = 37; p.castShadow = true; g.add(p);
-  const fg = new THREE.PlaneGeometry(36, 22, 10, 1), flagMat = new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide }), f = new THREE.Mesh(fg, flagMat); f.position.set(18, 62, 0); g.add(f); const fl = { fg, base: fg.attributes.position.array.slice() }; flags.push(fl);
+  const addFlag = (px, pz, hh) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, hh, 6), dk); p.position.set(px, hh / 2, pz); p.castShadow = true; g.add(p);
+    const fg = new THREE.PlaneGeometry(36, 22, 10, 1), flagMat = new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide }), f = new THREE.Mesh(fg, flagMat); f.position.set(px + 18, hh - 12, pz); g.add(f); const fl = { fg, base: fg.attributes.position.array.slice() }; flags.push(fl); return { fl, flagMat }; };
+  const main = addFlag(0, 0, 74 + tier * 8);
+  if (tier === 2) addFlag(-30, 14, 66);
   const body = new THREE.MeshStandardMaterial({ color: col, roughness: .8 }), skin = new THREE.MeshStandardMaterial({ color: 0xd4a17a }), steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, metalness: .6, roughness: .4 });
-  for (let k = 0; k < 14; k++) { const x = (k % 5 - 2) * 11 + (hash(k, 1) - .5) * 4, z = Math.floor(k / 5) * 12 - 10; const s = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, 11, 8), body); s.position.set(x, 8, z); s.castShadow = true; g.add(s); const hd = new THREE.Mesh(new THREE.SphereGeometry(2.6, 8, 6), k % 3 ? steel : skin); hd.position.set(x, 15.5, z); hd.castShadow = true; g.add(hd); const sp = new THREE.Mesh(new THREE.CylinderGeometry(.35, .35, 24, 4), dk); sp.position.set(x + 3.5, 14, z); g.add(sp); }
+  const count = [5, 12, 22][tier], cols = [3, 4, 6][tier], men = [];
+  for (let k = 0; k < count; k++) { const m = manFigure(body, skin, steel, dk, k, k % 3); m.position.set((k % cols - (cols - 1) / 2) * 11 + (hash(k, 1) - .5) * 4, 0, Math.floor(k / cols) * 12 - 10); g.add(m); men.push(m); }
+  if (tier >= 1) { const ld = manFigure(new THREE.MeshStandardMaterial({ color: col2, roughness: .7 }), skin, steel, dk, 99, true); ld.scale.setScalar(1.3); ld.position.set(((cols - 1) / 2) * 11 + 24, 0, 0); const pl = new THREE.Mesh(new THREE.SphereGeometry(2.2, 6, 5), new THREE.MeshStandardMaterial({ color: col2 })); pl.position.set(0, 21, 0); ld.add(pl); g.add(ld); men.push(ld); }
   scene.add(g); const el = document.createElement('div'); el.className = 'bn army'; el.style.setProperty('--c', col); el.innerHTML = shield(col, col2) + `<div class="rb"><b>${n}</b></div>`; labels.appendChild(el);
-  g.scale.setScalar(.6); return { g, el, top: new THREE.Vector3(), fl, flagMat, body, cols: col + col2, n };
+  g.scale.setScalar(.82); return { g, el, top: new THREE.Vector3(), fl: main.fl, flagMat: main.flagMat, body, cols: col + col2, n, men, tier };
 }
 
 const mine = sites.filter((s) => s.mine);
@@ -758,6 +769,8 @@ function frame() {
   (scene.userData.ships || []).forEach((s) => { const nx = s.b.position.x + Math.sin(s.a) * s.sp, nz = s.b.position.z + Math.cos(s.a) * s.sp; if (H(nx, nz) < SEA * .75) { s.b.position.x = nx; s.b.position.z = nz; } else s.a += 1.2 + Math.random(); s.b.rotation.y = s.a - Math.PI / 2; s.b.position.y = 1.2 + Math.sin(t * 1.6 + s.a * 5) * 1.1; s.b.rotation.z = Math.sin(t * 1.3 + s.a) * .04; });
   const tg = controls.target; { const mv = tg.distanceTo(lastShadowT); if (mv > 90 || frameNo < 3) { renderer.shadowMap.needsUpdate = true; lastShadowT.copy(tg); } frameNo++; }
   sun.position.set(tg.x + sunDir.x * 6000, tg.y + sunDir.y * 6000, tg.z + sunDir.z * 6000); sun.target.position.copy(tg);
+  armyList.forEach((ar) => ar.men.forEach((m) => { m.position.y = Math.abs(Math.sin(t * 7 + m.userData.phase)) * 1.8; m.rotation.z = Math.sin(t * 3.5 + m.userData.phase) * .05; }));
+  updateFx(dt, t);
   flags.forEach((f) => { const a = f.fg.attributes.position.array; for (let i = 0; i < a.length; i += 3) { const x = f.base[i] + 17; a[i + 2] = Math.sin(t * 4 + x * .22) * (x * .09); } f.fg.attributes.position.needsUpdate = true; });
   if (ring.visible) ring.scale.setScalar(castles[sel].g.userData.radius * (1.2 + Math.sin(t * 3) * .03));
   if (frameNo % 4 === 0) updateTiles(false);
@@ -776,16 +789,57 @@ function frame() {
   composer.render();
 }
 
+const fxs = [];
+function fightSide(col, n) {
+  const body = new THREE.MeshStandardMaterial({ color: col, roughness: .8 }), skin = new THREE.MeshStandardMaterial({ color: 0xd4a17a }), steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, metalness: .6, roughness: .4 }), dk = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: .9 });
+  const g = new THREE.Group(), men = [], per = Math.min(4, n);
+  for (let k = 0; k < n; k++) { const m = manFigure(body, skin, steel, dk, k, k % 2); m.position.set(-Math.floor(k / per) * 10, 0, (k % per - (per - 1) / 2) * 12); g.add(m); men.push(m); }
+  return { g, men };
+}
+function playBattle(d) {
+  if (fxs.length >= 4) return;
+  const g = new THREE.Group(); g.position.set(d.x, hAt(d.x, d.z), d.z); g.rotation.y = d.angle || 0; g.scale.setScalar(1.0);
+  const A = fightSide(d.colA[0], [3, 6, 10][d.tierA ?? 1]), B = fightSide(d.colB[0], [3, 6, 10][d.tierB ?? 1]);
+  B.g.rotation.y = Math.PI; g.add(A.g, B.g);
+  const sm = new THREE.MeshBasicMaterial({ color: 0xffe08a }), sparks = [];
+  for (let i = 0; i < 18; i++) { const sMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 2.4), sm); sMesh.visible = false; g.add(sMesh); sparks.push({ m: sMesh, v: new THREE.Vector3(), life: 0 }); }
+  const dust = [0, 1, 2, 3].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(13, 10, 8), new THREE.MeshBasicMaterial({ color: 0xb59c78, transparent: true, opacity: 0, depthWrite: false })); m.position.set((Math.random() - .5) * 36, 9, (Math.random() - .5) * 36); g.add(m); return m; });
+  const wc = d.winner === 0 ? d.colA[0] : d.colB[0], wg = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 78, 6), new THREE.MeshStandardMaterial({ color: 0x3a2a18 })); pole.position.y = 39; wg.add(pole);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(34, 21), new THREE.MeshStandardMaterial({ color: wc, side: THREE.DoubleSide })); fl.position.set(17, 64, 0); wg.add(fl); wg.scale.y = .001; g.add(wg);
+  scene.add(g); fxs.push({ g, A, B, sparks, dust, wg, win: d.winner, t0: clock.elapsedTime, dur: 5 });
+}
+function updateFx(dt, t) {
+  for (let i = fxs.length - 1; i >= 0; i--) {
+    const f = fxs[i], a = t - f.t0;
+    const adv = Math.min(1, a / 1.3), e = adv * adv * (3 - 2 * adv);
+    f.A.g.position.x = -100 + 84 * e; f.B.g.position.x = 100 - 84 * e;
+    [f.A, f.B].forEach((s, si) => s.men.forEach((m) => {
+      const sp = m.userData.spear;
+      if (a < 1.3) { m.position.y = Math.abs(Math.sin(a * 9 + m.userData.phase)) * 1.8; }
+      else if (a < 3.2) { m.position.y = Math.abs(Math.sin(a * 14 + m.userData.phase)) * 2.4; m.rotation.z = Math.sin(a * 16 + m.userData.phase) * .16; sp.rotation.z = -1.15 + Math.sin(a * 13 + m.userData.phase) * .35; }
+      else if (si !== f.win) { const k = Math.min(1, (a - 3.2) / .8); m.rotation.z = k * 1.45 * (m.userData.phase > 3.1 ? 1 : -1); m.position.y = -k * 4; sp.rotation.z = -1.15 + k * 1.1; }
+      else { m.position.y *= .85; m.rotation.z *= .85; sp.rotation.z = -.05; }
+    }));
+    if (a > 1.25 && a < 3.2 && Math.random() < .6) { const sp = f.sparks.find((q) => q.life <= 0); if (sp) { sp.m.position.set((Math.random() - .5) * 10, 8 + Math.random() * 12, (Math.random() - .5) * 30); sp.v.set((Math.random() - .5) * 90, 40 + Math.random() * 70, (Math.random() - .5) * 90); sp.life = .45 + Math.random() * .3; sp.m.visible = true; } }
+    f.sparks.forEach((sp) => { if (sp.life <= 0) return; sp.life -= dt; sp.m.position.addScaledVector(sp.v, dt); sp.v.y -= 140 * dt; sp.m.scale.setScalar(Math.max(.1, sp.life * 1.5)); if (sp.life <= 0) sp.m.visible = false; });
+    const dOp = Math.max(0, Math.min(1, (a - 1.25) / .6)) * Math.max(0, 1 - Math.max(0, a - 3.2) / 1.5) * .42;
+    f.dust.forEach((m, k) => { m.material.opacity = dOp; m.scale.setScalar(.7 + Math.max(0, a - 1.2) * (.45 + k * .08)); m.position.y = 9 + Math.max(0, a - 1.2) * 4; });
+    if (a > 3.4) { const k = Math.min(1, (a - 3.4) / .7); f.wg.scale.y = Math.max(.001, k); }
+    if (a > f.dur) { scene.remove(f.g); f.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); fxs.splice(i, 1); }
+  }
+}
 let focused = false;
 const armyList = [], armyById = new Map(), siteIdx = new Map(sites.map((s, i) => [s.id, i]));
 const bannerHtml = (s, c) => shield(c[0], c[1]) + `<div class="rb"><span>${s.name}</span><b>${s.troops ?? '?'}</b></div>`;
 const recolor = (c, cols) => { const t = c.g.userData.tint; if (!t) return; t.cloth.color.set(cols[0]); t.flag.color.set(cols[0]); t.stripe.color.set(cols[1]); };
 const api = {
   update(list) { if (!focused && list.some((x) => x.mine)) { focused = true; const ms2 = list.filter((x) => x.mine).map((x) => castles[siteIdx.get(x.id)].s), fx0 = ms2.reduce((a, q) => a + q.x, 0) / ms2.length, fz0 = ms2.reduce((a, q) => a + q.y, 0) / ms2.length; controls.target.set(fx0, 80, fz0); setView(1.0, Math.min(2600, Math.max(1500, W * .38))); } list.forEach(({ id, owner, troops, mine }) => { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i], s = c.s; if (c.junction) return; const cols = owner == null ? ['#8a8478', '#5a574f'] : spec.colors(owner); const changed = s.owner !== owner || s.troops !== troops || s.mine !== !!mine; s.owner = owner; s.troops = troops; s.mine = !!mine; if (changed) { c.el.style.setProperty('--c', cols[0]); c.el.innerHTML = bannerHtml(s, cols); recolor(c, cols); } }); },
+  playBattle,
   setArmies(list) {
     const keep = new Set(list.map((a) => a.id));
     armyById.forEach((a, id) => { if (!keep.has(id)) { scene.remove(a.g); a.el.remove(); armyList.splice(armyList.indexOf(a), 1); armyById.delete(id); } });
-    list.forEach((d) => { let a = armyById.get(d.id); if (!a || a.cols !== d.cols[0] + d.cols[1]) { if (a) { scene.remove(a.g); a.el.remove(); armyList.splice(armyList.indexOf(a), 1); } a = makeArmy(d.cols[0], d.cols[1], d.troops); armyById.set(d.id, a); armyList.push(a); }
+    list.forEach((d) => { let a = armyById.get(d.id); if (!a || a.cols !== d.cols[0] + d.cols[1] || a.tier !== (d.tier ?? 1)) { if (a) { scene.remove(a.g); a.el.remove(); armyList.splice(armyList.indexOf(a), 1); } a = makeArmy(d.cols[0], d.cols[1], d.troops, d.tier ?? 1); armyById.set(d.id, a); armyList.push(a); }
       if (a.n !== d.troops) { a.n = d.troops; a.el.querySelector('b').textContent = d.troops; } const y = hAt(d.x, d.z); a.g.position.set(d.x, y, d.z); a.g.rotation.y = d.heading; a.top.set(d.x, y + 62, d.z); });
   },
   setOverlays(o) {

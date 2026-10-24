@@ -760,6 +760,8 @@
         ['p', 'Siege & Sigil is a game of castles and armies. You lead a house. Take [[map|castles]], grow their [[economy|income]], and hold more of the realm than anyone else. There are no dice: every [[battles|fight]] is arithmetic, so the player who plans better wins.'],
         ['h', 'What wins the game'],
         ['p', 'The first player to hold the share of castles shown in the "Road to victory" bar wins. The host sets it ([[hosting#rules|Hosting a game]]); half of all castles is the default. A player who loses every castle is eliminated. If only one player is left standing, that player wins.'],
+        ['h', 'The story of the war'],
+        ['p', 'When a game ends, "The story" button opens a chronicle of the whole campaign: who took the Hollow Crown and how, the war told in three chapters (the Scramble, the War and the Reckoning) with the castles each house took and the alliances, betrayals, fallen kings and eliminated houses, the heroes of the war with their portraits and deeds, and how every house stood at the end. It opens by itself the first time you enter a finished game, and you can reopen it from the game screen or your campaigns list.'],
         ['h', 'How time works'],
         ['p', 'The game runs in ticks. The host picks the speed: a tick is 2 hours, 1 hour, 30 minutes or 15 minutes, or the game is turn-based and moves forward when everyone ends their turn or the deadline passes. The game keeps running while you are away, so orders you give now are carried out as ticks pass.'],
         ['h', 'Your first ten minutes'],
@@ -811,6 +813,9 @@
           'A pass castle sits in a gap in the mountains. Hold the pass and the range is closed to your enemies.',
           'A march ends at the first castle that is not yours or an ally\'s, so you must [[battles|take the crossing castle]] before you can go beyond it.',
         ]],
+        ['h', 'Marching armies and battles'],
+        ['p', 'A marching army is drawn on both the 2D and 3D map in its house colours. Its size shows how many troops it carries: a small band (under 30 troops), a company (30 to 119) or a host (120 or more, with a captain and a second banner). Enemy armies you can see are drawn the same way, so you can judge a threat before it arrives.'],
+        ['p', 'When a battle is reported, the map plays a short skirmish where it happened: the two armies close, clash in a cloud of dust, and the winner raises a banner. The result is decided instantly by the [[battles|battle rules]]; the animation is only for show and is skipped if your device asks for reduced motion.'],
         ['h', 'Natural wealth'],
         ['p', 'Each castle has natural resources, shown by the halo around it. Richer castles make [[economy#upgrade-costs|upgrades cheaper]], and tiers are Tier 1 (1 to 20), Tier 2 (21 to 40) and Tier 3 (41 to 60). Grab the rich ones first.'],
       ] },
@@ -1359,6 +1364,70 @@
             }, 'Add friend')
             : null)));
       modal(`${data.name}: final standings`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);margin-bottom:8px' }, `Ended at tick ${data.ticks}${data.reason ? ` (${data.reason})` : ''}`), h('div', { class: 'list', style: 'max-height:50vh;overflow-y:auto' }, ...rows)), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+    }
+
+
+    async function storyDialog(gameId) {
+      const { data, error } = await sb.rpc('game_story', { p_game_id: gameId });
+      if (error || !data) return toast(error ? error.message : 'The story is told once the war is over');
+      await loadFactions();
+      const fname = (slug) => `House ${factionOf(slug).name}`;
+      const byPlayer = new Map(data.houses.map((x) => [x.player_id, x]));
+      const house = (pid) => (byPlayer.get(pid) ? fname(byPlayer.get(pid).faction) : 'a lost house');
+      const winner = byPlayer.get(data.winner_player_id);
+      const MIN = { slow: 120, normal: 60, fast: 30, quad: 15, blitz: 5 };
+      const days = MIN[data.tick_speed] ? Math.max(1, Math.round((data.ticks * MIN[data.tick_speed]) / 1440)) : null;
+      const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+      const st = data.stats;
+
+      const banner = winner
+        ? h('div', { class: 'story-banner', style: `--hc1:${factionOf(winner.faction).color};--hc2:${factionOf(winner.faction).color2}` },
+          sigil(winner.faction, 92),
+          h('div', {},
+            h('h2', {}, `${fname(winner.faction)} took the Hollow Crown`),
+            h('div', { class: 'story-sub' }, `${data.reason === 'last_standing' ? `${fname(winner.faction)} was the last house standing` : `${fname(winner.faction)} held ${winner.castles} of ${data.total_castles} castles`}, after ${plural(data.ticks, 'tick')}${days ? ` (about ${plural(days, 'day')})` : ''}.`)))
+        : h('div', { class: 'story-banner' }, h('div', {}, h('h2', {}, 'The crown was never claimed'), h('div', { class: 'story-sub' }, `The war ended after ${plural(data.ticks, 'tick')} with no house holding the realm.`)));
+
+      const intro = h('p', { class: 'story-intro' },
+        `${data.houses.length} houses marched for the ${data.total_castles} castles of the Aldermark. ${plural(st.battles, 'battle')} were fought and ${plural(st.captures, 'castle')} changed hands. ${plural(st.commanders, 'commander')} took the field and ${st.fallen} did not come home${st.kings_killed ? `, including ${plural(st.kings_killed, 'king')}` : ''}.`);
+
+      const TITLES = ['I. The Scramble', 'II. The War', 'III. The Reckoning'];
+      const eventText = (e) => {
+        const p = e.payload || {};
+        if (e.type === 'player_eliminated') return `${house(p.player_id)} was driven from the realm.`;
+        if (e.type === 'king_killed') return `${p.name || 'A king'} of ${house(p.player_id)} fell in battle.`;
+        if (e.type === 'alliance_formed') return `${house(p.player_a)} and ${house(p.player_b)} swore an alliance.`;
+        if (e.type === 'alliance_broken') return `${house(p.by_player_id)} broke faith with ${house(p.against_player_id)}.`;
+        return '';
+      };
+      const chapters = data.chapters.map((c) => {
+        const caps = c.captures || [];
+        const lead = caps[0];
+        const lines = [];
+        if (lead) {
+          lines.push(`${fname(lead.faction)} led these days, taking ${plural(lead.n, 'castle')}.`);
+          if (caps[1]) lines.push(`${fname(caps[1].faction)} took ${plural(caps[1].n, 'castle')}.`);
+        } else lines.push('Few castles changed hands.');
+        return h('div', { class: 'story-chapter' },
+          h('h3', {}, TITLES[c.n - 1] || `Chapter ${c.n}`, h('small', {}, ` ticks ${c.from} to ${c.to}`)),
+          h('p', {}, lines.join(' ')),
+          c.events && c.events.length ? h('ul', {}, c.events.map((e) => h('li', {}, h('span', { class: 'ct' }, `Tick ${e.tick}`), eventText(e)))) : null);
+      });
+
+      const heroes = data.heroes.length ? h('div', { class: 'story-heroes' }, data.heroes.map((x) => h('div', { class: 'story-hero' },
+        cmdCard({ id: (x.profile && x.profile.look && x.profile.look.seed) || x.id, name: x.name, school: x.school, role: x.role, profile: x.profile }, { faction: x.faction, size: 'l' }),
+        h('div', {},
+          h('b', {}, `${x.role === 'king' ? '♛ ' : ''}${x.name}`), x.profile && x.profile.epithet ? h('em', {}, ` ${x.profile.epithet}`) : null,
+          h('div', { class: 'story-meta' }, `${fname(x.faction)}, ${x.school}. ${plural(x.wins, 'victory')}, ${plural(x.castles, 'castle')} taken. ${x.alive ? 'Alive at the end of the war.' : `Fell at tick ${x.died_tick}.`}`),
+          x.deeds && x.deeds.length ? h('ul', {}, x.deeds.map((d) => h('li', {}, d))) : null)))) : h('p', { class: 'story-meta' }, 'No commander won a battle worth recording.');
+
+      const standings = h('div', { class: 'story-houses' }, data.houses.map((x) => h('div', { class: 'story-house' },
+        sigil(x.faction, 34),
+        h('div', {}, h('b', {}, fname(x.faction)), x.player_id === data.winner_player_id ? h('span', { class: 'tag gold', style: 'margin-left:8px' }, 'winner') : null,
+          h('div', { class: 'story-meta' }, `${plural(x.castles, 'castle')} at the end, ${x.captures} taken in battle, ${plural(x.commanders, 'commander')} (${x.fallen} fallen)${x.eliminated_at_tick != null ? `, eliminated at tick ${x.eliminated_at_tick}` : ''}.`)))));
+
+      modal(`${data.name}: the story of the war`, h('div', { class: 'story' }, banner, intro, ...chapters, h('h3', { class: 'story-h' }, 'Heroes of the war'), heroes, h('h3', { class: 'story-h' }, 'The houses at the end'), standings),
+        (close) => [h('button', { onclick: () => { close(); summaryDialog(gameId); } }, 'Final standings'), h('button', { class: 'primary', onclick: close }, 'Close')]);
     }
 
     function updateFriendBadge(n) {
@@ -2368,7 +2437,7 @@
           actions.push(h('button', { class: 'primary', onclick: () => showMap(gameId) }, 'Open map'));
         } else if (game.status === 'finished') {
           const winner = players.find((p) => p.id === game.winner_player_id);
-          actions.push(h('span', { style: 'color:var(--gold2)' }, winner ? `Winner: ${winner.display_name}` : 'No winner recorded'), h('button', { onclick: () => showMap(gameId) }, 'Open map'));
+          actions.push(h('span', { style: 'color:var(--gold2)' }, winner ? `Winner: ${winner.display_name}` : 'No winner recorded'), h('button', { class: 'primary', onclick: () => storyDialog(gameId) }, 'The story'), h('button', { onclick: () => showMap(gameId) }, 'Open map'));
           if (isHost) actions.push(h('button', {
             class: 'danger',
             onclick: (e) => { if (confirm('Delete this finished game and all its data?')) run(e.currentTarget, async () => {
@@ -2794,6 +2863,66 @@
         parts.push(...pole(W * 0.01, -W * 0.74 - W * 0.36 + 2, tier >= 3 ? 20 : 17));
       }
       return sv('g', {}, ...parts);
+    }
+
+
+    const armyTier = (n) => (typeof n === 'number' ? (n < 30 ? 0 : n < 120 ? 1 : 2) : 1);
+
+    function armyFigure(col, col2, tier, flip, step) {
+      const rows = [[3], [3, 4], [4, 5, 4]][tier];
+      const kids = [];
+      let k = 0;
+      rows.forEach((n, r) => {
+        for (let i = 0; i < n; i++) {
+          const x = (i - (n - 1) / 2) * 5.4 + (r % 2 ? 1.3 : 0);
+          const y = 5 - r * 4.4;
+          const bob = (k++ + step) % 2 ? -1.1 : 0;
+          kids.push(sv('g', { transform: `translate(${x},${y + bob})` },
+            sv('line', { x1: 2.4, y1: -1, x2: 2.4, y2: -12, stroke: '#2a1c0c', 'stroke-width': 0.9, 'stroke-linecap': 'round' }),
+            sv('path', { d: 'M-2.1 0L2.1 0L1.6 -5.6L-1.6 -5.6Z', fill: col, stroke: '#1a1008', 'stroke-width': 0.5, 'stroke-linejoin': 'round' }),
+            sv('circle', { cx: 0, cy: -7.4, r: 1.9, fill: '#d9ab82', stroke: '#1a1008', 'stroke-width': 0.4 }),
+            sv('path', { d: 'M-2 -7.7a2 2 0 0 1 4 0Z', fill: '#8e949c' })));
+        }
+      });
+      const top = -rows.length * 4.4 - 15 + (tier === 0 ? 0 : -2);
+      const flag = (fx, fy) => sv('g', { transform: `translate(${fx},${fy})` },
+        sv('line', { x1: 0, y1: 0, x2: 0, y2: 24 + tier * 3, stroke: '#2a1c0c', 'stroke-width': 1.6, 'stroke-linecap': 'round' }),
+        sv('circle', { cx: 0, cy: -1, r: 1.8, fill: '#f5dc94' }),
+        sv('g', { class: 'flag' },
+          sv('path', { d: `M1 0H${12 + tier * 3}L${9.5 + tier * 3} 4.2L${12 + tier * 3} 8.4H1Z`, fill: col, stroke: '#1a1008', 'stroke-width': 0.9, 'stroke-linejoin': 'round' }),
+          sv('path', { d: `M1 3H${11 + tier * 3}L10 4.2L${11 + tier * 3} 5.4H1Z`, fill: col2, opacity: 0.95 })));
+      kids.unshift(flag(0, top));
+      if (tier === 2) kids.unshift(flag(-13, top + 7));
+      if (tier >= 1) kids.push(sv('g', { transform: `translate(${((rows[0] - 1) / 2) * 5.4 + 9},${5 - (rows.length - 1) * 2.2})` },
+        sv('path', { d: 'M-2.4 0L2.4 0L1.9 -6.4L-1.9 -6.4Z', fill: col2, stroke: '#1a1008', 'stroke-width': 0.5 }),
+        sv('circle', { cx: 0, cy: -8.3, r: 2.2, fill: '#d9ab82', stroke: '#1a1008', 'stroke-width': 0.4 }),
+        sv('path', { d: 'M-2.3 -8.7a2.3 2.3 0 0 1 4.6 0Z', fill: '#8e949c' }),
+        sv('path', { d: 'M0 -11.3q2.6 -3.2 4.8 -1.4', fill: 'none', stroke: col2, 'stroke-width': 1.3, 'stroke-linecap': 'round' })));
+      return sv('g', { transform: flip ? 'scale(-1,1)' : '' }, kids);
+    }
+
+    function battleFx2d(f, age, M) {
+      const ease = (t) => t * t * (3 - 2 * t);
+      const adv = ease(Math.min(1, age / 1.0));
+      const gap = 30 - 20 * adv;
+      const clash = age > 0.95 && age < 2.5;
+      const aft = age > 2.4 ? Math.min(1, (age - 2.4) / 0.7) : 0;
+      const fade = age > 3.0 ? Math.max(0, 1 - (age - 3.0) / 0.6) : 1;
+      const side = (col, col2, tier, flip, lost) => sv('g', { transform: `translate(${flip ? gap : -gap},0)`, opacity: lost ? 1 - aft * 0.7 : 1 },
+        sv('g', { transform: lost && aft ? `rotate(${(flip ? 1 : -1) * aft * 40}) translate(0,${aft * 3})` : '' }, armyFigure(col, col2, Math.min(tier, 1), flip, Math.floor(age * 6))));
+      const sparks = clash ? Array.from({ length: 9 }, (_, i) => {
+        const a = (i / 9) * 6.28 + age * 5;
+        const r1 = 4 + ((age * 38 + i * 7) % 11);
+        return sv('line', { x1: Math.cos(a) * r1, y1: -8 + Math.sin(a) * r1 * 0.6, x2: Math.cos(a) * (r1 + 4), y2: -8 + Math.sin(a) * (r1 + 4) * 0.6, stroke: i % 2 ? '#ffe08a' : '#fff', 'stroke-width': 1.3, 'stroke-linecap': 'round' });
+      }) : [];
+      const dust = age > 0.95 ? sv('ellipse', { cx: 0, cy: 2, rx: 6 + (age - 0.95) * 14, ry: 3 + (age - 0.95) * 5, fill: '#b59c78', opacity: Math.max(0, 0.4 - (age - 0.95) * 0.16) }) : null;
+      const winCol = f.winner === 0 ? f.colA[0] : f.colB[0];
+      const flag = aft > 0 ? sv('g', { transform: `translate(0,${-4 - aft * 24})`, opacity: fade },
+        sv('line', { x1: 0, y1: 0, x2: 0, y2: 26, stroke: '#2a1c0c', 'stroke-width': 1.6 }),
+        sv('path', { d: 'M1 0H16L12.5 4.5L16 9H1Z', fill: winCol, stroke: '#1a1008', 'stroke-width': 0.9 })) : null;
+      return sv('g', { transform: `translate(${f.x},${f.y}) scale(${M * 1.1},${M * 1.1})`, style: 'pointer-events:none', opacity: fade },
+        sv('ellipse', { cx: 0, cy: 3, rx: 30, ry: 6, fill: 'rgba(0,0,0,0.25)' }),
+        dust, side(f.colA[0], f.colA[1], f.tierA, false, f.winner === 1), side(f.colB[0], f.colB[1], f.tierB, true, f.winner === 0), ...sparks, flag);
     }
 
     function plateCastle(o) {
@@ -3452,17 +3581,16 @@
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
           const label = friend ? String(c.troops) : '?';
           const bw = Math.max(24, label.length * 9 + 12);
-          out.push(sv('g', { transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.1},${M() * 1.1})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
+          out.push(sv('g', { transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.6},${M() * 1.6})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
             sv('ellipse', { cx: 2, cy: 2, rx: 11, ry: 3.6, fill: 'rgba(0,0,0,0.4)' }),
             sel ? sv('ellipse', { class: 'selring', cx: 0, cy: 1, rx: 17, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 2, 'stroke-dasharray': '6 5' }) : null,
-            sv('line', { x1: 0, y1: 0, x2: 0, y2: -30, stroke: '#2a1c0c', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
-            sv('circle', { cx: 0, cy: -31, r: 2.2, fill: '#f5dc94' }),
-            sv('g', { transform: 'translate(0,-29)' }, sv('g', { class: 'flag' },
-              sv('path', { d: 'M1 0H17L13.5 5L17 10H1Z', fill: color(c.owner_player_id), stroke: '#1a1008', 'stroke-width': 1, 'stroke-linejoin': 'round' }),
-              sv('path', { d: 'M1 3.6H15L14 5L15 6.4H1Z', fill: color2(c.owner_player_id), opacity: 0.95 }))),
+            armyFigure(color(c.owner_player_id), color2(c.owner_player_id), armyTier(c.troops), (pos.dx || 0) < 0, Math.floor(Date.now() / 250)),
             sv('rect', { class: 'lbl-army', x: -bw / 2, y: 5, width: bw, height: 16, rx: 3, fill: 'rgba(16,11,6,0.85)', stroke: c.role === 'king' ? '#f5dc94' : 'rgba(214,171,82,0.6)', 'stroke-width': 1 }),
             sv('text', { class: 'lbl-army', x: 0, y: 17, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;font-family:Cinzel,serif;font-weight:700' }, label)));
         });
+        const nowMs = Date.now();
+        ms.fx = (ms.fx || []).filter((f) => nowMs - f.t0 < 3700);
+        ms.fx.forEach((f) => out.push(battleFx2d(f, (nowMs - f.t0) / 1000, M() * 1.6)));
         L.dyn.replaceChildren(...out);
       };
 
@@ -3542,7 +3670,7 @@
           if (!m || !commanderSeen(c, tf)) return;
           const pos = movementPos(m, tf);
           const friend = isFriend(c.owner_player_id);
-          list.push({ id: c.id, x: pos.x, z: pos.y, heading: -Math.atan2(pos.dy, pos.dx), cols: [color(c.owner_player_id), color2(c.owner_player_id)], troops: friend ? c.troops : '?' });
+          list.push({ id: c.id, x: pos.x, z: pos.y, heading: -Math.atan2(pos.dy, pos.dx), cols: [color(c.owner_player_id), color2(c.owner_player_id)], troops: friend ? c.troops : '?', tier: armyTier(c.troops) });
         });
         ms.m3.setArmies(list);
       };
@@ -3774,7 +3902,8 @@
           turnControl(),
           h('span', { class: 'grow' }),
           pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); } }, `Proposals (${pendingProposals()})`) : null,
-          g.status === 'finished' ? h('button', { class: 'primary', onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
+          g.status === 'finished' ? h('button', { class: 'primary', onclick: () => storyDialog(gameId) }, 'The story') : null,
+          g.status === 'finished' ? h('button', { onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
           stat('Treasury', ms.me.gold),
           g.fog_of_war ? h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null,
           h('button', { class: 'ghost', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
@@ -4697,9 +4826,14 @@
               action = h('button', { class: 'primary', style: 'margin-top:4px', disabled: ms.me.gold < 150, onclick: order('recruit_councillor', { p_area: c.area }, 'A new councillor takes the seat') }, 'Recruit a replacement (150 gold)');
             }
             const state = c.status === 'seated' ? `at court, level ${c.level}` : c.status === 'afield' ? `in the field (seat level ${c.level}, restores to ${c.banked_level})` : `seat vacant (level ${c.level}, restores to ${c.banked_level || c.level})`;
-            return h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
-              h('div', {}, h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[c.area] || c.area}: ${c.status === 'dead' ? 'vacant' : c.name}`), h('span', { style: 'color:var(--dim);margin-left:8px' }, state)),
-              action);
+            const face = c.profile && c.status !== 'dead'
+              ? cmdCard({ id: 90000 + (c.member_id || 0), name: c.name, school: ({ armory: 'battleschool', barracks: 'battleschool', watchtowers: 'rangers', stables: 'rangers' })[c.area] || 'university', role: 'commander', profile: c.profile }, { faction: ms.me.faction_slug })
+              : null;
+            return h('div', { class: 'council-row', style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
+              face,
+              h('div', {},
+                h('div', {}, h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[c.area] || c.area}: ${c.status === 'dead' ? 'vacant' : c.name}`), h('span', { style: 'color:var(--dim);margin-left:8px' }, state)),
+                action));
           }));
       };
 
@@ -5076,6 +5210,18 @@
         ms.battles = br.data;
         if (prevTick !== null && view.game.current_tick > prevTick) Sfx.bell();
         if (prevBattle !== null && br.data.some((b) => b.id > prevBattle)) setTimeout(Sfx.horn, 700);
+        if (prevBattle !== null && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          br.data.filter((b) => b.id > prevBattle).slice(0, 3).forEach((b) => {
+            const r = b.report;
+            const [sa, sb2] = r.sides;
+            const where = b.territory_id ? ms.t.get(b.territory_id) : (r.location ? { x: r.location.x, y: r.location.y } : null);
+            if (!where || !sa || !sb2) return;
+            const cols = (pid) => (pid && ms.players.get(pid) ? [color(pid), color2(pid)] : ['#8a8478', '#5a574f']);
+            const spec = { x: where.x, y: where.y, colA: cols(sa.player_id), colB: cols(sb2.player_id), winner: Number(r.winner), tierA: armyTier(sa.troops), tierB: armyTier(sb2.troops) };
+            if (ms.view3d && ms.m3) ms.m3.playBattle({ x: spec.x, z: spec.y, colA: spec.colA, colB: spec.colB, winner: spec.winner, tierA: spec.tierA, tierB: spec.tierB });
+            else ms.fx = (ms.fx || []).concat([{ ...spec, t0: Date.now() }]).slice(-6);
+          });
+        }
         if (view.game.tick_speed === 'turn_based' && view.game.status === 'active') {
           const ts = await sb.rpc('turn_status', { p_game_id: gameId });
           ms.turn = ts.data || null;
@@ -5097,6 +5243,13 @@
           if (t) t.msgs.push(m);
         });
         if (!ms.notes) await loadNotes();
+        if (view.game.status === 'finished' && !ms.storyShown) {
+          ms.storyShown = true;
+          try {
+            const sk = `ss-story-${gameId}`;
+            if (!localStorage.getItem(sk)) { localStorage.setItem(sk, '1'); setTimeout(() => storyDialog(gameId), 1500); }
+          } catch {}
+        }
         ms.routes = new Map();
         view.routes.sort((a, b) => a.id - b.id).forEach((r) => ms.routes.set(r.commander_id, r));
         const firstEdges = !ms.edgesAll;
@@ -5142,6 +5295,7 @@
         if (ms.mov.size || animStep === 0) renderDyn();
         if (animStep === 0) updateCountdown();
       }, 250);
+      const fxTimer = setInterval(() => { if (ms.fx && ms.fx.length && !ms.view3d) renderDyn(); }, 90);
       const loadTimer = setInterval(load, 20000);
       try { if (!TOUCH_DEVICE && localStorage.getItem('ss-view3d') === '1' && ms.art) toggle3D(); } catch {}
       const onKey = (e) => {
@@ -5150,7 +5304,7 @@
         else if (ms.sel) select(null);
       };
       window.addEventListener('keydown', onKey);
-      state.cleanup.push(() => { window.removeEventListener('keydown', onKey); clearTimeout(debounce); clearInterval(tickTimer); clearInterval(loadTimer); unwatch(); sb.removeChannel(channel); });
+      state.cleanup.push(() => { window.removeEventListener('keydown', onKey); clearTimeout(debounce); clearInterval(tickTimer); clearInterval(fxTimer); clearInterval(loadTimer); unwatch(); sb.removeChannel(channel); });
     }
 
     async function onSession(session, event) {
