@@ -1667,3 +1667,9 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
   - Speed 2.5 and neutral armory 0: 8,7,7,7 / tick 14 / 13 / none.
   - Same with world scale 9: 7,7,7,6 / tick 15 / 11 / none.
   - Neptune's Pride at the same tick: 17, 15, 13, 8 holdings.
+
+## 35. Order Lock, Speed Basis and Neutral Armory Default (migration 20261024280000)
+
+- **Order lock:** once a march has taken its first tick it cannot be turned back. `recall_route` is no longer callable (execute revoked from all client roles). New `cancel_march(game, commander)` undoes a march only while `commander_movements.departed_tick` equals the game's current tick and the route (if any) is on its first stop (`created_tick` = departed tick, `next_stop_index` 0). It deletes the movement, aborts the route, and restores the commander to the departure castle with the status recorded in the new `commander_movements.prev_status` (set by `launch_leg`; a sieging commander goes back to sieging). Later stops can still be dropped with `abort_route` (client: "Halt at next stop" while marching, "Drop remaining stops" while waiting). A follow-up to check against Neptune's Pride's behaviour in the next evaluation.
+- **Speed basis:** `games.speed_basis` multiplies `commander_speed_mult` inside `march_speed`. Existing games have 1 (unchanged); new games default to 3, so the host's 1x now means three times the old speed. The create wizard and the speed multiplier setting are unchanged: 1 is the new standard.
+- **Neutral armory default 0:** new games default `neutral_armory` to 0 (existing games keep their stored value). Neutral castles do not produce troops: `run_tick` adds troops only to castles with an owner, so a neutral garrison is fixed at its starting value (`starting_garrison` x tier).

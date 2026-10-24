@@ -944,7 +944,8 @@
         ]],
         ['p', 'Turn on Loop and the commander repeats the route forever. That is how you keep a front line supplied without checking in every hour.'],
         ['h', 'Changing your mind'],
-        ['p', 'Abort makes the army finish its current stretch and stop at the next castle. Recall sends it back to where it started.'],
+        ['p', 'Orders lock at the first tick. From the moment you send an army until the next tick arrives you can press Cancel march and it stays where it was. After that the army is committed to its destination and cannot turn back.'],
+        ['p', 'On a route with several stops you can still press Halt at next stop, or Drop remaining stops while it waits. The army finishes its current stretch, stops at that castle and does not go on.'],
       ] },
       { id: 'battles', group: 'War', title: 'Battles', blocks: [
         ['p', 'There are no dice. Each side destroys a fixed number of enemy troops every round and the battle runs until one side has none left.'],
@@ -1069,7 +1070,7 @@
           ['Prestige', 'Points that level up your realm areas ([[areas|Realm areas]]).'],
           ['Production cycle', 'The interval at which gold is paid; 24 ticks by default ([[economy#how-production-works|Production]]).'],
           ['Rank', 'The total of a commander\'s ability levels, capped at 20 ([[commanders#growing-stronger|Growing stronger]]).'],
-          ['Recall', 'Send a marching army back to where it started ([[marching#changing-your-mind|Changing your mind]]).'],
+          ['Cancel march', 'Undo a march before the next tick arrives. After that the order is locked ([[marching#changing-your-mind|Changing your mind]]).'],
           ['Relief', 'A friendly army that breaks a siege ([[sieges|Sieges]]).'],
           ['Route', 'A march through several castles, optionally looping ([[marching#routes|Routes]]).'],
           ['Sally', 'A garrison sortie that fights the besiegers in the open ([[sieges|Sieges]]).'],
@@ -4246,10 +4247,6 @@
         if (c.status === 'moving') {
           const route = ms.routes.get(c.id);
           const m = ms.mov.get(c.id);
-          if (route && route.status === 'recalled' && m) {
-            return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
-              h('div', { style: 'color:var(--gold2)' }, `Recalled. Reaches ${ms.t.get(m.to_territory_id).name} first, then returns to ${ms.t.get(route.origin_territory_id).name}.`));
-          }
           if (route && route.status === 'aborted' && m) {
             return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
               h('div', { style: 'color:var(--gold2)' }, `Halting at ${ms.t.get(m.to_territory_id).name}.`));
@@ -4257,8 +4254,10 @@
           return h('div', { class: 'sec' }, h('b', {}, 'Orders'),
             route && route.status === 'active' ? routeLines(route, call, c) : null,
             h('div', { class: 'row wrap2' },
-              h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Will halt at the next stop') }, 'Halt at next stop'),
-              h('button', { onclick: call('recall_route', { p_commander_id: c.id }, 'Recalling to origin') }, 'Recall')));
+              m && m.departed_tick === ms.game.current_tick && (!route || (route.created_tick === m.departed_tick && !route.next_stop_index))
+                ? h('button', { onclick: call('cancel_march', { p_commander_id: c.id }, 'March cancelled') }, 'Cancel march') : null,
+              h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Will halt at the next stop') }, 'Halt at next stop')),
+            h('div', { class: 'tip' }, 'A march can be cancelled until the next tick. After that the army is committed to its destination.'));
         }
         if ((c.status !== 'idle' && c.status !== 'sieging') || !c.current_territory_id) return null;
 
@@ -4268,7 +4267,7 @@
         if (waiting && waiting.status === 'active' && waiting.resume_tick != null) {
           out.push(h('div', { style: 'color:var(--gold2);margin-bottom:6px' }, `Waiting at ${t.name} until tick ${waiting.resume_tick}, then continues its route.`),
             routeLines(waiting, call, c),
-            h('div', { style: 'margin-bottom:10px' }, h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Route cancelled') }, 'Cancel route')));
+            h('div', { style: 'margin-bottom:10px' }, h('button', { onclick: call('abort_route', { p_commander_id: c.id }, 'Remaining stops dropped') }, 'Drop remaining stops')));
         }
         if (c.status === 'sieging') {
           out.push(h('div', { style: 'color:var(--gold2);margin-bottom:8px' }, `Besieging ${t.name}. The garrison starves each tick.`),
