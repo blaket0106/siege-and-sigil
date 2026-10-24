@@ -207,6 +207,52 @@ export function assignSeats(seed, playerIds) {
 }
 
 
+function betweenness(n, edges, isTarget) {
+  const adj = Array.from({ length: n }, () => []);
+  for (const e of edges) {
+    adj[e.a].push([e.b, e.length]);
+    adj[e.b].push([e.a, e.length]);
+  }
+  const cb = new Array(n).fill(0);
+  for (let s = 0; s < n; s++) {
+    if (!isTarget[s]) continue;
+    const dist = new Array(n).fill(Infinity);
+    const sigma = new Array(n).fill(0);
+    const pred = Array.from({ length: n }, () => []);
+    const done = new Array(n).fill(false);
+    const order = [];
+    dist[s] = 0;
+    sigma[s] = 1;
+    for (;;) {
+      let u = -1;
+      let best = Infinity;
+      for (let i = 0; i < n; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+      if (u < 0) break;
+      done[u] = true;
+      order.push(u);
+      for (const [v, w] of adj[u]) {
+        if (done[v]) continue;
+        const nd = dist[u] + w;
+        if (nd < dist[v] - 1e-6) {
+          dist[v] = nd;
+          sigma[v] = sigma[u];
+          pred[v] = [u];
+        } else if (Math.abs(nd - dist[v]) <= 1e-6) {
+          sigma[v] += sigma[u];
+          pred[v].push(u);
+        }
+      }
+    }
+    const delta = new Array(n).fill(0);
+    for (let k = order.length - 1; k > 0; k--) {
+      const w = order[k];
+      for (const v of pred[w]) delta[v] += (sigma[v] / sigma[w]) * ((isTarget[w] ? 1 : 0) + delta[w]);
+      cb[w] += delta[w];
+    }
+  }
+  return cb;
+}
+
 export const SHAPES = ['continent', 'round', 'ring', 'twin', 'archipelago', 'rift'];
 const AREA_FRAC = { continent: 1, round: 1, ring: 0.78, twin: 0.5, archipelago: 0.42, rift: 0.8 };
 const CROSS_CAP = { twin: 3, archipelago: 2, rift: 5 };
@@ -816,6 +862,13 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       const crossEnd = base + tr.crossings.length;
       layout.edges = tr.edges.map((e) => ({ a: Math.min(e.a, e.b), b: Math.max(e.a, e.b), kind: e.kind, length: round4(e.length), move_cost_mult: e.mult, defense_mult: (e.a >= base && e.a < crossEnd) || (e.b >= base && e.b < crossEnd) ? 1.25 : 1, path: e.a < e.b ? e.path : [...e.path].reverse() }));
       layout.trails = true;
+      const isCastle = territories.map((t) => !t.junction);
+      const cb = betweenness(territories.length, layout.edges, isCastle);
+      const peak = Math.max(1e-9, ...cb.filter((_, i) => isCastle[i]));
+      territories.forEach((t, i) => {
+        const r = cb[i] / peak;
+        t.choke = t.junction ? 0 : r >= 0.75 ? 3 : r >= 0.5 ? 2 : r >= 0.3 ? 1 : 0;
+      });
     } else if (freeTravel) {
       layout.edges = world.links(LINK_CAP * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
     }

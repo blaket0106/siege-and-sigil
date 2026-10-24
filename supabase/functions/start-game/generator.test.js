@@ -626,3 +626,21 @@ test('trails: routes are direct, dead ends are rare and castles are evenly space
   assert.ok(leaves / castlesTotal < 0.12, `dead ends ${leaves}/${castlesTotal}`);
   assert.ok(cvSum / maps < 0.3, `spacing variation ${cvSum / maps}`);
 });
+
+test('trails: chokepoint levels are 0 to 3, junctions are never chokepoints and strong ones are rare', () => {
+  let strong = 0;
+  let castles = 0;
+  for (const seed of [1, 2, 3]) {
+    const layout = trailLayout({ players: 4, mapSize: 'standard', seed, scale: 3 });
+    assert.ok(layout.territories.some((t) => t.choke >= 2));
+    for (const t of layout.territories) {
+      assert.ok([0, 1, 2, 3].includes(t.choke), `choke ${t.choke}`);
+      if (t.junction) assert.equal(t.choke, 0);
+      else {
+        castles += 1;
+        if (t.choke >= 2) strong += 1;
+      }
+    }
+  }
+  assert.ok(strong / castles < 0.25, `strong chokepoints ${strong}/${castles}`);
+});
