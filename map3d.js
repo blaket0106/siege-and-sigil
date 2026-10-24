@@ -640,6 +640,8 @@ function makeDock(s, ang) {
 }
 const labels = $('labels');
 const shield = (c, c2) => `<svg class="sh" viewBox="0 0 64 72"><path d="M4 4H60V38C60 56 46 66 32 70C18 66 4 56 4 38Z" fill="${c}" stroke="#1a1008" stroke-width="3"/><path d="M4 22H60V32H4Z" fill="${c2}" opacity=".9"/><circle cx="32" cy="27" r="8" fill="${c2}" stroke="#1a1008" stroke-width="2"/><path d="M4 4H60V38C60 56 46 66 32 70C18 66 4 56 4 38Z" fill="none" stroke="#f5dc94" stroke-width="2.4"/></svg>`;
+const fillRb = (rb, name, n) => { rb.replaceChildren(); if (name) { const sp = document.createElement('span'); sp.textContent = name; rb.appendChild(sp); } const b = document.createElement('b'); b.textContent = String(n); rb.appendChild(b); };
+const setLabel = (el, c1, c2, name, n) => { el.innerHTML = shield(c1, c2); const rb = document.createElement('div'); rb.className = 'rb'; fillRb(rb, name, n); el.appendChild(rb); };
 await stage('Raising castles');
 const castles = [], DOCKS = [];
 sites.forEach((s, i) => {
@@ -656,7 +658,7 @@ sites.forEach((s, i) => {
   const g = makeCastle(s.tier || 1, c[0], c[1], i, s.riv ? 'riverTwins' : s.crossing_kind === 'pass' ? 'passGate' : pickVariant(s.tier || 1, s.terrain, i), biome(s.x, s.y)[0] > .4, biome(s.x, s.y)[4] > .4, s.riv); g.position.set(s.x, s.gy, s.y); g.rotation.y = s.riv ? -Math.atan2(s.riv.nz, s.riv.nx) : face; scene.add(g);
   let sea = -1; for (let k = 0; k < 16 && sea < 0; k++) { const a = k / 16 * 6.2832; for (let d = 160; d <= 520; d += 60) if (H(s.x + Math.sin(a) * d, s.y + Math.cos(a) * d) < SEA) { sea = a; break; } }
   if (sea >= 0 && !s.riv) { const dk = makeDock(s, sea); scene.add(dk); DOCKS.push(dk); }
-  const el = document.createElement('div'); el.className = 'bn'; el.style.setProperty('--c', c[0]); el.innerHTML = shield(c[0], c[1]) + `<div class="rb"><span>${s.name}</span><b>${s.troops ?? '?'}</b></div>`; labels.appendChild(el); s.cols = c;
+  const el = document.createElement('div'); el.className = 'bn'; el.style.setProperty('--c', c[0]); setLabel(el, c[0], c[1], s.name, s.troops ?? '?'); labels.appendChild(el); s.cols = c;
   const hit = new THREE.Mesh(new THREE.SphereGeometry(g.userData.radius, 8, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(s.x, s.gy + 50, s.y); hit.userData.i = i; scene.add(hit);
   const own = [[0, 1, .22], [1.02, 1.2, .85]].map(([r0, r1, op]) => { const m = new THREE.Mesh(drapedRing(s.x, s.y, s.pl * r0, s.pl * r1), new THREE.MeshBasicMaterial({ color: c[0], transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide })); m.renderOrder = 2; scene.add(m); return m; });
   castles.push({ s, g, el, hit, own, top: new THREE.Vector3(s.x, s.gy + g.userData.hgt + 14, s.y) }); el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.onclick = () => select(i);
@@ -794,7 +796,7 @@ function makeArmy(col, col2, n, tier = 1, name = '') {
   }
   for (let k = 0; k < u.eng; k++) { const m = new THREE.Mesh(k % 2 ? geos.cat : geos.ram, armyMat); m.castShadow = true; m.position.set((k - (u.eng - 1) / 2) * 50, 0, rows * 12 + 22); g.add(m); }
   if (tier >= 1) { const skin = new THREE.MeshStandardMaterial({ color: 0xd4a17a }), steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, metalness: .6, roughness: .4 }); const ld = manFigure(new THREE.MeshStandardMaterial({ color: col2, roughness: .7 }), skin, steel, dk, 99, true); ld.scale.setScalar(1.3); ld.position.set(half + 24, 0, 0); const pl = new THREE.Mesh(new THREE.SphereGeometry(2.2, 6, 5), new THREE.MeshStandardMaterial({ color: col2 })); pl.position.set(0, 21, 0); ld.add(pl); g.add(ld); }
-  scene.add(g); const el = document.createElement('div'); el.className = 'bn army'; el.style.setProperty('--c', col); el.innerHTML = shield(col, col2) + `<div class="rb">${name ? `<span>${name}</span>` : ''}<b>${n}</b></div>`; labels.appendChild(el);
+  scene.add(g); const el = document.createElement('div'); el.className = 'bn army'; el.style.setProperty('--c', col); setLabel(el, col, col2, name, n); labels.appendChild(el);
   g.scale.setScalar(.58); return { g, el, top: new THREE.Vector3(), fl: main.fl, flagMat: main.flagMat, cols: col + col2, n, name, tier, ukey: u.foot + '/' + u.cav + '/' + u.eng, foot, fpos, cav, cpos, flagRecs, lastAnim: -1 };
 }
 const _ad = new THREE.Object3D();
@@ -1024,10 +1026,9 @@ function updateSieges(dt, t) {
 const fxFlash = [], fxDebris = [];
 let focused = false;
 const armyList = [], armyById = new Map(), siteIdx = new Map(sites.map((s, i) => [s.id, i]));
-const bannerHtml = (s, c) => shield(c[0], c[1]) + `<div class="rb"><span>${s.name}</span><b>${s.troops ?? '?'}</b></div>`;
 const recolor = (c, cols) => { const t = c.g.userData.tint; if (!t) return; t.cloth.color.set(cols[0]); t.flag.map = flagTex(cols[0], cols[1]); t.flag.needsUpdate = true; t.stripe.color.set(cols[1]); if (c.own) c.own.forEach((m) => m.material.color.set(cols[0])); };
 const api = {
-  update(list) { if (!focused && list.some((x) => x.mine)) { focused = true; const ms2 = list.filter((x) => x.mine).map((x) => castles[siteIdx.get(x.id)].s), fx0 = ms2.reduce((a, q) => a + q.x, 0) / ms2.length, fz0 = ms2.reduce((a, q) => a + q.y, 0) / ms2.length, spread = Math.max(...ms2.map((q) => Math.hypot(q.x - fx0, q.y - fz0))), f0 = spread > 1500 ? ms2[0] : null; controls.target.set(f0 ? f0.x : fx0, 80, f0 ? f0.y : fz0); setView(1.0, Math.min(2600, Math.max(1500, W * .38))); } list.forEach(({ id, owner, troops, mine }) => { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i], s = c.s; if (c.junction) return; const cols = owner == null ? ['#8a8478', '#5a574f'] : spec.colors(owner); const changed = s.owner !== owner || s.troops !== troops || s.mine !== !!mine; s.owner = owner; s.troops = troops; s.mine = !!mine; if (changed) { c.el.style.setProperty('--c', cols[0]); c.el.innerHTML = bannerHtml(s, cols); recolor(c, cols); } }); },
+  update(list) { if (!focused && list.some((x) => x.mine)) { focused = true; const ms2 = list.filter((x) => x.mine).map((x) => castles[siteIdx.get(x.id)].s), fx0 = ms2.reduce((a, q) => a + q.x, 0) / ms2.length, fz0 = ms2.reduce((a, q) => a + q.y, 0) / ms2.length, spread = Math.max(...ms2.map((q) => Math.hypot(q.x - fx0, q.y - fz0))), f0 = spread > 1500 ? ms2[0] : null; controls.target.set(f0 ? f0.x : fx0, 80, f0 ? f0.y : fz0); setView(1.0, Math.min(2600, Math.max(1500, W * .38))); } list.forEach(({ id, owner, troops, mine }) => { const i = siteIdx.get(id); if (i === undefined) return; const c = castles[i], s = c.s; if (c.junction) return; const cols = owner == null ? ['#8a8478', '#5a574f'] : spec.colors(owner); const changed = s.owner !== owner || s.troops !== troops || s.mine !== !!mine; s.owner = owner; s.troops = troops; s.mine = !!mine; if (changed) { c.el.style.setProperty('--c', cols[0]); setLabel(c.el, cols[0], cols[1], s.name, s.troops ?? '?'); recolor(c, cols); } }); },
   playBattle,
   siegeEdge(id) { const sg = sieges.get(id); if (!sg) return null; const s = sg.s, a = Math.atan2(sg.cz - s.y, sg.cx - s.x), r = s.pl + 18; return { x: s.x + Math.cos(a) * r, z: s.y + Math.sin(a) * r, angle: -a }; },
   setSieges(list) {
@@ -1040,7 +1041,7 @@ const api = {
     armyById.forEach((a, id) => { if (!keep.has(id)) { killArmy(a); armyById.delete(id); } });
     list.forEach((d) => { let a = armyById.get(d.id); const uk = (() => { const q = armyUnits(d.troops, d.tier ?? 1); return q.foot + '/' + q.cav + '/' + q.eng; })(); if (!a || a.cols !== d.cols[0] + d.cols[1] || a.ukey !== uk) { if (a) killArmy(a); a = makeArmy(d.cols[0], d.cols[1], d.troops, d.tier ?? 1, d.name || ''); armyById.set(d.id, a); armyList.push(a); }
       if (a.n !== d.troops) { a.n = d.troops; a.el.querySelector('b').textContent = d.troops; }
-      if ((d.name || '') !== a.name) { a.name = d.name || ''; a.el.querySelector('.rb').innerHTML = (a.name ? `<span>${a.name}</span>` : '') + `<b>${a.n}</b>`; } const y = hAt(d.x, d.z); a.g.position.set(d.x, y, d.z); a.g.rotation.y = d.heading; a.top.set(d.x, y + 46, d.z); });
+      if ((d.name || '') !== a.name) { a.name = d.name || ''; fillRb(a.el.querySelector('.rb'), a.name, a.n); } const y = hAt(d.x, d.z); a.g.position.set(d.x, y, d.z); a.g.rotation.y = d.heading; a.top.set(d.x, y + 46, d.z); });
   },
   setOverlays(o) {
     clearOverlays();
