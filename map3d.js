@@ -161,6 +161,9 @@ EDG.forEach((e) => { const A = sites[e.a], B = sites[e.b]; const raw = e.path &&
   const pts = []; raw.forEach((q, k) => { if (!k) { pts.push(q); return; } const q0 = raw[k - 1], L = Math.hypot(q.x - q0.x, q.z - q0.z), n = Math.max(1, Math.ceil(L / 45)); for (let s = 1; s <= n; s++) pts.push({ x: q0.x + (q.x - q0.x) * s / n, z: q0.z + (q.z - q0.z) * s / n }); });
   const road = { a: e.a, b: e.b, k: KIND[e.kind] ?? 0, len: e.length, m: e.mult, pts }; ROADS.push(road); ROADMAP.set(Math.min(e.a, e.b) + '-' + Math.max(e.a, e.b), road);
   cx.beginPath(); pts.forEach((q, i) => { i ? cx.lineTo(toPx(q.x), toPx(q.z)) : cx.moveTo(toPx(q.x), toPx(q.z)); }); cx.strokeStyle = 'rgba(70,54,32,.5)'; cx.lineWidth = toPx(15); cx.stroke(); cx.strokeStyle = 'rgba(176,150,104,.82)'; cx.lineWidth = toPx(9); cx.stroke(); });
+const ROADGRID = new Map(), RGC = 100;
+ROADS.forEach((r) => r.pts.forEach((q) => { const k = Math.floor(q.x / RGC) + ',' + Math.floor(q.z / RGC); (ROADGRID.get(k) || ROADGRID.set(k, []).get(k)).push(q); }));
+const roadDist = (x, z) => { const cx0 = Math.floor(x / RGC), cz0 = Math.floor(z / RGC); let d = 1e9; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = ROADGRID.get((cx0 + a) + ',' + (cz0 + b)); if (l) for (const q of l) { const e = Math.hypot(x - q.x, z - q.z); if (e < d) d = e; } } return d; };
 const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
 
 await stage('Raising the mountains');
@@ -386,6 +389,7 @@ for (let z = 20; z < W; z += STEP) for (let x = 20; x < W; x += STEP) {
   if (sites.some((s) => Math.hypot(px - s.x, pz - s.y) < 210)) continue;
   const [dr, kr] = rvq(px, pz); if (kr >= 0 && dr < RVW[kr] * 1.5) continue;
   if (nearLake(px, pz, 1.3)) continue;
+  { const rd = roadDist(px, pz); if (rd < 30 || (rd < 66 && hash(Math.round(px * 3), Math.round(pz * 3)) < (66 - rd) / 36)) continue; }
   if (bsw > .3) { if (rnd() < .3 + bsw * .15) SP[rnd() < .5 ? 'dead' : 'willow'].push([px, hAt(px, pz), pz, .7 + rnd() * .7, rnd()]); continue; }
   if (bd > .12 && bd <= .45 && rnd() < .05) { SP.acacia.push([px, hAt(px, pz), pz, .7 + rnd() * .8, rnd()]); continue; }
   if (bd > .45) { const oasis = kr >= 0 && dr < RVW[kr] * 4.5; if (rnd() < (oasis ? .5 : .045 * (bd - .4)) ) SP[oasis ? 'palm' : 'cactus'].push([px, hAt(px, pz), pz, .7 + rnd() * .7, rnd()]); continue; }

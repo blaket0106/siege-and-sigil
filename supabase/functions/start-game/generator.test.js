@@ -442,6 +442,18 @@ test('trails: rivers are walls, crossed only at river castles', () => {
   }
 });
 
+test('strategic placement: big neutral castles sit on chokepoints and small ones are outposts', () => {
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  for (const c of TRAIL_CASES) {
+    const layout = trailLayout(c);
+    const neutral = layout.territories.filter((t) => !t.junction && !t.crossing && t.owner_seat === null);
+    const big = neutral.filter((t) => t.tier === 3);
+    const small = neutral.filter((t) => t.tier === 1);
+    assert.ok(big.length > 0 && small.length > 0);
+    assert.ok(mean(big.map((t) => t.choke)) > mean(small.map((t) => t.choke)), 'tier 3 castles should be more central than tier 1 castles');
+  }
+});
+
 test('trails: river castles are low-tier neutral posts standing on a river, each bridging two banks', () => {
   for (const c of TRAIL_CASES) {
     const layout = trailLayout(c);

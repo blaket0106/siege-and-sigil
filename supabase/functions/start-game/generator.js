@@ -873,6 +873,21 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
       layout.edges = world.links(LINK_CAP * spacing).map((l) => ({ a: l.a, b: l.b, kind: l.kind, length: round4(l.length), move_cost_mult: l.mult, defense_mult: 1 }));
     }
   }
+  if (!mirrored && starScatter !== 'twin_rings') {
+    const isCastle = territories.map((t) => !t.junction);
+    const cb = betweenness(territories.length, layout.edges, isCastle);
+    const peak = Math.max(1e-9, ...cb.filter((_, i) => isCastle[i]));
+    const srng = makeRng(seed, 11);
+    const idx = territories.map((_, i) => i).filter((i) => !territories[i].junction && !territories[i].crossing && territories[i].owner_seat === null);
+    const score = new Map(idx.map((i) => [i, cb[i] / peak + (srng() - 0.5) * 0.24]));
+    const values = idx.map((i) => territories[i].natural_resources).sort((x, y) => y - x);
+    idx.sort((x, y) => score.get(y) - score.get(x));
+    idx.forEach((i, k) => {
+      const natural = values[k];
+      const tier = tierOf(natural);
+      Object.assign(territories[i], { tier, natural_resources: natural, troops: startingGarrison * tier, treasury_level: tier - 1, resources: natural });
+    });
+  }
   layout.world_scale = scale;
 
   return layout;
