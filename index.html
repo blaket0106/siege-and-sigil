@@ -438,7 +438,7 @@
     }
 
     const TOUCH_DEVICE = window.innerWidth < 900 || window.matchMedia('(pointer: coarse)').matches;
-    const FLIGHT = { alt: 170, pitch: (9 * Math.PI) / 180, speed: 32, fov: 48, fog: 2.4, sun: { el: 9, az: 248 }, horizon: 0xe9b48a, exposure: 1.15 };
+    const FLIGHT = { alt: 170, pitch: (23 * Math.PI) / 180, speed: 32, fov: 48, fog: 2.4, sun: { el: 9, az: 248 }, horizon: 0xe9b48a, exposure: 1.15 };
 
     function loginWorld(opts, seed0) {
       const src = 'self.onmessage = async (e) => { try { const m = await import(e.data.url); self.postMessage({ ok: true, layout: m.generateWorld(e.data.opts) }); } catch (err) { self.postMessage({ ok: false, error: String((err && err.message) || err) }); } };';

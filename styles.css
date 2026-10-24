@@ -583,7 +583,7 @@ svg.hide-plates .lbl-plate, svg.hide-armies .lbl-army, svg.hide-infra .lbl-infra
 
 body.on-login #stage, body.on-login::after { display: none; }
 .login { --text: #ecdfc2; --dim: #b5a687; --faint: #7e7259; --gilt: #d6ab52; --gilt-hi: #f5dc94; --gilt-lo: #8d6a28; --rule: #7a5e32; --rule-soft: #3d2d1b; --gules: #9c2e26; --gules-hi: #cf5246; --recess: rgba(0, 0, 0, 0.42); --text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75); position: fixed; inset: 0; overflow: hidden; background: #07090d; color: var(--text); z-index: 3; }
-.login-poster { position: absolute; inset: 0; background: url('assets/login-still-wide.jpg') center / cover no-repeat, radial-gradient(ellipse 90% 55% at 66% 80%, rgba(233, 160, 96, 0.5), transparent 62%), linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
+.login-poster { position: absolute; inset: 0; background: url('assets/login-still-wide.jpg') center bottom / auto 142% no-repeat, radial-gradient(ellipse 90% 55% at 66% 80%, rgba(233, 160, 96, 0.5), transparent 62%), linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
 .flyover { position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s ease; }
 .flyover.on { opacity: 1; }
 .flyover #ui, .flyover #labels, .flyover #load { display: none !important; }
@@ -597,7 +597,7 @@ body.on-login #stage, body.on-login::after { display: none; }
 .login .rule { width: 210px; margin: 14px auto 12px; }
 .login .lede { font-size: 1.12rem; color: var(--dim); }
 .login-rail .auth-card { background: none; border: 0; box-shadow: none; padding: 0; width: 100%; margin-top: 14px; text-align: left; }
-.login-rail .auth-card .tabs button { padding: 9px; }
+.login-rail .auth-card .tabs button { padding: 9px 4px; white-space: nowrap; letter-spacing: 0.12em; }
 .login-rail .auth-card .switch { display: none; text-align: center; margin-top: 14px; }
 .login-rail .roster { margin-top: auto; padding-top: 16px; }
 .login .lower { position: absolute; left: 420px; bottom: 34px; font-family: var(--font-display); letter-spacing: 0.22em; font-size: 0.78rem; color: rgba(245, 220, 148, 0.85); text-shadow: 0 2px 8px #000; opacity: 0; transition: opacity 1.6s; pointer-events: none; }
@@ -621,6 +621,17 @@ body.on-login #stage, body.on-login::after { display: none; }
   .login-rail .auth-card { margin-top: 6px; }
   .login .lower { display: none; }
   .login-poster { background: url('assets/login-still-tall.jpg') center top / cover no-repeat, linear-gradient(180deg, #0a1428 0%, #223350 42%, #b0795a 72%, #231a14 100%); }
+}
+@media (min-width: 900px) and (max-height: 880px) {
+  .login-rail { padding: 18px 36px 14px; }
+  .login .bigcrest { width: 92px; margin-top: 0; }
+  .login h1 { font-size: 1.45rem; margin-top: 12px; }
+  .login .rule { margin: 10px auto 8px; }
+  .login .lede { font-size: 1.02rem; }
+  .login-rail .auth-card { margin-top: 8px; }
+  .login-rail .roster { padding-top: 8px; }
+  .login .housebtn, .login .housebtn:hover:not(:disabled), .login .housebtn:active:not(:disabled) { padding: 3px 4px 6px; }
+  .login .housename { margin-top: 6px; }
 }
 @media (max-width: 860px) {
   .house { padding: 18px 16px 16px; }
