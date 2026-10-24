@@ -425,7 +425,12 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .hud-id { display: flex; align-items: center; gap: 12px; }
 .hud-id b { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.05em; font-size: 1.05rem; line-height: 1.1; color: var(--gilt-hi); text-shadow: 0 1px 0 #000; }
 .hud-id .sub { color: #b5a687; font-size: 0.9rem; font-style: italic; }
-.meter { flex: 1 1 220px; max-width: 440px; min-width: 170px; }
+.meter { flex: 1 1 220px; max-width: 440px; min-width: 110px; }
+.hud > * { flex-shrink: 0; }
+.hud > .meter { flex-shrink: 1; }
+.hud > .hud-id { flex-shrink: 1; min-width: 0; }
+.hud button, .hud .stat, .hud .tag, .hud label.check { white-space: nowrap; }
+@media (min-width: 900px) { .hud { flex-wrap: nowrap; gap: 8px 14px; } .hud button { padding-left: 11px; padding-right: 11px; } .hud-id > div:last-child { min-width: 0; } .hud-id b { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 .meter-label { display: flex; justify-content: space-between; font-family: var(--font-display); font-weight: 600; letter-spacing: 0.08em; font-size: 0.66rem; color: #b5a687; margin-bottom: 5px; }
 .meter-label b { color: var(--gilt-hi); font-weight: 700; }
 .meter-track { position: relative; height: 14px; border-radius: 2px; background: #07040a; border: 1px solid #000; box-shadow: 0 0 0 1px var(--gilt-lo), inset 0 2px 5px rgba(0, 0, 0, 0.9); overflow: hidden; }
@@ -1082,3 +1087,48 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .sgbar-fill.low { background: linear-gradient(90deg, #b0382c, #e0685c); }
 .sgbar-note { font-size: 11px; opacity: .75; margin-top: 4px; line-height: 1.35; }
 .bn.starving { filter: saturate(.55) brightness(.85); }
+
+.mk-layer, .castles-layer { display: inline; }
+.mk-layer { display: none; }
+svg.mk-on .mk-layer { display: inline; }
+svg.mk-on .castles-layer { display: none; }
+.mk-i { transform: scale(var(--mk, 1)); transform-origin: 0 0; }
+.mk text { paint-order: stroke; stroke: #000; stroke-width: 3px; stroke-linejoin: round; font-family: Cinzel, serif; font-weight: 700; text-anchor: middle; pointer-events: none; }
+.mk .mk-name { display: none; }
+svg.mk-names .mk .mk-name { display: inline; }
+.mk-threat { animation: mkPulse 1s ease-in-out infinite; }
+@keyframes mkPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.ak { display: none; }
+svg.mk-on .ak { display: inline; }
+svg.mk-on .army-fig { display: none; }
+.ak text { paint-order: stroke; stroke: #000; stroke-width: 3px; stroke-linejoin: round; font-family: Cinzel, serif; font-weight: 700; text-anchor: middle; pointer-events: none; }
+.enemyline { animation: none; }
+@media (prefers-reduced-motion: reduce) { .mk-threat { animation: none; } }
+.ak .mk-name { display: none; }
+svg.mk-names .ak .mk-name { display: inline; }
+
+svg.mk-on .terrain-layer { filter: saturate(0.6) brightness(0.82); }
+.legend .lsw { position: static; inset: auto; width: 22px; height: 22px; vertical-align: middle; margin-right: 4px; display: inline-block; }
+.legend .lnote { font-size: 0.78rem; opacity: 0.85; margin-top: 3px; max-width: 190px; line-height: 1.3; }
+.map3d .bn.threat .rb { box-shadow: 0 0 0 2px #ff3b2a; animation: mkPulse 1s ease-in-out infinite; }
+.map3d .bn.threat .rb b::after { content: " !"; color: #ff6a5a; }
+
+.ctable-wrap { max-height: 60vh; overflow: auto; border: 1px solid var(--rule-soft, rgba(214, 171, 82, 0.3)); border-radius: 6px; }
+.ctable { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.ctable th, .ctable td { padding: 5px 8px; text-align: left; border-bottom: 1px solid rgba(214, 171, 82, 0.15); }
+.ctable th { position: sticky; top: 0; background: #20160d; color: #f5dc94; font-weight: 600; }
+.ctable td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ctable tbody tr { cursor: pointer; }
+.ctable tbody tr:hover { background: rgba(245, 220, 148, 0.08); }
+.ctable tr.threat td { color: #ff7a68; }
+.cdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; border: 1.5px solid #fff; vertical-align: middle; }
+@media (max-width: 760px) {
+  .hud { flex-wrap: nowrap; overflow-x: auto; gap: 8px 10px; padding: 6px 10px 9px; scrollbar-width: none; }
+  .hud::-webkit-scrollbar { display: none; }
+  .hud > .meter { flex: 0 0 150px; min-width: 120px; }
+  .hud label.check, .hud .stat span { display: none; }
+  .hud-id .sub { font-size: 0.78rem; }
+  .mapbody { flex-direction: column; }
+  .mapwrap { flex: 1 1 54vh; min-height: 46vh; }
+  .side { flex: 0 0 auto; max-height: 36vh; }
+}

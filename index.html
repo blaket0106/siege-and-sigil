@@ -42,7 +42,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
+    const GAME_COLS = 'id, name, status, neutral_armory, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
 
     function watchGame(gameId, onRefresh) {
       const channel = sb.channel('game:' + gameId, { config: { private: true } })
@@ -755,6 +755,20 @@
           h('button', { class: 'ghost', onclick: () => sb.auth.signOut() }, DEV_GUEST ? 'New guest' : 'Sign out')));
     }
 
+    const pluralN = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+    const combatSim = (aT, aD, dT, dD, defFirst = true) => {
+      const rounds = [[aT, dT]];
+      let a = aT;
+      let d = dT;
+      for (let g = 0; g < 2000 && a > 0 && d > 0; g++) {
+        if (defFirst) { a = Math.max(0, a - dD); if (a > 0 && d > 0) d = Math.max(0, d - aD); } else { d = Math.max(0, d - aD); if (a > 0 && d > 0) a = Math.max(0, a - dD); }
+        rounds.push([a, d]);
+      }
+      return rounds;
+    };
+    const troopsNeeded = (dT, dD, aD) => dD * Math.ceil(dT / Math.max(1, aD)) + 1;
+
     const MANUAL = [
       { id: 'basics', group: 'Start here', title: 'The basics', blocks: [
         ['p', 'Siege & Sigil is a game of castles and armies. You lead a house. Take [[map|castles]], grow their [[economy|income]], and hold more of the realm than anyone else. There are no dice: every [[battles|fight]] is arithmetic, so the player who plans better wins.'],
@@ -785,9 +799,17 @@
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
           ['8', 'The side panel. Info shows what you have selected, News lists events, Inbox holds messages and reports, Chat is the game channel.'],
-          ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]).'],
+          ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions in the Info tab.'],
+        ['h', 'Finding your way'],
+        ['list', [
+          'Castles opens a table of every castle you hold with troops, income and who is threatening it. Home flies the map back to your starting castle.',
+          'A red chip in the top bar means one of your castles is under threat. Click it to jump to the castle.',
+          'Zoomed out, castles and armies turn into coloured markers that stay readable at any distance. Names appear as you zoom in.',
+          'Returning after time away shows a "since you were last here" summary, and an army arriving at a castle pops up a notice.',
+          'On a phone the map sits above the side panel and the top bar scrolls sideways.',
+        ]],
       ] },
       { id: 'lore', group: 'The world', title: 'History of the realm', blocks: [
         ['p', 'For four hundred years the Aldermark was one realm, the Concord of the Eight Seals. Eight great houses each held a seal, and a castle belonged to whoever held a charter stamped with the Throne\'s seal and their own house\'s. The Great Roads joined every chartered castle, kept by Road-Wardens who set a milestone and a signpost at every crossroads.'],
@@ -832,7 +854,7 @@
         ] }],
         ['h', 'How production works'],
         ['list', [
-          'A production cycle is 12 ticks by default. Gold is paid in one lump at the end of each cycle.',
+          'A production cycle is 24 ticks by default. Gold is paid in one lump at the end of each cycle. Troops arrive a little every tick, so the count on a castle goes up between cycles.',
           'Gold per cycle = total Treasury levels, times 10 plus 2 for every level of your [[areas|Mint]].',
           'Troops arrive a little every tick. Over a cycle a castle produces its Recruitment level times (4 plus your [[areas|Barracks]] level).',
           'Prestige arrives every tick and goes to the [[areas|realm area]] you are currently building.',
@@ -935,6 +957,8 @@
         ['calc'],
         ['h', 'Fighting in the open'],
         ['p', 'When two armies meet on the [[marching|trail]], both are attackers with no defender bonus. The side with the higher initiative ([[areas|Watchtowers]] level plus the leader\'s [[commanders|Tactics]]) strikes first. The loser is destroyed.'],
+        ['h', 'Taking this castle'],
+        ['p', 'Select an enemy or neutral castle and the "Taking this castle" panel shows the defenders, the damage each side deals and how many troops you need, using the same arithmetic as the battle. It also shows whether your strongest idle army is enough. Neutral castles are exact; an enemy garrison you cannot see is an estimate. The march preview shows the same odds before you commit.'],
         ['h', 'Allies'],
         ['p', '[[diplomacy|Allied]] armies fight as one side using the best Armory among them, and the defending team gets the +1.'],
       ] },
@@ -948,6 +972,7 @@
           'A friendly army that reaches the castle fights the besiegers in the open. A win lifts the siege.',
           'The besieger can break off and [[marching|assault]] at any time.',
         ]],
+        ['p', 'While you besiege, the castle panel shows a siege bar: ticks under siege and the garrison left.'],
         ['note', 'A sieging army can be caught by a relief force. Keep the besiegers strong enough to beat what is coming.'],
       ] },
       { id: 'fog', group: 'War', title: 'Fog of war', blocks: [
@@ -1035,7 +1060,7 @@
           ['Natural resources', 'How rich a castle is; richer castles upgrade more cheaply ([[map#natural-wealth|Natural wealth]]).'],
           ['Pass', 'A gap in a mountain range, held by a pass castle ([[map#rivers-and-mountains|Rivers and mountains]]).'],
           ['Prestige', 'Points that level up your realm areas ([[areas|Realm areas]]).'],
-          ['Production cycle', 'The interval at which gold is paid; 12 ticks by default ([[economy#how-production-works|Production]]).'],
+          ['Production cycle', 'The interval at which gold is paid; 24 ticks by default ([[economy#how-production-works|Production]]).'],
           ['Rank', 'The total of a commander\'s ability levels, capped at 20 ([[commanders#growing-stronger|Growing stronger]]).'],
           ['Recall', 'Send a marching army back to where it started ([[marching#changing-your-mind|Changing your mind]]).'],
           ['Relief', 'A friendly army that breaks a siege ([[sieges|Sieges]]).'],
@@ -1138,17 +1163,7 @@
         const A = { t: Math.max(0, Math.floor(Number(aT.value))), dmg: Math.max(1, Math.floor(Number(aD.value))) };
         const D = { t: Math.max(0, Math.floor(Number(dT.value))), dmg: Math.max(1, Math.floor(Number(dD.value))) + (mode === 'castle' ? 1 : 0) };
         const defFirst = mode === 'castle';
-        const F = defFirst ? D : A;
-        const S = defFirst ? A : D;
-        const rounds = [[A.t, D.t]];
-        let a = A.t; let d = D.t;
-        for (let guard = 0; guard < 400 && a > 0 && d > 0; guard++) {
-          const hitF = defFirst ? () => { a = Math.max(0, a - F.dmg); } : () => { d = Math.max(0, d - F.dmg); };
-          const hitS = defFirst ? () => { d = Math.max(0, d - S.dmg); } : () => { a = Math.max(0, a - S.dmg); };
-          hitF();
-          if (a > 0 && d > 0) hitS();
-          rounds.push([a, d]);
-        }
+        const rounds = combatSim(A.t, A.dmg, D.t, D.dmg, defFirst);
         return { rounds, A, D };
       };
       const draw = () => {
@@ -1158,7 +1173,7 @@
         slider.value = String(i);
         const [a, d] = rounds[i];
         const last = rounds[rounds.length - 1];
-        const verdict = last[0] === 0 && last[1] === 0 ? 'Both sides are empty.' : last[1] === 0 ? `Attacker wins with ${last[0]} troops left.` : last[0] === 0 ? `Defender wins with ${last[1]} troops left.` : '';
+        const verdict = last[0] === 0 && last[1] === 0 ? 'Both sides are empty.' : last[1] === 0 ? `Attacker wins with ${pluralN(last[0], 'troop')} left.` : last[0] === 0 ? `Defender wins with ${pluralN(last[1], 'troop')} left.` : '';
         const bar = (who, now, start, cls) => h('div', { class: 'cbarrow' }, h('span', {}, who), h('div', { class: 'cbar' }, h('i', { class: cls, style: `width:${start ? (100 * now) / start : 0}%` })), h('b', {}, String(now)));
         out.replaceChildren(
           bar('Attacker', a, A.t, 'att'), bar('Defender', d, D.t, 'def'),
@@ -1606,12 +1621,14 @@
         if (mine.error) toast(mine.error.message);
         else {
           const rows = (mine.data || []).filter((r) => r.games).sort((a, b) => b.games.id - a.games.id);
+          campaignsB.textContent = String(((state.profile && state.profile.total_games) || 0) + rows.filter((r) => r.games.status !== 'finished').length);
           bannerGrid.replaceChildren(...rows.map(banner), h('button', { class: 'banner new', onclick: createDialog },
             h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), h('span', {}, rows.length ? 'Raise another campaign' : 'Raise your first campaign')));
         }
       };
 
       const profile = state.profile || {};
+      const campaignsB = h('b', {}, profile.total_games ?? 0);
       crestHolder.replaceChildren(emblem(150, { draw: !state.homeDrawn }));
       state.homeDrawn = true;
 
@@ -1621,7 +1638,7 @@
             crestHolder,
             h('h2', { onclick: renameDialog, title: 'Change your name', style: 'cursor:pointer' }, profile.display_name || 'Lord'),
             h('div', { class: 'record' },
-              h('div', {}, h('b', {}, profile.total_games ?? 0), 'campaigns'),
+              h('div', {}, campaignsB, 'campaigns'),
               h('div', {}, h('b', {}, profile.total_wins ?? 0), 'victories'),
               h('div', {}, h('b', {}, profile.honor ?? 0), 'honor')),
             h('div', { class: 'actions' },
@@ -2021,8 +2038,8 @@
         mirror.el.classList.toggle('off', !okMirror);
         const mins = (SPEED_CARDS.find((c) => c[0] === speed.value) || [])[3];
         cycleHelp.textContent = mins
-          ? `Gold is paid and troops arrive in full every ${cycle.value || 24} ticks. At this speed that is every ${lengthText((cycle.value || 24) * mins)}.`
-          : `Gold is paid and troops arrive in full every ${cycle.value || 24} ticks.`;
+          ? `Gold is paid every ${cycle.value || 24} ticks, which at this speed is every ${lengthText((cycle.value || 24) * mins)}. Troops arrive a little every tick and are fully counted over each cycle.`
+          : `Gold is paid every ${cycle.value || 24} ticks. Troops arrive a little every tick and are fully counted over each cycle.`;
         turnBlock.hidden = speed.value !== 'turn_based';
       };
 
@@ -3007,7 +3024,7 @@
         tag ? sv('g', { class: 'lbl-plate', style: 'pointer-events:none' },
           sv('rect', { x: -(tag[1].length * 6.4 + 10) / 2, y: -W * 1.3 - 14, width: tag[1].length * 6.4 + 10, height: 17, rx: 8, fill: 'rgba(16,11,6,0.82)', stroke: tag[2], 'stroke-width': 1.3 }),
           sv('text', { x: 0, y: -W * 1.3 - 2, 'text-anchor': 'middle', 'font-size': 10.5, style: `fill:${tag[2]};font-family:Cinzel,serif;font-weight:700` }, tag[1])) : null,
-        showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'lbl-infra', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
+        showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'lbl-infra', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `T${t.treasury_level} · R${t.industry_level} · P${t.prestige_level}`) : null,
         here.map((c, i) => sv('circle', {
           cx: (i - (here.length - 1) / 2) * 16, cy: dotY, r: c.role === 'king' ? 7 : 5.8, fill: colors.cmd(c.owner_player_id),
           stroke: cmdSel(c) ? '#fff' : (c.role === 'king' ? '#f5dc94' : '#000'), 'stroke-width': c.role === 'king' ? 2 : 1.4, style: 'cursor:pointer',
@@ -3092,7 +3109,7 @@
       const calc = () => {
         firstRow.style.display = mode.value === 'field' ? '' : 'none';
         const r = resolveFight(mode.value, { troops: Number(aT.value), damage: Number(aD.value) }, { troops: Number(dT.value), damage: Number(dD.value) }, first.value);
-        result.replaceChildren(h('b', {}, r.winner ? `${r.winner[0].toUpperCase()}${r.winner.slice(1)} wins with ${r.left} troops left` : 'Both sides are empty'), h('div', { style: 'color:var(--dim);margin-top:4px' }, r.note));
+        result.replaceChildren(h('b', {}, r.winner ? `${r.winner[0].toUpperCase()}${r.winner.slice(1)} wins with ${pluralN(r.left, 'troop')} left` : 'Both sides are empty'), h('div', { style: 'color:var(--dim);margin-top:4px' }, r.note));
       };
       [mode, first, aT, aD, dT, dD].forEach((el) => { el.addEventListener('input', calc); el.addEventListener('change', calc); });
       calc();
@@ -3180,7 +3197,7 @@
       const hud = h('div', { class: 'hud' });
       const sideEl = h('div', { class: 'side' });
       const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
-      const L = { terrain: sv('g'), rivers: sv('g'), crossings: sv('g'), fog: sv('g'), cells: sv('g'), edges: sv('g'), junctions: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      const L = { terrain: sv('g', { class: 'terrain-layer' }), rivers: sv('g'), crossings: sv('g'), fog: sv('g'), cells: sv('g'), edges: sv('g'), junctions: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g', { class: 'castles-layer' }), marks: sv('g', { class: 'mk-layer' }), dyn: sv('g') };
       svg.append(sv('defs', {},
         sv('radialGradient', { id: 'gDirt' }, sv('stop', { offset: '0', 'stop-color': '#8a6a3c', 'stop-opacity': 0.62 }), sv('stop', { offset: '0.6', 'stop-color': '#6f5530', 'stop-opacity': 0.4 }), sv('stop', { offset: '1', 'stop-color': '#4a3a20', 'stop-opacity': 0 })),
         sv('radialGradient', { id: 'gShadow' }, sv('stop', { offset: '0', 'stop-color': '#000', 'stop-opacity': 0.5 }), sv('stop', { offset: '1', 'stop-color': '#000', 'stop-opacity': 0 })),
@@ -3401,7 +3418,7 @@
 
       const act = (btn, fn) => run(btn, async () => {
         await fn();
-        await load();
+        load({ lite: true });
       });
 
       const addStop = (id) => {
@@ -3463,14 +3480,20 @@
         L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])));
         L.junctions.replaceChildren(...[...ms.t.values()].filter((t) => t.is_junction).map((t) => cross(t.x, t.y)));
         svg.parentElement.style.background = ms.game.fog_dark ? '#000' : '#0e2f4f';
-        if (!svg.parentElement.querySelector('.legend')) {
-          const dot = (style) => h('span', { class: 'ldot', style });
-          svg.parentElement.append(h('div', { class: 'legend' },
-            h('div', {}, dot('border-color:#f0cf7d;box-shadow:0 0 0 2px #f0cf7d'), 'Yours'),
-            h('div', {}, dot('border-color:#c0453a'), 'Other players'),
-            h('div', {}, dot('border-color:#9aa3b2'), 'Unclaimed'),
-            h('div', {}, dot('border-color:#5b6270;border-style:dashed'), 'Unknown')));
-        }
+        if (!svg.parentElement.querySelector('.legend')) svg.parentElement.append(h('div', { class: 'legend' }));
+      };
+
+      const paintLegend = () => {
+        const box = svg.parentElement.querySelector('.legend');
+        if (!box) return;
+        const swatch = (fill, dashed) => sv('svg', { width: 26, height: 18, viewBox: '-15 -9 30 18', class: 'lsw' }, sv('ellipse', { cy: 2, rx: 12, ry: 5, fill: 'none', stroke: fill, 'stroke-width': 3, 'stroke-dasharray': dashed ? '3 3' : null }), sv('path', { d: 'M-5 3v-9h2v2h2v-2h2v2h2v-2h2v9z', fill: '#d8ceb4', stroke: '#2a2216', 'stroke-width': 0.7 }));
+        const rows = [h('div', {}, sv('svg', { width: 26, height: 18, viewBox: '-15 -9 30 18', class: 'lsw' }, sv('ellipse', { cy: 2, rx: 13.5, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 1.2 }), sv('ellipse', { cy: 2, rx: 12, ry: 5, fill: 'none', stroke: color(ms.me.id), 'stroke-width': 3 }), sv('path', { d: 'M-5 3v-9h2v2h2v-2h2v2h2v-2h2v9z', fill: '#d8ceb4', stroke: '#2a2216', 'stroke-width': 0.7 })), 'You')];
+        [...ms.players.values()].filter((p) => p.id !== ms.me.id).forEach((p) => rows.push(h('div', {}, swatch(color(p.id)), (p.display_name || 'House').slice(0, 16))));
+        rows.push(h('div', {}, swatch('#b9b09a', true), 'Unclaimed'));
+        rows.push(h('div', { class: 'lnote' }, h('b', {}, '12'), ' troops in the castle, ? if out of sight'));
+        rows.push(h('div', { class: 'lnote' }, 'T R P: treasury, recruitment, prestige levels'));
+        rows.push(h('div', { class: 'lnote' }, h('span', { style: 'color:#ff6a5a' }, 'Pulsing red ring'), ': an enemy army is heading there'));
+        box.replaceChildren(...rows);
       };
 
       const render = () => {
@@ -3507,6 +3530,16 @@
 
         const cells = [];
         const castles = [];
+        const marks = [];
+        const threatened = new Set();
+        ms.cmd.forEach((c) => {
+          if (c.status !== 'moving' || c.owner_player_id === ms.me.id || isFriend(c.owner_player_id) || !commanderSeen(c, tf)) return;
+          const mv = ms.mov.get(c.id);
+          const dest = mv && (mv.to_territory_id != null ? mv.to_territory_id : mv.path[mv.path.length - 1]);
+          const dt = dest != null ? ms.t.get(dest) : null;
+          if (dt && dt.owner_player_id === ms.me.id) threatened.add(dest);
+        });
+        ms.threats = [...threatened];
         ms.t.forEach((t) => {
           if (t.is_junction) return;
           const seen = ms.vis.has(t.id);
@@ -3540,9 +3573,30 @@
             : sv('g', {}, sv('circle', { cx: 0, cy: 0, r: 8 + 3 * tier, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }), sv('text', { x: 0, y: -8 - 3 * tier - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'));
           g.setAttribute('transform', `translate(${t.x},${t.y}) scale(${k},${k})`);
           castles.push(g);
+          const oc = owner ? color(owner) : '#8a8478';
+          const count = showTroops ? String(t.troops) : '?';
+          const MW = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
+          const ms2 = tier >= 3 ? 1.0 : tier === 2 ? 1.15 : 1.35;
+          const cw = count.length * 9 + 14;
+          marks.push(sv('g', { class: 'mk', transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${seen ? 1 : 0.7}`, onclick: pick },
+            sv('g', { class: 'mk-i' },
+              sv('circle', { cy: -8, r: 34, fill: 'transparent' }),
+              owner ? sv('ellipse', { cy: 4, rx: 40, ry: 17, fill: oc, opacity: 0.35, style: 'pointer-events:none' }) : null,
+              sv('ellipse', { cy: 4, rx: 30, ry: 11.5, fill: 'none', stroke: owner ? oc : '#b9b09a', 'stroke-width': owner ? 4 : 1.6, 'stroke-dasharray': owner ? null : '5 5', style: 'pointer-events:none' }),
+              mine ? sv('ellipse', { cy: 4, rx: 34, ry: 13.5, fill: 'none', stroke: '#f5dc94', 'stroke-width': 1.4, style: 'pointer-events:none' }) : null,
+              threatened.has(t.id) ? sv('ellipse', { class: 'mk-threat', cy: 4, rx: 44, ry: 19, fill: 'rgba(255,60,40,0.18)', stroke: '#ff4a3a', 'stroke-width': 3.5 }) : null,
+              sieged ? sv('ellipse', { cy: 4, rx: 38, ry: 16, fill: 'none', stroke: '#e0685c', 'stroke-width': 2.5, 'stroke-dasharray': '6 5' }) : null,
+              selected ? sv('ellipse', { cy: 4, rx: 36, ry: 15, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.5, 'stroke-dasharray': '8 6' }) : null,
+              sv('g', { transform: `scale(${(ms2 * 0.8).toFixed(3)})`, style: 'pointer-events:none' }, castleSprite(tier, t.terrain, oc, owner ? color2(owner) : '#5a574f')),
+              sv('rect', { x: -cw / 2, y: 14, width: cw, height: 20, rx: 4, fill: 'rgba(16,11,6,0.88)', stroke: owner ? oc : 'rgba(214,171,82,0.6)', 'stroke-width': owner ? 2.4 : 1.2 }),
+              sv('text', { y: 29, 'font-size': 14, fill: showTroops ? '#f5dc94' : '#9a8a64', style: 'stroke:none;paint-order:normal' }, count),
+              isCap ? sv('text', { y: -MW * 0.9, 'font-size': 14, fill: '#f5dc94' }, '♛') : null,
+              sv('text', { class: 'mk-name', y: 48, 'font-size': 11, fill: '#efe3c4' }, t.name))));
         });
         L.cells.replaceChildren(...cells);
         L.castles.replaceChildren(...castles);
+        L.marks.replaceChildren(...marks);
+        paintLegend();
 
         const nearLimit = 150 * 1.7 * S();
         L.edges.replaceChildren(...(trailsOn() ? [] : ms.edges).filter((e) => !ms.game.free_travel || e.length <= nearLimit).map((e) => {
@@ -3643,22 +3697,31 @@
           if (!m || !commanderSeen(c, tf)) return;
           const pos = movementPos(m, tf);
           const friend = isFriend(c.owner_player_id);
-          if (friend) {
+          {
             const pts = trailsOn() ? [`${pos.x},${pos.y}`, ...trailPoly(m.path.slice(pos.i)).map((q) => `${q.x},${q.y}`)] : [`${pos.x},${pos.y}`, ...m.path.slice(pos.i + 1).map((id) => `${ms.t.get(id).x},${ms.t.get(id).y}`)];
-            out.push(sv('polyline', { class: 'marchline', points: pts.join(' '), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', 'stroke-dasharray': '8 8', style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
+            const destT = ms.t.get(m.path[m.path.length - 1]);
+            const toMe = !friend && destT && destT.owner_player_id === ms.me.id;
+            out.push(sv('polyline', { class: friend ? 'marchline' : 'enemyline', points: pts.join(' '), fill: 'none', stroke: friend ? '#f5dc94' : toMe ? '#ff4a3a' : color(c.owner_player_id), 'stroke-width': friend ? 3.5 : toMe ? 4 : 2.6, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', 'stroke-dasharray': friend ? '8 8' : toMe ? '10 6' : '3 7', 'stroke-opacity': friend ? 1 : 0.85, style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
           }
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
           const label = friend ? String(c.troops) : '?';
           const nm = c.name ? String(c.name) : '';
           const bw = Math.max(34, label.length * 10 + 14, nm.length * 6.4 + 14);
           const lh = nm ? 31 : 17;
-          out.push(sv('g', { transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.3},${M() * 1.3})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
+          out.push(sv('g', { class: 'army-fig', transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.3},${M() * 1.3})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
             sv('ellipse', { cx: 2, cy: 2, rx: 11, ry: 3.6, fill: 'rgba(0,0,0,0.4)' }),
             sel ? sv('ellipse', { class: 'selring', cx: 0, cy: 1, rx: 17, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 2, 'stroke-dasharray': '6 5' }) : null,
             armyFigure(color(c.owner_player_id), color2(c.owner_player_id), armyTier(c.troops), (pos.dx || 0) < 0, Math.floor(Date.now() / 250)),
             sv('rect', { class: 'lbl-army', x: -bw / 2, y: 5, width: bw, height: lh, rx: 3, fill: 'rgba(16,11,6,0.85)', stroke: c.role === 'king' ? '#f5dc94' : 'rgba(214,171,82,0.6)', 'stroke-width': 1 }),
             nm ? sv('text', { class: 'lbl-army', x: 0, y: 16, 'text-anchor': 'middle', 'font-size': 10, style: 'fill:#efe3c4;font-family:Cinzel,serif;font-weight:600' }, nm) : null,
             sv('text', { class: 'lbl-army', x: 0, y: nm ? 29 : 17, 'text-anchor': 'middle', 'font-size': 13, style: 'fill:#f5dc94;font-family:Cinzel,serif;font-weight:700' }, label)));
+          const ang = (Math.atan2(pos.dy || 0, pos.dx || 1) * 180) / Math.PI;
+          const hostileToMe = !friend && !isFriend(c.owner_player_id);
+          out.push(sv('g', { class: 'ak', transform: `translate(${pos.x},${pos.y})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
+            sv('g', { class: 'mk-i' },
+              sv('polygon', { points: '15,0 -9,-10 -4,0 -9,10', transform: `rotate(${ang.toFixed(0)})`, fill: color(c.owner_player_id), stroke: hostileToMe ? '#ff4a3a' : '#0b0705', 'stroke-width': hostileToMe ? 3 : 2.5, 'stroke-linejoin': 'round' }),
+              sv('text', { y: -15, 'font-size': 13, fill: '#ffffff' }, label),
+              nm ? sv('text', { class: 'mk-name', y: 22, 'font-size': 10.5, fill: '#efe3c4' }, nm) : null)));
         });
         const nowMs = Date.now();
         ms.fx = (ms.fx || []).filter((f) => nowMs - f.t0 < 3700);
@@ -3714,7 +3777,7 @@
         ms.m3.update([...ms.t.values()].map((t) => {
           const seen = ms.vis.has(t.id);
           const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
-          return { id: t.id, owner, troops: seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war) ? t.troops : null, mine: owner === ms.me.id };
+          return { id: t.id, owner, troops: seen && (isFriend(t.owner_player_id) || !ms.game.fog_of_war) ? t.troops : null, mine: owner === ms.me.id, threat: !!(ms.threats && ms.threats.includes(t.id)) };
         }));
         ms.m3.select(ms.sel && ms.sel.type === 't' ? ms.sel.id : null);
         const routes = [];
@@ -3981,6 +4044,7 @@
             h('div', { class: 'meter-label' }, h('span', {}, 'Road to victory'), h('b', {}, `${mineN} of ${winAt}`)),
             h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))),
           g.paused_at && g.status === 'active' ? h('span', { class: 'tag gold' }, 'Paused') : null,
+          ms.threats && ms.threats.length ? h('button', { class: 'ghost', style: 'color:#ff7a68;border-color:#ff4a3a', title: 'Hostile armies are heading for your castles. Click to look at the first one.', onclick: () => { const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); } }, `${ms.threats.length} under threat`) : null,
           g.seasons_enabled && g.status === 'active' ? h('span', { class: 'tag gold' }, seasonLabel(g)) : null,
           g.time_limit_ticks && g.status === 'active' ? h('span', { class: 'tag' }, `Ends at tick ${g.time_limit_ticks}`) : null,
           ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { class: 'tag', style: 'color:var(--gules-hi);border-color:var(--gules)' }, 'Eliminated') : null,
@@ -3993,6 +4057,8 @@
           g.fog_of_war ? h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null,
           h('button', { class: 'ghost', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
           TOUCH_DEVICE ? null : h('button', { onclick: toggle3D }, ms.view3d ? '2D map' : '3D map'),
+          h('button', { class: 'ghost', onclick: castlesDialog, title: 'Every castle in one table' }, 'Castles'),
+          h('button', { class: 'ghost', onclick: () => ms.goHome && ms.goHome(), title: 'Back to your castles' }, 'Home'),
           h('button', { class: 'primary', onclick: menuDialog }, 'Menu'),
           h('button', { class: 'ghost', onclick: helpDialog }, 'Help')].filter(Boolean));
         updateCountdown();
@@ -4074,7 +4140,7 @@
           live ? h('div', { class: 'sec' }, h('b', {}, 'Upgrade everywhere, cheapest first'),
             h('div', { class: 'row wrap2' }, type, budget,
               h('button', {
-                onclick: (e) => order('bulk_upgrade_infrastructure', { p_infra_type: type.value, p_budget: Number(budget.value) || 1 }, (d) => `${d.upgraded} upgrades for ${d.spent} gold`)(e),
+                onclick: (e) => order('bulk_upgrade_infrastructure', { p_infra_type: type.value, p_budget: Number(budget.value) || 1 }, (d) => `${pluralN(d.upgraded, 'upgrade')} for ${d.spent} gold`)(e),
               }, 'Spend'))) : null,
         ];
       };
@@ -4102,7 +4168,7 @@
           out.push(h('div', { class: 'sgbar', title: 'Garrison strength compared with when the siege began' },
             h('div', { class: 'sgbar-top' }, h('span', {}, 'Garrison holding'), h('b', {}, `${Math.round(frac * 100)}%`)),
             h('div', { class: 'sgbar-track' }, h('div', { class: 'sgbar-fill' + (frac < 0.35 ? ' low' : frac < 0.65 ? ' mid' : ''), style: `width:${Math.round(frac * 100)}%` })),
-            h('div', { class: 'sgbar-note' }, `${t.troops} of ${sg.troops} troops left. The garrison starves about 3% a tick, and one level of Treasury, Recruitment or Prestige is lost each production cycle.`)));
+            h('div', { class: 'sgbar-note' }, `${pluralN(t.troops, 'troop')} left of ${sg.troops} when the siege began. The garrison starves about 3% a tick, and one level of Treasury, Recruitment or Prestige is lost each production cycle.`)));
         }
         if (t.owner_player_id === ms.me.id) {
           const defenders = ms.cmd.filter((c) => c.current_territory_id === t.id && c.status === 'idle' && isFriend(c.owner_player_id));
@@ -4188,7 +4254,7 @@
 
         const extras = [];
         if (t.owner_player_id === ms.me.id && t.garrison_commander_id !== c.id) {
-          extras.push(h('button', { onclick: order('assign_garrison_commander', { p_commander_id: c.id }, 'Now leads the garrison') }, 'Lead garrison'));
+          extras.push(h('button', { title: 'This commander takes charge of the castle and stays to defend it. Their abilities boost the garrison. Release them to send them out again.', onclick: order('assign_garrison_commander', { p_commander_id: c.id }, 'Now holds this castle') }, 'Hold this castle'));
         }
         if (!ms.cmd.some((x) => x.owner_player_id === ms.me.id && x.role === 'king')) {
           extras.push(h('button', { onclick: order('crown_commander', { p_commander_id: c.id }, (d) => `Crowned. Takes effect at tick ${d.effective_tick}`) }, 'Crown as king'));
@@ -4197,7 +4263,7 @@
 
         if (t.garrison_commander_id === c.id) {
           out.push(h('div', { style: 'color:var(--dim);margin-bottom:8px' }, 'Leads this garrison and cannot march.'),
-            h('button', { onclick: call('unassign_garrison_commander', { p_territory_id: t.id }, 'Released from the garrison') }, 'Release from garrison'));
+            h('button', { onclick: call('unassign_garrison_commander', { p_territory_id: t.id }, 'No longer holds the castle') }, 'Release from the castle'));
           return h('div', { class: 'sec' }, out);
         }
 
@@ -4228,7 +4294,7 @@
               h('option', { value: 'assault' }, 'Assault the castle'),
               h('option', { value: 'siege' }, 'Lay siege'));
             type.value = pv.type;
-            out.push(h('label', {}, 'On arrival'), type);
+            out.push(h('label', {}, 'On arrival'), type, assaultPreview(dest, c));
           }
           out.push(h('div', { class: 'row wrap2', style: 'margin-top:10px' },
             h('button', {
@@ -4311,7 +4377,7 @@
         if (c.status === 'moving' && m) {
           const to = ms.t.get(m.to_territory_id);
           const left = Math.max(0, m.arrival_tick - ms.game.current_tick);
-          const via = route && route.status === 'active' ? ` ${route.looping ? 'On a looping route' : 'On a route'} of ${route.stops.length} stops.` : '';
+          const via = route && route.status === 'active' ? ` ${route.looping ? 'On a looping route' : 'On a route'} of ${pluralN(route.stops.length, 'stop')}.` : '';
           return `Marching to ${to ? to.name : 'a castle'}, arriving tick ${m.arrival_tick} (${left} tick${left === 1 ? '' : 's'}).${via}`;
         }
         if (c.status === 'sieging' && at) return `Besieging ${at.name}.`;
@@ -4385,6 +4451,77 @@
             await loadNotes();
             toast('Note saved', true);
           }) }, 'Save note')));
+      };
+
+      const attackStats = (ids) => {
+        ms.atkStats = ms.atkStats || new Map();
+        const key = ids.slice().sort((x, y) => x - y).join(',');
+        let e = ms.atkStats.get(key);
+        if (!e) { e = { at: 0, data: null, p: null }; ms.atkStats.set(key, e); }
+        if (!e.p && Date.now() - e.at > 15000) {
+          e.at = Date.now();
+          e.p = sb.rpc('my_attack_stats', { p_game_id: gameId, p_commander_ids: ids }).then(({ data }) => { e.data = data; e.p = null; return data; });
+        }
+        return e;
+      };
+
+      const defenceEstimate = (t, myArmory) => {
+        if (!ms.vis.has(t.id) || typeof t.troops !== 'number') return null;
+        const mountain = t.terrain === 'mountain' ? 1 : 0;
+        if (t.owner_player_id == null) return { troops: t.troops, dmg: (ms.game.neutral_armory ?? 1) + 1 + mountain, exact: true, stationed: 0 };
+        const here = ms.cmd.filter((c) => c.current_territory_id === t.id && c.status === 'idle' && c.owner_player_id === t.owner_player_id && commanderSeen(c, tickF()) && typeof c.troops === 'number');
+        return { troops: t.troops + here.reduce((a, c) => a + c.troops, 0), dmg: myArmory + 1 + mountain, exact: false, stationed: here.length };
+      };
+
+      const strongestIdle = () => ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.troops > 0).sort((a, b) => b.troops - a.troops)[0] || null;
+
+      const assaultSection = (t) => {
+        if (!canAct() || t.is_junction || t.owner_player_id === ms.me.id || (t.owner_player_id && isFriend(t.owner_player_id))) return null;
+        const best = strongestIdle();
+        const box = h('div', {});
+        const paint = (st) => {
+          const est = defenceEstimate(t, st ? st.armory : 1);
+          const out = [h('b', {}, 'Taking this castle')];
+          if (!est) {
+            out.push(h('div', { class: 'empty' }, ms.vis.has(t.id) ? 'The garrison is not visible.' : 'The garrison is out of sight. Move a commander or a watchtower within range to see it.'));
+          } else {
+            const mine = st ? st.damage : 1;
+            out.push(line('Defenders', est.stationed ? `${est.troops} troops, ${est.troops - t.troops} with ${pluralN(est.stationed, 'commander')}` : `${est.troops} troops`),
+              line('Their damage per round', est.exact ? String(est.dmg) : `${est.dmg} (estimate)`),
+              line('Your damage per round', String(mine)),
+              h('div', { class: 'tip' }, 'The fewest troops you need to take it, by the damage per round you deal:'),
+              h('div', { class: 'needs' }, [1, 2, 3, 4].map((a) => h('span', { class: 'need' + (a === mine ? ' mine' : ''), style: a === mine ? 'outline:1px solid var(--gold2)' : '' }, h('b', {}, String(troopsNeeded(est.troops, est.dmg, a))), ` at ${a}`))));
+            const need = troopsNeeded(est.troops, est.dmg, mine);
+            if (best) {
+              const ok = best.troops >= need;
+              out.push(h('div', { style: `margin-top:6px;color:${ok ? '#7fd08a' : 'var(--gules-hi)'}` }, ok ? `${best.name} has ${best.troops} troops here: enough.` : `${best.name}, your strongest, has ${best.troops}. You need ${need - best.troops} more.`));
+            }
+            if (!est.exact) out.push(h('div', { class: 'tip' }, 'Estimate: assumes their Armory matches yours and their leader has no Valor. Real defence may be stronger.'));
+          }
+          box.replaceChildren(h('div', { class: 'sec' }, out));
+        };
+        const e = attackStats(best ? [best.id] : []);
+        paint(e.data);
+        if (!e.data && e.p) e.p.then(paint);
+        return box;
+      };
+
+      const assaultPreview = (dest, c) => {
+        const box = h('div', {});
+        const paint = (st) => {
+          const est = defenceEstimate(dest, st ? st.armory : 1);
+          if (!est || !st) { box.replaceChildren(h('div', { class: 'tip' }, 'The defenders are not visible, so the result cannot be predicted.')); return; }
+          const rounds = combatSim(c.troops, st.damage, est.troops, est.dmg, true);
+          const last = rounds[rounds.length - 1];
+          const win = last[1] === 0 && last[0] > 0;
+          box.replaceChildren(h('div', { class: 'sec' }, h('b', {}, 'If you assault'),
+            h('div', { style: `color:${win ? '#7fd08a' : 'var(--gules-hi)'};margin:4px 0` }, win ? `Predicted win: ${pluralN(last[0], 'troop')} left of ${c.troops}.` : `Predicted loss: ${c.troops} against ${est.troops} fails. You would need ${troopsNeeded(est.troops, est.dmg, st.damage)} troops.`),
+            h('div', { class: 'tip' }, `${rounds.length - 1} rounds. You deal ${st.damage} per round, they deal ${est.dmg}${est.exact ? '' : ' (estimate)'}. The defender strikes first.`)));
+        };
+        const e = attackStats([c.id]);
+        paint(e.data);
+        if (!e.data && e.p) e.p.then(paint);
+        return box;
       };
 
       const castleReportBox = (t) => {
@@ -4771,7 +4908,7 @@
               const cmdr = r.sides.flatMap((sd) => sd.commanders).find((c) => c.id === x.commander_id);
               return line(`${cmdr ? cmdr.name : 'Commander'} · ${ABILITY_NAMES[x.ability] || x.ability}`, `+${x.amount}${x.level_up ? ` (reached level ${x.level_up})` : ''}`);
             })) : null,
-        ];
+        ].filter(Boolean);
       };
 
       const feedRow = (tick, text, hot) => h('div', { class: 'line', style: `gap:10px;${hot ? 'color:var(--gold2)' : ''}` },
@@ -4779,6 +4916,39 @@
         h('span', { style: 'white-space:nowrap' }, `t${tick}`));
 
       const dipRow = (pid) => ms.dip.find((d) => d.player_a_id === pid || d.player_b_id === pid);
+
+      const castlesDialog = () => {
+        const state2 = { sort: 'troops', dir: -1, filter: 'all' };
+        const mineList = [...ms.t.values()].filter((t) => !t.is_junction && t.owner_player_id === ms.me.id);
+        const rows = [...ms.t.values()].filter((t) => !t.is_junction).map((t) => {
+          const seen = ms.vis.has(t.id);
+          const owner = seen ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
+          const near = mineList.length ? Math.min(...mineList.map((m) => Math.hypot(m.x - t.x, m.y - t.y))) : 0;
+          return { t, seen, owner, troops: seen && typeof t.troops === 'number' ? t.troops : null, near: Math.round(near / (150 * S()) * 10) / 10, threat: !!(ms.threats && ms.threats.includes(t.id)) };
+        });
+        const wrap = h('div', {});
+        const filterSel = selectOf({ all: 'All castles', mine: 'Yours', rivals: 'Other houses', neutral: 'Unclaimed', targets: 'Targets I can see' }, 'all');
+        const draw = () => {
+          const f = state2.filter;
+          let list = rows.filter((r) => f === 'all' || (f === 'mine' && r.owner === ms.me.id) || (f === 'rivals' && r.owner && r.owner !== ms.me.id) || (f === 'neutral' && !r.owner) || (f === 'targets' && r.owner !== ms.me.id && r.seen && r.troops !== null));
+          const val = (r) => (state2.sort === 'name' ? r.t.name : state2.sort === 'owner' ? (r.owner ? pname(r.owner) : 'zzz') : state2.sort === 'near' ? r.near : state2.sort === 'tier' ? r.t.tier : state2.sort === 'income' ? (r.seen ? (r.t.treasury_level || 0) : -1) : (r.troops === null ? -1 : r.troops));
+          list = list.sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * state2.dir || a.t.id - b.t.id; });
+          const th = (key, label) => h('th', { style: 'cursor:pointer;white-space:nowrap', onclick: () => { if (state2.sort === key) state2.dir *= -1; else { state2.sort = key; state2.dir = key === 'name' || key === 'owner' || key === 'near' ? 1 : -1; } draw(); } }, label + (state2.sort === key ? (state2.dir < 0 ? ' v' : ' ^') : ''));
+          wrap.replaceChildren(h('div', { class: 'row', style: 'margin-bottom:8px' }, filterSel), h('div', { class: 'ctable-wrap' }, h('table', { class: 'ctable' },
+            h('thead', {}, h('tr', {}, th('name', 'Castle'), th('owner', 'House'), th('troops', 'Troops'), th('tier', 'Tier'), th('income', 'T / R / P'), th('near', 'From you'))),
+            h('tbody', {}, list.map((r) => h('tr', { class: r.threat ? 'threat' : '', onclick: () => { select('t', r.t.id); if (ms.focusOn) ms.focusOn(r.t.id); } },
+              h('td', {}, h('span', { class: 'cdot', style: `background:${r.owner ? color(r.owner) : '#8a8478'}` }), r.t.name, r.threat ? ' !' : ''),
+              h('td', {}, r.owner ? pname(r.owner) : 'Unclaimed'),
+              h('td', { class: 'num' }, r.troops === null ? '?' : String(r.troops)),
+              h('td', { class: 'num' }, String(r.t.tier || 1)),
+              h('td', { class: 'num' }, r.seen && r.t.treasury_level != null ? `${r.t.treasury_level} / ${r.t.industry_level} / ${r.t.prestige_level}` : '?'),
+              h('td', { class: 'num' }, r.near ? `${r.near}` : '-')))))),
+            h('div', { class: 'tip' }, 'Click a column to sort and a row to look at the castle. "From you" is the distance from your nearest castle in castle spacings.'));
+        };
+        filterSel.addEventListener('change', () => { state2.filter = filterSel.value; draw(); });
+        draw();
+        modal('All castles', wrap, (close) => [h('button', { onclick: close }, 'Close')]);
+      };
 
       const sendGoldDialog = (p) => {
         const amount = h('input', { type: 'number', min: '1', max: String(ms.me.gold), value: String(Math.min(50, ms.me.gold) || 1) });
@@ -5042,6 +5212,7 @@
           parts.push(castleNotes(t));
           const crb = castleReportBox(t);
           if (crb) parts.push(crb);
+          parts.push(assaultSection(t));
           parts.push(castleThreat(t), castleSupply(t));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
           if (here.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Commanders here'), here.map(cmdRow)));
@@ -5141,11 +5312,29 @@
         return { x: view.x + (lx - (W - view.w * k) / 2) / k, y: view.y + (ly - (H - view.h * k) / 2) / k };
       };
       const toMap = (e) => toMapWith(ms.view, e);
+      const clampView = (v) => {
+        const f = ms.full;
+        if (!f) return v;
+        const w = Math.min(v.w, f.w * 1.04);
+        const h = w * (v.h / v.w);
+        const slack = w >= f.w ? (f.w - w) / 2 : 0;
+        const x = w >= f.w ? f.x + slack : Math.min(f.x + f.w - w, Math.max(f.x, v.x));
+        const y = h >= f.h ? f.y + (f.h - h) / 2 : Math.min(f.y + f.h - h, Math.max(f.y, v.y));
+        return { x, y, w, h };
+      };
       const onPrefs = () => applyView();
       window.addEventListener('ss-prefs', onPrefs);
+      const roMap = new ResizeObserver(() => { if (ms.view && !ms.view3d) applyView(); });
+      roMap.observe(svg);
+      state.cleanup.push(() => roMap.disconnect());
       state.cleanup.push(() => window.removeEventListener('ss-prefs', onPrefs));
       const applyView = () => {
         svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
+        const pxu = Math.min(svg.clientWidth / ms.view.w, svg.clientHeight / ms.view.h) || 1;
+        svg.style.setProperty('--mk', String(1 / pxu));
+        const plateW = 72 * (ms.terr ? M() * 1.3 : 1) * pxu;
+        svg.classList.toggle('mk-on', plateW < 60);
+        svg.classList.toggle('mk-names', 150 * S() * pxu > 70);
         const ratio = ms.full ? ms.view.w / ms.full.w : 1;
         const shown = (setting) => setting === 'always' || (setting === 'zoomed' && ratio < 0.5) || (setting === 'close' && ratio < 0.25);
         svg.classList.toggle('hide-plates', !shown(PREFS.plates));
@@ -5157,9 +5346,9 @@
         e.preventDefault();
         const pt = toMap(e);
         const v = ms.view;
-        const nw = Math.min(ms.full.w * 1.3, Math.max(ms.full.w / 40, v.w * Math.exp(e.deltaY * 0.0015)));
+        const nw = Math.min(ms.full.w * 1.04, Math.max(ms.full.w / 40, v.w * Math.exp(e.deltaY * 0.0015)));
         const k = nw / v.w;
-        ms.view = { x: pt.x - (pt.x - v.x) * k, y: pt.y - (pt.y - v.y) * k, w: nw, h: v.h * k };
+        ms.view = clampView({ x: pt.x - (pt.x - v.x) * k, y: pt.y - (pt.y - v.y) * k, w: nw, h: v.h * k });
         applyView();
       }, { passive: false });
 
@@ -5174,9 +5363,9 @@
       svg.addEventListener('touchmove', (e) => {
         if (!pinch || e.touches.length !== 2) return;
         e.preventDefault();
-        const nw = Math.min(ms.full.w * 1.3, Math.max(ms.full.w / 40, pinch.view.w * (pinch.d / touchDist(e.touches))));
+        const nw = Math.min(ms.full.w * 1.04, Math.max(ms.full.w / 40, pinch.view.w * (pinch.d / touchDist(e.touches))));
         const k = nw / pinch.view.w;
-        ms.view = { x: pinch.at.x - (pinch.at.x - pinch.view.x) * k, y: pinch.at.y - (pinch.at.y - pinch.view.y) * k, w: nw, h: pinch.view.h * k };
+        ms.view = clampView({ x: pinch.at.x - (pinch.at.x - pinch.view.x) * k, y: pinch.at.y - (pinch.at.y - pinch.view.y) * k, w: nw, h: pinch.view.h * k });
         applyView();
       }, { passive: false });
       svg.addEventListener('touchend', (e) => {
@@ -5195,7 +5384,7 @@
           if (Math.hypot(dx, dy) > 4) ms.dragged = true;
           if (!ms.dragged) return;
           const now = toMapWith(start.view, ev);
-          ms.view = { ...start.view, x: start.view.x + start.at.x - now.x, y: start.view.y + start.at.y - now.y };
+          ms.view = clampView({ ...start.view, x: start.view.x + start.at.x - now.x, y: start.view.y + start.at.y - now.y });
           applyView();
         };
         const up = () => {
@@ -5212,21 +5401,25 @@
       });
 
       let firstLoad = true;
-      const load = async () => {
+      const LITE_FETCH = new Set([0, 1, 2, 3, 8, 9]);
+      const load = async (opts = {}) => {
         if (state.view !== 'map' || state.roomId !== gameId) return;
-        const res = await Promise.all([
-          sb.rpc('get_game_view', { p_game_id: gameId }),
-          sb.from('game_moments').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
-          sb.from('player_inbox').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
-          sb.from('battle_reports').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
-          sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(150),
-          sb.from('message_threads').select('*').eq('game_id', gameId),
-          sb.from('thread_participants').select('*').eq('game_id', gameId),
-          ms.edgesAll && !ms.fogDark ? Promise.resolve({ data: ms.edgesAll }) : sb.rpc('get_game_edges', { p_game_id: gameId }),
-          sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
-          sb.rpc('my_world_events', { p_game_id: gameId }),
-          sb.rpc('my_council', { p_game_id: gameId }),
-        ]);
+        const lite = !!opts.lite && !!ms.lastRes;
+        const fetchers = [
+          () => sb.rpc('get_game_view', { p_game_id: gameId }),
+          () => sb.from('game_moments').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
+          () => sb.from('player_inbox').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
+          () => sb.from('battle_reports').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(100),
+          () => sb.from('game_chat').select('*').eq('game_id', gameId).order('id', { ascending: false }).limit(150),
+          () => sb.from('message_threads').select('*').eq('game_id', gameId),
+          () => sb.from('thread_participants').select('*').eq('game_id', gameId),
+          () => (ms.edgesAll && !ms.fogDark ? Promise.resolve({ data: ms.edgesAll }) : sb.rpc('get_game_edges', { p_game_id: gameId })),
+          () => sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
+          () => sb.rpc('my_world_events', { p_game_id: gameId }),
+          () => sb.rpc('my_council', { p_game_id: gameId }),
+        ];
+        const res = await Promise.all(fetchers.map((f, i) => (lite && !LITE_FETCH.has(i) ? Promise.resolve(ms.lastRes[i]) : f())));
+        ms.lastRes = res;
         if (state.view !== 'map' || state.roomId !== gameId) return;
 
         const [vw, mo, ib, br, ch, th, pt, ed, of, we, cn] = res;
@@ -5235,9 +5428,10 @@
         if (failed) { toast(failed.error.message); return; }
         const view = vw.data;
         const threadIds = th.data.map((t) => t.id);
-        const tm = threadIds.length
+        const tm = lite && ms.lastTm ? ms.lastTm : threadIds.length
           ? await sb.from('thread_messages').select('*').in('thread_id', threadIds).order('id', { ascending: false }).limit(500)
           : { data: [] };
+        ms.lastTm = tm;
         if (tm.error) { toast(tm.error.message); return; }
         if (state.view !== 'map' || state.roomId !== gameId) return;
         const prevTick = ms.game ? ms.game.current_tick : null;
@@ -5251,6 +5445,18 @@
         ms.serverSources = view.sources;
         ms.winAt = view.win_at;
         ms.explored = view.explored || null;
+        if (ms.cmd && ms.cmd.length && !ms.replay && ms.me) {
+          const before = new Map(ms.cmd.map((c) => [c.id, c]));
+          const arrived = [];
+          view.commanders.forEach((c) => {
+            const old = before.get(c.id);
+            if (old && c.owner_player_id === ms.me.id && old.status === 'moving' && (c.status === 'idle' || c.status === 'sieging') && c.current_territory_id) {
+              const dest = ms.t.get(c.current_territory_id);
+              arrived.push(`${c.name} ${c.status === 'sieging' ? 'laid siege to' : 'reached'} ${dest ? dest.name : 'a castle'}`);
+            }
+          });
+          if (arrived.length) { toast(arrived.slice(0, 2).join('. ') + (arrived.length > 2 ? ` and ${arrived.length - 2} more` : ''), true); Sfx.bell(); }
+        }
         ms.cmd = view.commanders;
         ms.captives = view.captives || [];
         ms.abil = new Map();
@@ -5338,13 +5544,52 @@
         }
         if (firstLoad) {
           firstLoad = false;
-          const pad = 40 * ((view.game && view.game.world_scale) || 1);
-          ms.full = { x: -pad, y: -pad, w: view.game.map_w + 2 * pad, h: view.game.map_h + 2 * pad };
+          const sc = (view.game && view.game.world_scale) || 1;
+          const castles = [...ms.t.values()].filter((t) => !t.is_junction);
+          const xs = castles.map((t) => t.x), ys = castles.map((t) => t.y);
+          const pad = 250 * sc;
+          const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+          const side = Math.max(Math.max(...xs) + pad - x0, Math.max(...ys) + pad - y0);
+          ms.full = { x: x0 - (side - (Math.max(...xs) + pad - x0)) / 2, y: y0 - (side - (Math.max(...ys) + pad - y0)) / 2, w: side, h: side };
           ms.view = { ...ms.full };
-          const cap = ms.me && ms.t.get(ms.me.capital_territory_id);
-          const viewW = 150 * 6 * ((view.game && view.game.world_scale) || 1);
-          if (cap && ms.full.w > viewW * 1.1) ms.view = { x: cap.x - viewW / 2, y: cap.y - viewW / 2, w: viewW, h: viewW };
-          applyView();
+          ms.goHome = () => {
+            const mine = [...ms.t.values()].filter((t) => !t.is_junction && ms.me && t.owner_player_id === ms.me.id);
+            const cap = ms.me && ms.t.get(ms.me.capital_territory_id);
+            const pts = mine.length ? mine : cap ? [cap] : [];
+            const viewW = 150 * 6 * sc;
+            if (pts.length && ms.full.w > viewW * 1.1) {
+              const px = pts.map((t) => t.x), py = pts.map((t) => t.y);
+              const cx = (Math.min(...px) + Math.max(...px)) / 2, cy = (Math.min(...py) + Math.max(...py)) / 2;
+              const w = Math.max(viewW, Math.max(Math.max(...px) - Math.min(...px), Math.max(...py) - Math.min(...py)) * 1.6 + 300 * sc);
+              ms.view = { x: cx - w / 2, y: cy - w / 2, w, h: w };
+            } else ms.view = { ...ms.full };
+            if (ms.view3d && ms.m3 && cap) ms.m3.focus(cap.id, 1500);
+            applyView();
+          };
+          ms.focusOn = (id) => {
+            const t = ms.t.get(id);
+            if (!t) return;
+            if (ms.view3d && ms.m3) ms.m3.focus(id, 1100);
+            else { const w = Math.min(ms.view.w, 150 * 5 * sc); ms.view = { x: t.x - w / 2, y: t.y - w / 2, w, h: w }; applyView(); }
+          };
+          ms.goHome();
+          try {
+            const key = `ss-lastseen-${gameId}`;
+            const prev = Number(localStorage.getItem(key));
+            const nowTick = view.game.current_tick;
+            if (prev && nowTick - prev >= 4 && view.game.status === 'active') {
+              const inbox = (ms.inbox || []).filter((i) => i.tick > prev);
+              const fights = (ms.battles || []).filter((b) => b.tick > prev);
+              const news = (ms.moments || []).filter((m) => m.tick > prev && ['castle_captured', 'siege_started', 'war_declared', 'alliance_formed', 'player_eliminated'].includes(m.type));
+              if (inbox.length || fights.length || news.length) {
+                setTimeout(() => modal(`Since you were last here (tick ${prev} to ${nowTick})`, h('div', {},
+                  h('div', { class: 'tip', style: 'margin:0 0 8px' }, `${pluralN(nowTick - prev, 'tick')} have passed. ${pluralN(fights.length, 'battle')} involved you, ${pluralN(news.length, 'notable event')} happened in the realm, and ${pluralN(inbox.length, 'report')} arrived.`),
+                  h('div', { class: 'sec' }, h('b', {}, 'Latest')), inbox.slice(0, 6).map((i) => feedRow(i.tick, i.title, false)), news.slice(0, 5).map((m) => feedRow(m.tick, momentText(m), false))), (close) => [h('button', { class: 'primary', onclick: close }, 'Continue')]), 700);
+              }
+            }
+            window.addEventListener('beforeunload', () => { try { localStorage.setItem(key, String(ms.game.current_tick)); } catch {} });
+            state.cleanup.push(() => { try { localStorage.setItem(key, String(ms.game.current_tick)); } catch {} });
+          } catch {}
         }
         render();
         drawSide();
