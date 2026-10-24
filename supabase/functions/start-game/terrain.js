@@ -147,8 +147,9 @@ function decorSeed(parts) {
 
 export const trailDebug = { reason: '' };
 const TRAIL_CAP = 1.9;
-const MAX_DETOUR = 2.4;
-const SHARE = 0.35;
+const SPAN = 2.0;
+const CROSS_SPAN = 2.4;
+const SHARE = 0.2;
 
 function planTrails(c, lenient = 0) {
   const wet = (sc) => (lenient ? sc.oceanFrac > lenient : sc.ocean);
@@ -380,19 +381,46 @@ function planTrails(c, lenient = 0) {
     link(prev, cd.b, dist(prevPt, points[cd.b]), 'river');
   };
   picked.forEach(addCrossing);
-  free.sort((x, y) => x.len - y.len || x.a - y.a || x.b - y.b);
-  for (const e of free) {
-    if (sp(e.a, e.b, e.len * MAX_DETOUR * 1.01) <= e.len * MAX_DETOUR) continue;
-    link(e.a, e.b, e.len, 'land');
-  }
-  const maxCross = Math.max(picked.length, Math.ceil(0.1 * N0));
   const pickedKeys = new Set(picked.map((p) => key(p.a, p.b)));
-  const extras = cross1.filter((cd) => !pickedKeys.has(key(cd.a, cd.b))).sort((x, y) => x.len - y.len);
-  for (const cd of extras) {
-    if (crossings.length >= maxCross) break;
-    if (crossings.some((q) => Math.hypot(q.x - cd.pts[0].x, q.y - cd.pts[0].y) < spacing * 1.8)) continue;
-    if (sp(cd.a, cd.b, Infinity) <= 2 * cd.direct) continue;
+  const rest = [
+    ...free.map((e) => ({ kind: 'free', a: e.a, b: e.b, len: e.len, direct: e.len })),
+    ...cross1.filter((cd) => !pickedKeys.has(key(cd.a, cd.b))).map((cd) => ({ kind: 'cross', ...cd })),
+  ].sort((x, y) => x.direct - y.direct || x.a - y.a || x.b - y.b);
+  const consider = (cd) => {
+    const limit = cd.kind === 'free' ? SPAN : CROSS_SPAN;
+    if (sp(cd.a, cd.b, cd.direct * limit * 1.01) <= cd.direct * limit) return false;
+    if (cd.kind === 'free') {
+      link(cd.a, cd.b, cd.len, 'land');
+      return true;
+    }
+    if (cd.len > cd.direct * 1.4) return false;
+    if (crossings.some((q) => Math.hypot(q.x - cd.pts[0].x, q.y - cd.pts[0].y) < spacing * 0.7)) return false;
     addCrossing(cd);
+    return true;
+  };
+  for (const cd of rest) if (cd.kind === 'free') consider(cd);
+  for (const cd of rest) if (cd.kind === 'cross') consider(cd);
+  const angleOf = (a, b) => Math.atan2(points[b].y - points[a].y, points[b].x - points[a].x);
+  for (let a = 0; a < N0; a++) {
+    if (adj[a].length !== 1) continue;
+    const first = adj[a][0][0];
+    const base = first < N0 ? angleOf(a, first) : Math.atan2(nodes[first].y - points[a].y, nodes[first].x - points[a].x);
+    const opts = rest.filter((cd) => (cd.a === a || cd.b === a) && cd.direct <= spacing * 1.6).sort((x, y) => x.direct - y.direct);
+    for (const cd of opts) {
+      const other = cd.a === a ? cd.b : cd.a;
+      if (adj[a].some(([v]) => v === other)) continue;
+      let diff = Math.abs(angleOf(a, other) - base);
+      diff = Math.min(diff, 2 * Math.PI - diff);
+      if (diff < 0.7) continue;
+      if (cd.kind === 'free') {
+        link(cd.a, cd.b, cd.len, 'land');
+        break;
+      }
+      if (cd.len > cd.direct * 1.4) continue;
+      if (crossings.some((q) => Math.hypot(q.x - cd.pts[0].x, q.y - cd.pts[0].y) < spacing * 0.7)) continue;
+      addCrossing(cd);
+      break;
+    }
   }
 
   const G2 = G * G;
@@ -760,7 +788,7 @@ export function buildTerrain(o) {
 
       const nr = fbm(noiseB, fx / (spacing * 1.9), fy / (spacing * 1.9), 5);
       const ridge = 1 - Math.abs(2 * nr - 1);
-      const mount = smoothstep(0.82 - 0.12 * (preset.mountain - 1), 0.98 - 0.08 * (preset.mountain - 1), ridge);
+      const mount = smoothstep(0.92 - 0.12 * (preset.mountain - 1), 1.02 - 0.08 * (preset.mountain - 1), ridge);
       const flat = Math.max(near[i], 0.55 * corr[i]);
       const land = smoothstep(LAND_T, LAND_T + 0.12, score[i]);
       const roll = fbm(noiseC, fx / (spacing * 0.9), fy / (spacing * 0.9), 3);
@@ -864,7 +892,7 @@ export function buildTerrain(o) {
 
   const rivers = [];
   const riverCount = new Uint16Array(G * G);
-  const wanted = preset.rivers ? Math.max(3, Math.round((points.length / 3.5) * preset.rivers)) : 0;
+  const wanted = preset.rivers ? Math.max(3, Math.round((points.length / 5.5) * preset.rivers)) : 0;
   const candidates = [];
   for (let i = 0; i < G * G; i++) {
     if (isLand[i] && height[i] > SEA + 0.2) {

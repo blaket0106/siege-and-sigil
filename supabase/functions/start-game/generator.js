@@ -494,34 +494,52 @@ function placeTwinRings({ rng, players, start, radius, wedge, minDist, ringMin, 
   return { homes, neutrals: out, inner, outer };
 }
 
-function placeNeutrals({ rng, count, radius, center, minDist, clump, taken, inside }) {
+function placeNeutrals({ rng, count, radius, center, minDist, clump, taken, inside, spacing }) {
   const blobs = Array.from({ length: 3 + Math.floor(count / 32) }, () => {
     const r = radius * 0.9 * Math.sqrt(rng());
     const a = 2 * Math.PI * rng();
     return { x: r * Math.cos(a), y: r * Math.sin(a) };
   });
-  const sigma = radius * 0.16;
+  const sigma = radius * 0.2;
   const density = (p) => {
-    let w = clump;
-    for (const b of blobs) w += Math.exp(-((p.x - b.x) ** 2 + (p.y - b.y) ** 2) / (2 * sigma * sigma));
-    return Math.min(1, w / 1.1);
+    let w = 0;
+    for (const b of blobs) w = Math.max(w, Math.exp(-((p.x - b.x) ** 2 + (p.y - b.y) ** 2) / (2 * sigma * sigma)));
+    return w;
   };
+  const cap = spacing * 0.95;
   const out = [];
   const all = taken.map((p) => ({ x: p.x - center, y: p.y - center }));
   for (let i = 0; i < count; i++) {
-    let p = null;
-    for (let t = 0; t < 2400 && !p; t++) {
+    let best = null;
+    let bestScore = -1;
+    let found = 0;
+    for (let t = 0; t < 3000 && found < 14; t++) {
       const r = radius * 0.97 * Math.sqrt(rng());
       const a = 2 * Math.PI * rng();
       const c = { x: r * Math.cos(a), y: r * Math.sin(a) };
       if (!inside(c)) continue;
-      if (rng() > density(c)) continue;
-      const md = minDist * (t > 1200 ? 0.8 : 1);
-      if (all.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md * md)) p = c;
+      const md = minDist * (t > 1500 ? 0.8 : 1);
+      let near = Infinity;
+      let ok = true;
+      for (const o of all) {
+        const d = Math.hypot(o.x - c.x, o.y - c.y);
+        if (d < md) {
+          ok = false;
+          break;
+        }
+        if (d < near) near = d;
+      }
+      if (!ok) continue;
+      found += 1;
+      const score = Math.min(near, cap) + clump * 5 * spacing * density(c);
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
     }
-    if (!p) return null;
-    out.push(p);
-    all.push(p);
+    if (!best) return null;
+    out.push(best);
+    all.push(best);
   }
   return out;
 }
@@ -611,7 +629,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
         homes = placeClusters({ rng, players, start: startingTerritories, shape, minDist: homeDist, R: radius });
         if (!homes) continue;
       }
-      neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center: 0, minDist, clump: styleConfig.clump, taken: homes, inside: (p) => shape.inside(p) });
+      neutrals = placeNeutrals({ rng, count: neutralTotal, radius, center: 0, minDist, clump: styleConfig.clump, taken: homes, inside: (p) => shape.inside(p), spacing });
     }
     if (neutrals) {
       locals = homes.map((p) => ({ x: center + p.x, y: center + p.y }));

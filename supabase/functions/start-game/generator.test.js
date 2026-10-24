@@ -577,3 +577,52 @@ test('trails: junction nodes are neutral, ownerless, have three or more roads an
   }
   assert.ok(total > 0);
 });
+
+test('trails: routes are direct, dead ends are rare and castles are evenly spaced', () => {
+  const ratios = [];
+  let castlesTotal = 0;
+  let leaves = 0;
+  let cvSum = 0;
+  let maps = 0;
+  for (const seed of [1, 2, 3, 4]) {
+    const layout = trailLayout({ players: 4, mapSize: 'standard', seed, scale: 3 });
+    const T = layout.territories;
+    const n = T.length;
+    const castles = T.map((t, i) => i).filter((i) => !T[i].junction && !T[i].crossing);
+    const adj = Array.from({ length: n }, () => []);
+    for (const e of layout.edges) {
+      adj[e.a].push([e.b, e.length]);
+      adj[e.b].push([e.a, e.length]);
+    }
+    castles.forEach((i) => {
+      castlesTotal += 1;
+      if (adj[i].length === 1) leaves += 1;
+    });
+    const reach = 150 * 3 * 3.2;
+    for (let s = 0; s < castles.length; s += 6) {
+      const dist = new Array(n).fill(Infinity);
+      dist[castles[s]] = 0;
+      const queue = [[0, castles[s]]];
+      while (queue.length) {
+        queue.sort((a, b) => a[0] - b[0]);
+        const [d, u] = queue.shift();
+        if (d > dist[u]) continue;
+        for (const [v, w] of adj[u]) if (d + w < dist[v]) { dist[v] = d + w; queue.push([dist[v], v]); }
+      }
+      for (const j of castles) {
+        if (j === castles[s]) continue;
+        const eu = Math.hypot(T[j].x - T[castles[s]].x, T[j].y - T[castles[s]].y);
+        if (eu < reach) ratios.push(dist[j] / eu);
+      }
+    }
+    const nn = castles.map((i) => Math.min(...castles.filter((j) => j !== i).map((j) => Math.hypot(T[i].x - T[j].x, T[i].y - T[j].y))));
+    const mean = nn.reduce((a, b) => a + b, 0) / nn.length;
+    cvSum += Math.sqrt(nn.reduce((a, b) => a + (b - mean) ** 2, 0) / nn.length) / mean;
+    maps += 1;
+  }
+  ratios.sort((a, b) => a - b);
+  assert.ok(ratios[Math.floor(ratios.length * 0.5)] < 1.5, 'median route is within 1.5x of a straight line');
+  assert.ok(ratios[Math.floor(ratios.length * 0.9)] < 2.2, 'ninetieth percentile route is within 2.2x');
+  assert.ok(leaves / castlesTotal < 0.12, `dead ends ${leaves}/${castlesTotal}`);
+  assert.ok(cvSum / maps < 0.3, `spacing variation ${cvSum / maps}`);
+});
