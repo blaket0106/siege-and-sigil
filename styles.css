@@ -441,6 +441,7 @@ button.link { background: none; border: none; box-shadow: none; padding: 0; text
 .stat { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; padding: 3px 14px; background: var(--recess); border: 1px solid var(--gilt-lo); border-radius: 2px; box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55); }
 .stat span { color: var(--gilt); font-family: var(--font-display); font-weight: 600; letter-spacing: 0.1em; font-size: 0.6rem; }
 .stat b { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--gilt-hi); }
+.stat span.sub { letter-spacing: 0.04em; font-weight: 500; color: var(--dim); }
 .hud label.check { margin: 0; display: flex; align-items: center; gap: 6px; color: #ecdfc2; font-weight: 400; font-family: var(--font-ui); font-size: 0.98rem; letter-spacing: 0; text-shadow: none; }
 .hud label input { width: auto; }
 .hud .tag { color: var(--gilt-hi); }

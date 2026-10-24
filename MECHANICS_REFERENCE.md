@@ -1651,3 +1651,19 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - **`games.neutral_armory` (0 to 3, default 1):** the Armory level used by neutral garrisons in `fight_castle`, `ai_sieges`, `ai_commanders`; settable through `create_game`; there is no lobby control for it yet.
 - **Sim harness (`soak_step(game, n)`, `sim_report(game)`):** steps a paused all-AI game and reports captures, spend and growth, used for the balance comparisons. Internal only, not granted to clients.
 - **Mobile (max-width 760 px):** HUD is one scrolling row, map above the side panel (about 54 vh), side panel capped at 36 vh.
+
+## 34. Next Move, Quick Start, Income and Cues (client only)
+
+- **Original castle icons restored at overview zoom:** the marker layer now draws the same castle sprite as the close-up plates (scaled to a constant screen size per tier), a filled owner-colour glow with a solid owner ring (dashed grey for neutral), a gold ring on your own castles, and a troop-count tag below. The shape-and-circle markers were removed, and the legend uses small castle swatches.
+- **Next move box (`nextMoveSection`, top of the Info tab):** if no commander leads troops it offers "Take N troops with <commander>" from the biggest home castle (leaves 1). Otherwise it takes your strongest idle commander, finds the six nearest visible neutral castles, computes troops needed with the same `troopsNeeded` formula (neutral damage = `neutral_armory` + 1 + 1 on mountain; your damage = Armory + Valor), and offers "Send <commander> to <castle>" for the nearest one you can take, or names the easiest target and what is missing. The Send button selects the commander and opens the normal march preview (with odds); it does not commit the march. The same "Send" button appears in the "Taking this castle" panel when your strongest idle commander has enough.
+- **Income in the header:** the Treasury box shows `+N in Kt`: N = sum over your castles of Treasury level x (10 + 2 x Mint level) (stewards, morale and seasons not included), K = ticks to the next production tick.
+- **Quick start:** lobby button; creates a game with `max_players` 4 and default rules, adds three AI seats at difficulty 3, starts it and opens the map. Subject to the five unfinished games limit.
+- **Host tools:** Jump 6 and Jump 24 ticks added; the client chains `admin_jump_ticks` calls of 5 or fewer, so the server cap is unchanged.
+- **Sound cues:** `fanfare` when you gain a castle, `lost` when you lose one, `alarm` when a new castle becomes threatened (no cue on the first load).
+- **Parity check:** the client troops-needed formula was compared with `castle_report` for 10 castles at 4 damage levels each (40 values, 0 differences).
+- **Sim results at tick 66, 4 AI-only seats (castles per house / first capture / captures / first PvP battle):**
+  - Current defaults: 6,5,5,5 / tick 49 / 5 / none.
+  - March speed 2.5: 7,6,5,5 / tick 27 / 7 / none.
+  - Speed 2.5 and neutral armory 0: 8,7,7,7 / tick 14 / 13 / none.
+  - Same with world scale 9: 7,7,7,6 / tick 15 / 11 / none.
+  - Neptune's Pride at the same tick: 17, 15, 13, 8 holdings.

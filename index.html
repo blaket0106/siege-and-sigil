@@ -223,6 +223,9 @@
         ok: () => { tone(523.25, 0.18, { type: 'triangle', vol: 0.12 }); tone(783.99, 0.28, { type: 'triangle', vol: 0.1, at: 0.08 }); },
         bad: () => { tone(150, 0.28, { type: 'sawtooth', vol: 0.13, slide: 90, cut: 700 }); },
         bell: () => { [1, 2.4, 3.9].forEach((m, i) => tone(329.63 * m, 2.2 - i * 0.5, { vol: 0.14 / (i + 1), attack: 0.004 })); },
+        fanfare: () => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 0.32, { type: 'triangle', vol: 0.12, at: i * 0.1, attack: 0.01 })); },
+        lost: () => { [392, 311.13, 233.08].forEach((f, i) => tone(f, 0.45, { type: 'sawtooth', vol: 0.09, at: i * 0.16, cut: 800 })); },
+        alarm: () => { [0, 0.28, 0.56].forEach((at) => tone(740, 0.2, { type: 'square', vol: 0.06, at, cut: 1800 })); },
         horn: () => { tone(98, 1.5, { type: 'sawtooth', vol: 0.16, attack: 0.3, cut: 500 }); tone(147, 1.5, { type: 'sawtooth', vol: 0.1, attack: 0.35, cut: 500 }); },
         toggle: () => {
           on = !on;
@@ -804,6 +807,10 @@
         ['note', 'Click any castle or army to select it and see its actions in the Info tab.'],
         ['h', 'Finding your way'],
         ['list', [
+          'The Next move box at the top of the Info tab tells you what to do first: put troops under a commander, then which neutral castle you can take now, with a button to send them.',
+          'Your gold box shows what the next production pays and how many ticks away it is.',
+          'Quick start on the home screen makes a four-house game with three AI rivals and begins it at once.',
+          'Sounds mark a castle gained, a castle lost, and a new threat to your castles.',
           'Castles opens a table of every castle you hold with troops, income and who is threatening it. Home flies the map back to your starting castle.',
           'A red chip in the top bar means one of your castles is under threat. Click it to jump to the castle.',
           'Zoomed out, castles and armies turn into coloured markers that stay readable at any distance. Names appear as you zoom in.',
@@ -1643,6 +1650,7 @@
               h('div', {}, h('b', {}, profile.honor ?? 0), 'honor')),
             h('div', { class: 'actions' },
               h('button', { class: 'primary', onclick: createDialog }, 'Raise a campaign'),
+              h('button', { onclick: quickStart, title: 'Four houses with three AI rivals and default rules, ready to play' }, 'Quick start'),
               h('button', { class: 'ghost', onclick: helpDialog }, 'How to play'))),
           h('main', {},
             inviteStrip,
@@ -2231,6 +2239,29 @@
       draw();
       mount(h('div', { class: 'wrap' }, topbar(),
         h('div', { class: 'sheet' }, rail, h('div', { class: 'sx-main' }, summaryEl, h('div', { class: 'panel' }, body, foot)))));
+    }
+
+    async function quickStart(e) {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        const { data, error } = await sb.rpc('create_game', { p_settings: { name: 'Quick start', max_players: 4 } });
+        if (error) throw error;
+        for (let i = 0; i < 3; i++) {
+          const r = await sb.rpc('add_ai_seat', { p_game_id: data, p_difficulty: 3, p_faction: null });
+          if (r.error) throw r.error;
+        }
+        const { error: se } = await sb.functions.invoke('start-game', { body: { game_id: data } });
+        if (se) {
+          let detail = se.message;
+          try { detail = (await se.context.json()).error || detail; } catch {}
+          throw new Error(detail);
+        }
+        await openGame(data);
+      } catch (err) {
+        toast(err.message || 'Could not start the game');
+        btn.disabled = false;
+      }
     }
 
     async function openGame(gameId) {
@@ -3539,6 +3570,7 @@
           const dt = dest != null ? ms.t.get(dest) : null;
           if (dt && dt.owner_player_id === ms.me.id) threatened.add(dest);
         });
+        if (ms.threats && [...threatened].some((id) => !ms.threats.includes(id))) Sfx.alarm();
         ms.threats = [...threatened];
         ms.t.forEach((t) => {
           if (t.is_junction) return;
@@ -3961,7 +3993,7 @@
         const paused = !!g.paused_at;
         const jump = (n) => (e) => {
           if (confirm(`Jump ${n} tick${n === 1 ? '' : 's'} ahead now? Production, movement and battles all run, and it cannot be undone.`)) {
-            act(e.currentTarget, async () => { const { data, error } = await sb.rpc('admin_jump_ticks', { p_game_id: gameId, p_ticks: n }); if (error) throw error; toast(`Now at tick ${data.tick}`, true); });
+            act(e.currentTarget, async () => { let data; for (let left = n; left > 0; left -= 5) { const r = await sb.rpc('admin_jump_ticks', { p_game_id: gameId, p_ticks: Math.min(5, left) }); if (r.error) throw r.error; data = r.data; if (data.status !== 'active') break; } toast(`Now at tick ${data.tick}`, true); });
           }
         };
         modal('Host tools', h('div', {},
@@ -3970,7 +4002,7 @@
             h('button', { onclick: (e) => act(e.currentTarget, async () => { const { error } = await sb.rpc('admin_set_paused', { p_game_id: gameId, p_paused: !paused }); if (error) throw error; toast(paused ? 'Game resumed' : 'Game paused', true); }) }, paused ? 'Resume' : 'Pause')),
           h('div', { class: 'sec' }, h('b', {}, 'Jump ahead'),
             h('div', { class: 'tip' }, solo ? 'Run ticks now to test movement, production and battles. This cannot be undone.' : 'Only available while you are the only human in the game.'),
-            h('div', { class: 'row wrap2' }, h('button', { disabled: !solo, onclick: jump(1) }, 'Jump 1 tick'), h('button', { disabled: !solo, onclick: jump(5) }, 'Jump 5 ticks')))),
+            h('div', { class: 'row wrap2' }, h('button', { disabled: !solo, onclick: jump(1) }, 'Jump 1 tick'), h('button', { disabled: !solo, onclick: jump(5) }, 'Jump 5 ticks'), h('button', { disabled: !solo, onclick: jump(6) }, 'Jump 6 ticks'), h('button', { disabled: !solo, onclick: jump(24) }, 'Jump 24 ticks')))),
           (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
       };
 
@@ -4053,7 +4085,13 @@
           pendingProposals() ? h('button', { class: 'primary', onclick: () => { ms.sel = null; ms.tab = 'info'; ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); } }, `Proposals (${pendingProposals()})`) : null,
           g.status === 'finished' ? h('button', { class: 'primary', onclick: () => storyDialog(gameId) }, 'The story') : null,
           g.status === 'finished' ? h('button', { onclick: () => summaryDialog(gameId) }, 'Final standings') : null,
-          stat('Treasury', ms.me.gold),
+          (() => {
+            const mint = (ms.areas.find((a) => a.area === 'mint') || { level: 1 }).level;
+            const inc = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id).reduce((a, t) => a + (t.treasury_level || 0) * (10 + 2 * mint), 0);
+            const cyc = g.production_cycle_ticks;
+            const left = cyc - (g.current_tick % cyc);
+            return h('div', { class: 'stat', title: `Production pays every ${cyc} ticks. About +${inc} gold at the next one, in ${left} tick${left === 1 ? '' : 's'}.` }, h('span', {}, 'Treasury'), h('b', {}, String(ms.me.gold)), h('span', { class: 'sub' }, `+${inc} in ${left}t`));
+          })(),
           g.fog_of_war ? h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: ms.rings, onchange: (e) => { ms.rings = e.target.checked; render(); } }), 'Scan rings') : null,
           h('button', { class: 'ghost', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
           TOUCH_DEVICE ? null : h('button', { onclick: toggle3D }, ms.view3d ? '2D map' : '3D map'),
@@ -4475,6 +4513,56 @@
 
       const strongestIdle = () => ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.troops > 0).sort((a, b) => b.troops - a.troops)[0] || null;
 
+      const sendHere = (c, t) => {
+        select('c', c.id);
+        ms.marching = true;
+        render();
+        drawSide();
+        previewTo(t.id);
+      };
+
+      const nextMoveSection = () => {
+        if (!canAct() || ms.game.status !== 'active') return null;
+        const best = strongestIdle();
+        if (!best) {
+          const idle = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.current_territory_id != null && ms.t.get(c.current_territory_id) && ms.t.get(c.current_territory_id).owner_player_id === ms.me.id && ms.t.get(c.current_territory_id).troops > 1);
+          if (!idle.length) return null;
+          const pick = idle.sort((a, b) => ms.t.get(b.current_territory_id).troops - ms.t.get(a.current_territory_id).troops)[0];
+          const home = ms.t.get(pick.current_territory_id);
+          const n = home.troops - 1;
+          return h('div', { class: 'sec' }, h('b', {}, 'Next move'),
+            h('div', {}, `Your commanders are not leading any troops yet. ${home.name} holds ${home.troops}. Put ${n} of them under ${pick.name}, then march to a neutral castle.`),
+            h('button', { class: 'primary', style: 'margin-top:6px', onclick: (e) => act(e.currentTarget, async () => {
+              const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: pick.id, p_amount: n });
+              if (error) throw error;
+              select('c', pick.id);
+            }) }, `Take ${n} troops with ${pick.name}`));
+        }
+        if (best.current_territory_id == null) return null;
+        const from = ms.t.get(best.current_territory_id);
+        if (!from) return null;
+        const armory = (ms.areas.find((a) => a.area === 'armory') || { level: 1 }).level;
+        const dmg = Math.max(1, armory + ((ms.abil.get(best.id) || {}).valor || 0));
+        const cands = [...ms.t.values()]
+          .filter((t) => !t.is_junction && t.owner_player_id == null && ms.vis.has(t.id) && typeof t.troops === 'number')
+          .map((t) => ({ t, need: troopsNeeded(t.troops, (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), dmg), d: Math.hypot(t.x - from.x, t.y - from.y) }))
+          .sort((a, b) => a.d - b.d).slice(0, 6);
+        if (!cands.length) return null;
+        const ready = cands.filter((x) => best.troops >= x.need)[0];
+        const easiest = cands.slice().sort((a, b) => a.need - b.need)[0];
+        const out = [h('b', {}, 'Next move')];
+        if (ready) {
+          out.push(h('div', {}, `${best.name} has ${best.troops} troops. ${ready.t.name} needs ${ready.need}, so you can take it now.`),
+            h('div', { class: 'row wrap2', style: 'margin-top:6px' },
+              h('button', { class: 'primary', onclick: () => sendHere(best, ready.t) }, `Send ${best.name} to ${ready.t.name}`),
+              h('button', { class: 'ghost', onclick: () => { select('t', ready.t.id); ms.focusOn && ms.focusOn(ready.t.id); } }, 'Look first')));
+        } else {
+          out.push(h('div', {}, `${best.name} has ${best.troops} troops. The nearest easy target, ${easiest.t.name}, needs ${easiest.need}. Raise Recruitment, or move troops onto ${best.name}.`),
+            h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { class: 'ghost', onclick: () => { select('t', easiest.t.id); ms.focusOn && ms.focusOn(easiest.t.id); } }, `Look at ${easiest.t.name}`)));
+        }
+        return h('div', { class: 'sec' }, out);
+      };
+
       const assaultSection = (t) => {
         if (!canAct() || t.is_junction || t.owner_player_id === ms.me.id || (t.owner_player_id && isFriend(t.owner_player_id))) return null;
         const best = strongestIdle();
@@ -4494,7 +4582,8 @@
             const need = troopsNeeded(est.troops, est.dmg, mine);
             if (best) {
               const ok = best.troops >= need;
-              out.push(h('div', { style: `margin-top:6px;color:${ok ? '#7fd08a' : 'var(--gules-hi)'}` }, ok ? `${best.name} has ${best.troops} troops here: enough.` : `${best.name}, your strongest, has ${best.troops}. You need ${need - best.troops} more.`));
+              out.push(h('div', { style: `margin-top:6px;color:${ok ? '#7fd08a' : 'var(--gules-hi)'}` }, ok ? `${best.name} has ${best.troops} troops: enough.` : `${best.name}, your strongest, has ${best.troops}. You need ${need - best.troops} more.`));
+              if (ok && best.current_territory_id !== t.id) out.push(h('button', { class: 'primary', style: 'margin-top:6px', onclick: () => sendHere(best, t) }, `Send ${best.name}`));
             }
             if (!est.exact) out.push(h('div', { class: 'tip' }, 'Estimate: assumes their Armory matches yours and their leader has no Valor. Real defence may be stronger.'));
           }
@@ -5281,7 +5370,7 @@
           if (c.current_territory_id) parts.push(h('div', { class: 'sec' }, h('button', { onclick: () => select('t', c.current_territory_id) }, 'Show territory')));
         } else {
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
-          parts.push(h('h3', {}, 'Realm'), ...realmSection());
+          parts.push(h('h3', {}, 'Realm'), nextMoveSection(), ...realmSection());
           parts.push(offersSection());
           parts.push(eventsSection());
           parts.push(prisonersSection());
@@ -5440,7 +5529,19 @@
         ms.players = new Map(view.players.map((p) => [p.id, p]));
         ms.me = ms.players.get(view.me);
         if (ms.me) setHouse(factionOf(ms.me.faction_slug));
+        const prevOwn = ms.t && !ms.replay && ms.me ? new Map([...ms.t].map(([id, t]) => [id, t.owner_player_id])) : null;
         ms.t = new Map(view.territories.map((t) => [t.id, t]));
+        if (prevOwn && ms.me) {
+          let gained = 0;
+          let lostN = 0;
+          ms.t.forEach((t, id) => {
+            const was = prevOwn.get(id);
+            if (was === undefined || was === t.owner_player_id) return;
+            if (t.owner_player_id === ms.me.id) gained++;
+            else if (was === ms.me.id) lostN++;
+          });
+          if (lostN) Sfx.lost(); else if (gained) Sfx.fanfare();
+        }
         ms.standings = view.standings;
         ms.serverSources = view.sources;
         ms.winAt = view.win_at;
