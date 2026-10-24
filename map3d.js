@@ -449,7 +449,7 @@ function village(cx0, cz0, n, S) { for (let i = 0; i < n; i++) { const a = rnd()
 const makeSign = () => {
   const parts = [], post = new THREE.CylinderGeometry(.7, .8, 16, 5); post.translate(0, 8, 0); parts.push(paint(post, () => [.3, .21, .12]));
   for (const [yy, rot] of [[13, .4], [9.5, -.5]]) { const arm = new THREE.BoxGeometry(11, 2.4, .8); arm.translate(5.5, 0, 0); arm.rotateY(rot); arm.translate(0, yy, 0); parts.push(paint(arm, () => [.62, .5, .3])); }
-  const m = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 })); m.castShadow = true; m.scale.setScalar(2.2);
+  const m = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 })); m.castShadow = true; m.scale.setScalar(3.6);
   const g = new THREE.Group(); g.add(m); g.userData = { radius: 22, hgt: 36 }; return g;
 };
 const flags = [];

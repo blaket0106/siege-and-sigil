@@ -3155,8 +3155,8 @@
           sv('path', { d: 'M-9,5 L-4,-6 L0,1 L4,-6 L9,5 Z', fill: '#e8dcc2', stroke: '#2a2418', 'stroke-width': 1.2 }),
           sv('line', { x1: 0, y1: 1, x2: 0, y2: 5, stroke: '#2a2418', 'stroke-width': 1 }));
         const cross = (x, y) => sv('g', { transform: `translate(${x},${y}) scale(${M()})`, style: 'pointer-events:none' },
-          sv('circle', { r: 5, fill: '#c9a46a', stroke: '#2a2418', 'stroke-width': 1.2 }),
-          sv('path', { d: 'M-3,0 H3 M0,-3 V3', stroke: '#2a2418', 'stroke-width': 1.1 }));
+          sv('circle', { r: 7, fill: '#c9a46a', stroke: '#2a2418', 'stroke-width': 1.4 }),
+          sv('path', { d: 'M-4.5,0 H4.5 M0,-4.5 V4.5', stroke: '#2a2418', 'stroke-width': 1.5 }));
         L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])));
         L.junctions.replaceChildren(...[...ms.t.values()].filter((t) => t.is_junction).map((t) => cross(t.x, t.y)));
         svg.parentElement.style.background = ms.game.fog_dark ? '#000' : '#0e2f4f';
