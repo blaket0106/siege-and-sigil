@@ -978,3 +978,25 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 
 :root[data-theme='light'] .hud-id b, :root[data-theme='light'] .side h3, :root[data-theme='light'] .side .sec > b, :root[data-theme='light'] .side .tabs button.on { color: color-mix(in srgb, var(--house) 75%, black); }
 :root[data-theme='light'] .panel, :root[data-theme='light'] .modal { box-shadow: var(--shadow), inset 0 0 90px -48px color-mix(in srgb, var(--panel-accent, var(--house)) 60%, transparent); }
+
+.ccard { position: relative; flex: none; border-radius: 6px; padding: 2px; background: linear-gradient(160deg, #8d8f95, #3b3d44 45%, #7a6a45); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.ccard.king { background: linear-gradient(160deg, #f5dc94, #8d6a28 45%, #d6ab52); }
+.ccard .cart { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 4px; background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--c1) 70%, #fff 8%), color-mix(in srgb, var(--c1) 55%, #000) 70%, #0b0b10 130%); }
+.ccard .cart::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.55)); pointer-events: none; }
+.ccard img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.ccard svg { display: block; width: 100%; height: 100%; }
+.ccard .sil-b { fill: rgba(8, 8, 12, 0.58); }
+.ccard .sil-g { fill: rgba(8, 8, 12, 0.78); stroke: var(--c2); stroke-width: 1.4; }
+.ccard.s { width: 34px; height: 44px; }
+.ccard.l { width: 118px; height: 158px; border-radius: 8px; padding: 3px; }
+.ccard .cbadge { position: absolute; z-index: 2; display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: rgba(10, 10, 14, 0.82); border: 1px solid var(--c2); color: var(--c2); font: 600 0.72rem var(--font-ui, serif); }
+.ccard .cbadge.sch { top: 6px; left: 6px; padding: 0; width: 24px; }
+.ccard .cbadge.rank { top: 6px; right: 6px; color: #f5dc94; border-color: #d6ab52; }
+.ccard .cbar { position: absolute; z-index: 2; left: 3px; right: 3px; bottom: 3px; display: flex; align-items: center; justify-content: center; gap: 5px; height: 22px; border-radius: 0 0 5px 5px; background: linear-gradient(180deg, rgba(10, 10, 14, 0.7), rgba(10, 10, 14, 0.92)); color: #f3e7c6; font: 600 0.85rem var(--font-ui, serif); border-top: 1px solid var(--c2); }
+.cprofile { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 8px; }
+.cinfo h3 { margin: 2px 0 2px; }
+.cepi { color: var(--gilt-hi, #f5dc94); font-style: italic; margin-bottom: 4px; }
+.cbio { line-height: 1.45; color: var(--dim); margin: 0 0 10px; }
+
+.ccard.s .cart img { transform: scale(1.75); transform-origin: 50% 24%; }
+.ccard.l { width: 132px; height: 176px; }

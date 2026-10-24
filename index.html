@@ -441,6 +441,46 @@
       state.factions = f.data || [];
     }
 
+    let portraitMod = null;
+    let portraitLoading = null;
+    const loadPortraitMod = () => portraitLoading || (portraitLoading = import('./portrait3d.js').then((m) => (portraitMod = m)).catch(() => null));
+    const portraitQueue = [];
+    let portraitBusy = false;
+    function queuePortrait(job) {
+      portraitQueue.push(job);
+      if (portraitBusy) return;
+      portraitBusy = true;
+      const next = () => { const j = portraitQueue.shift(); if (!j) { portraitBusy = false; return; } j(); setTimeout(next, 0); };
+      setTimeout(next, 0);
+    }
+
+    const SCHOOL_ICON = { battleschool: 'swords', university: 'school_university', rangers: 'school_rangers' };
+    function silhouetteSvg(school) {
+      const gear = school === 'battleschool' ? '<path d="M30 46a15 15 0 0 1 30 0v6H30z"/><path d="M43 46h4v14h-4z"/>'
+        : school === 'university' ? '<path d="M28 40c4-10 30-10 34 0l-3 6H31z"/>'
+        : '<path d="M27 62c-4-22 4-34 18-34s22 12 18 34l-8-6V46a10 10 0 0 0-20 0v10z"/>';
+      return `<svg viewBox="0 0 90 120" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><ellipse cx="45" cy="116" rx="40" ry="30" class="sil-b"/><rect x="39" y="66" width="12" height="16" class="sil-b"/><ellipse cx="45" cy="52" rx="15" ry="19" class="sil-b"/><g class="sil-g">${gear}</g></svg>`;
+    }
+
+    function cmdCard(c, opts = {}) {
+      const f = factionOf(opts.faction);
+      const art = h('div', { class: 'cart' });
+      const spec = c.profile && c.profile.look ? { id: c.id, school: c.school, role: c.role, age: c.profile.age, sex: c.profile.sex, look: c.profile.look, c1: f.color, c2: f.color2 } : null;
+      const cached = spec && portraitMod ? portraitMod.portraitPeek(spec) : null;
+      if (cached) art.append(h('img', { src: cached, alt: '' }));
+      else {
+        pictCache.innerHTML = silhouetteSvg(c.school);
+        art.append(pictCache.content.firstElementChild);
+        if (spec) loadPortraitMod().then((m) => { if (m) queuePortrait(() => { try { art.replaceChildren(h('img', { src: m.portraitDataUrl(spec), alt: '' })); } catch {} }); });
+      }
+      const large = opts.size === 'l';
+      return h('div', { class: `ccard ${large ? 'l' : 's'}${c.role === 'king' ? ' king' : ''}`, style: `--c1:${f.color};--c2:${f.color2}` },
+        art,
+        large ? h('span', { class: 'cbadge sch', title: c.school }, pict(SCHOOL_ICON[c.school] || 'swords', 16)) : null,
+        large && opts.rank != null ? h('span', { class: 'cbadge rank', title: 'Rank' }, `R${opts.rank}`) : null,
+        large && c.troops != null ? h('span', { class: 'cbar' }, pict('troops', 14), String(c.troops)) : null);
+    }
+
     function houseCard(slug) {
       const f = factionOf(slug);
       const leaders = state.leaders.filter((x) => x.faction_slug === slug);
@@ -811,7 +851,9 @@
       { id: 'commanders', group: 'Your forces', title: 'Commanders', blocks: [
         ['p', 'Commanders carry troops, and there is no limit to how many. Gather troops from several castles into one army before a big attack. Commanders are cheap, and you will lose some. A commander who survives [[battles|battles]] gets stronger and becomes worth protecting.'],
         ['h', 'Hiring'],
-        ['p', 'Pick a school and pay the price. You get a generated name and one level in a random ability of that school.'],
+        ['p', 'Pick a school and pay the price. You get a new commander with a name from your house\'s own culture and one level in a random ability of that school.'],
+        ['h', 'Names, faces and backgrounds'],
+        ['p', 'Every commander has a profile card: a portrait, an age, sometimes an epithet such as "Quillhand", and a short background made of where they grew up, something that happened to them, and a habit. Your house\'s starting king and commanders are its named [[lore|leaders]]. The card shows the commander\'s school, rank and troops. Select a commander to read the full profile. Portraits and backgrounds are for flavor only and do not change any ability.'],
         ['table', { head: ['School', 'Abilities'], rows: [
           ['Battleschool', 'Valor (more [[battles#damage-per-round|damage]]), Tactics (strike first in the [[battles#fighting-in-the-open|field]]), Siegecraft (stronger [[sieges|sieges]])'],
           ['University', 'Muster (more troops), Steward (more gold), Scholar (more prestige)'],
@@ -1680,6 +1722,8 @@
       bell: '<path d="M12 34V22a12 12 0 0 1 24 0v12l3 4H9z"/><path d="M20 42a4 4 0 0 0 8 0"/>',
       flag: '<path d="M12 6v38M12 8h26l-6 9 6 9H12"/>',
       sun: '<circle cx="24" cy="24" r="8"/><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/>',
+      school_university: '<path d="M6 10h14a4 4 0 0 1 4 4v26a3 3 0 0 0-3-3H6zM42 10H28a4 4 0 0 0-4 4v26a3 3 0 0 1 3-3h15z"/>',
+      school_rangers: '<path d="M8 40L36 12M36 12h-10M36 12v10"/><path d="M14 33c-5-9-3-20 6-25"/>',
       snow: '<path d="M24 5v38M7 14l34 20M41 14L7 34M18 8l6 5 6-5M18 40l6-5 6 5"/>',
       comet: '<circle cx="34" cy="14" r="6" fill="currentColor" stroke="none"/><path d="M30 18L8 40M34 22L18 44M26 12L6 28" stroke-width="2.2" opacity=".7"/>',
       hire: '<circle cx="18" cy="14" r="6"/><path d="M6 38c1-12 22-12 24 0"/><path d="M34 22v14M27 29h14" stroke-width="3"/>',
@@ -3998,8 +4042,9 @@
       };
 
       const line = (k, v) => h('div', { class: 'line' }, h('span', {}, k), h('span', {}, v));
+      const slugOf = (pid) => (ms.players.get(pid) || {}).faction_slug;
       const cmdRow = (c) => h('button', { class: 'cmdrow', onclick: () => select('c', c.id) },
-        h('span', { class: 'chip', style: `background:${color(c.owner_player_id)}` }),
+        cmdCard(c, { faction: slugOf(c.owner_player_id) }),
         `${c.role === 'king' ? '♛ ' : ''}${c.name}`,
         h('span', { style: 'color:var(--dim);margin-left:auto' }, `R${rankOf(c)} · ${c.troops}`));
 
@@ -4595,8 +4640,14 @@
           }
           const ab = ms.abil.get(c.id) || {};
           const m = ms.mov.get(c.id);
-          parts.push(h('h3', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`),
-            h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}${c.council_area ? ` · Councillor of the ${AREA_NAMES[c.council_area] || c.council_area}` : ''}${c.promoted ? ' · Veteran' : ''}`));
+          const pr = c.profile;
+          parts.push(h('div', { class: 'cprofile' },
+            cmdCard(c, { size: 'l', faction: slugOf(c.owner_player_id), rank: rankOf(c), troops: c.troops }),
+            h('div', { class: 'cinfo' },
+              h('h3', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`),
+              pr && pr.epithet ? h('div', { class: 'cepi' }, pr.epithet) : null,
+              h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}${pr && pr.age ? ` · age ${pr.age}` : ''}${c.council_area ? ` · Councillor of the ${AREA_NAMES[c.council_area] || c.council_area}` : ''}${c.promoted ? ' · Veteran' : ''}`))));
+          if (pr && pr.bio) parts.push(h('p', { class: 'cbio' }, pr.bio));
           parts.push(h('div', { class: 'sec' },
             line('Rank', rankOf(c)),
             line('Troops', c.troops),
