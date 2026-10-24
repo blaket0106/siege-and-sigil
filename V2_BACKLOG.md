@@ -23,7 +23,7 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - Random event deck (plague, unrest, harvest, comet) with optional responses. Built but hidden from setup for now.
 
 ### Council
-- Named council seat characters: seven seats, seven named councillors per player, deployable to the field (seat bonus lost while away) or killable (seat vacant until a replacement is recruited).
+- Named council seat characters: seven seats, seven named councillors per player, deployable to the field (seat bonus lost while away) or killable (seat vacant until a replacement is recruited). Built, with the player-facing section parked (see the parking lot below).
 
 ### UI / Intelligence
 - News bulletin tab: the News tab already carries the public record (war declarations, eliminations, captures, sieges, world events); alliances and pacts stay private.
@@ -36,6 +36,7 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - **AI council advisor** — per-seat AI voice answering live game state in character. Needs an Anthropic API key, a server-side call and a per-question cost budget.
 - **Character personalities in the intel system** — procedurally generated traits for named commanders and council members, used by the advisor and AI-written whispers (councillors are ready to carry them). Councillors now exist, so this depends only on the advisor.
 
+- **Named councillors in the Info panel (parking lot)** — the Council section of the right-hand Info panel (named councillor per seat with portraits, Deploy to the field, Recall to court, Recruit a replacement) has been taken off the screen for now. Everything behind it still runs: every seat keeps its named councillor at court, so seat bonuses still apply, and the server functions (`deploy_councillor`, `recall_councillor`, `recruit_councillor`), AI behaviour, profiles and portraits are untouched. The section was removed from `index.html` in the commit after 312bbd2; restore it from git history (`councilSection`) when the idea comes back. Open questions: whether deploying a seat's councillor is worth the bonus loss, and where it should live (Realm panel or a dedicated council page).
 - **House boosts (parking lot)** — each house gets a real gameplay identity that matches its lore `known_for` line (Kaldran stronger walls and watchtowers, Veyra alliances and learning, Dravos arms and siege engines, Halcyr fast marches and stables, Mereth gold and hired captains, Ostrand river crossings and coastal levies, Thornwick scouts and patient defence, Brannoch large cheap levies). Step one is a design doc proposing one boost per house for review, then balancing with sims. `factions.modifier` (jsonb) is reserved for it.
 - **Supply-line helper for players (parked)** — a one-click looping route builder and map flow arrows. Parked until after the AI balance and end-game work.
 
