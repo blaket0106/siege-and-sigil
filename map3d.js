@@ -446,6 +446,15 @@ function village(cx0, cz0, n, S) { for (let i = 0; i < n; i++) { const a = rnd()
   const g = mergeGeometries(parts), im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95, side: THREE.DoubleSide }), PASS.length), d = new THREE.Object3D();
   PASS.forEach((p, i) => { d.position.set(p.x, hAt(p.x, p.z) - 1, p.z); d.rotation.y = hash(i, 4) * 6; d.scale.setScalar(.95); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }); im.castShadow = true; im.receiveShadow = true; scene.add(im); scene.userData.pass = im;
 }
+{
+  const J = art.junctions || [];
+  if (J.length) {
+    const parts = [], post = new THREE.CylinderGeometry(.7, .8, 16, 5); post.translate(0, 8, 0); parts.push(paint(post, () => [.3, .21, .12]));
+    for (const [yy, rot] of [[13, .4], [9.5, -.5]]) { const arm = new THREE.BoxGeometry(11, 2.4, .8); arm.translate(5.5, 0, 0); arm.rotateY(rot); arm.translate(0, yy, 0); parts.push(paint(arm, () => [.62, .5, .3])); }
+    const im = new THREE.InstancedMesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 }), J.length), d = new THREE.Object3D();
+    J.forEach(([x, z], i) => { d.position.set(x, hAt(x, z), z); d.rotation.y = hash(i, 9) * 6; d.scale.setScalar(1); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }); im.castShadow = true; scene.add(im);
+  }
+}
 const flags = [];
 const mEarth = new THREE.MeshStandardMaterial({ color: 0xb08c5c, roughness: 1, map: thatchTex, bumpMap: thatchTex, bumpScale: 1 });
 const mCobble = new THREE.MeshStandardMaterial({ map: stoneTex, bumpMap: stoneTex, bumpScale: 2.5, color: 0x7e776a, roughness: 1 });

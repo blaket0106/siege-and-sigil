@@ -305,7 +305,7 @@ cost = floor(base × (currentLevel + 1) / resources × infra_cost_mult)
 | Treasury | 500 |
 | Recruitment | 1000 |
 | Prestige | 4000 |
-| Road | `floor(10000 / natural_resources)` |
+| Road | `floor(6 x resources x infra_cost_mult)` (x3 if costly) |
 
 `resources = (laws_council_level × 5) + territory.natural_resources`
 
@@ -328,7 +328,7 @@ base_speed = 17.5 × commander_speed_mult   (leagues/tick, using normalized map 
 ### 5b. Road Bonus
 When **both** origin and destination have a road built:
 ```
-road_speed = base_speed × 3   (52.5 leagues/tick at 1.0 multiplier)
+road_speed = base_speed × sqrt(Stables level + 3)   (about 1.73x at Stables 0, 2x at 1, 3x at 6)
 ```
 
 ### 5c. Travel Time
@@ -989,7 +989,7 @@ All are client-callable (signed-in players) and require an active game and a non
 - `transfer_troops(game, commander, amount)`: commander must be idle at one of your territories; positive moves garrison to commander, negative the reverse.
 - `upgrade_infrastructure(game, territory, type)`: `type` is `treasury` / `recruitment` / `prestige` (levels `treasury_level` / `industry_level` / `prestige_level`). Cost `floor(base × (level + 1) / resources × infra_cost_mult)` with base 500 / 1000 / 4000, minimum 1. No level cap.
 - `bulk_upgrade_infrastructure(game, type, budget)`: repeatedly upgrades the currently cheapest owned territory until the budget (capped at your gold) runs out. Returns `{upgraded, spent}`; one ledger row.
-- `build_road(game, territory)`: cost `floor(10000 / natural_resources × infra_cost_mult)`. `demolish_road` is free and refunds nothing.
+- `build_road(game, territory)`: cost `floor(6 × resources × infra_cost_mult × (3 if expensive))`. `demolish_road` is free and refunds nothing.
 - `send_gold(game, target_player, amount)`: ledger rows for both sides, inbox message for the receiver. Not allowed to self or to eliminated players.
 - `set_active_area(game, area)`: sets the single active project; progress in other areas is kept.
 - `assign_garrison_commander(game, commander)` / `unassign_garrison_commander(game, territory)`: the commander must be idle at one of your territories. Assigning replaces any current garrison commander there.
@@ -1000,7 +1000,7 @@ All are client-callable (signed-in players) and require an active game and a non
 ### 20m. Movement (orders implemented; execution is the tick engine's job)
 
 - **Pathing:** Dijkstra over `territory_edges`, minimizing travel time. A commander may pass **only through territory owned by himself or an ally** (formal alliance). The destination can be anything, so contact with an enemy or neutral castle is always the end of an order, and castles block movement. No friendly corridor to the destination means no route.
-- **Speed:** `17.5 × commander_speed_mult × (1 + 0.10 × Pace level)`, units per tick; Pace uses the higher of the commander's own level and the king's floor (king level - 1, king active only after `coronation_tick`). Each edge costs `length × move_cost_mult`, divided by 3 when both of its end territories have a road.
+- **Speed:** `17.5 × commander_speed_mult × (1 + 0.10 × Pace level)`, units per tick; Pace uses the higher of the commander's own level and the king's floor (king level - 1, king active only after `coronation_tick`). Each edge costs `length × move_cost_mult`, divided by `sqrt(3 + Stables level)` of the marching player when both of its end territories have a road.
 - **Arrival ticks:** `ceil(cumulative cost / speed)` per node, never decreasing, at least 1 tick overall. Stored in `commander_movements.path_arrival_ticks` so mid-march position and intercepts can be computed.
 - **Range:** `90 + 60 × Stables level` limits the raw (road-free) length of one order's path. **A single-edge hop is always allowed**, otherwise the longer edges (up to about 300 units, against a level-1 range of 150) could be unreachable for a long time. Range applies to each leg of a multi-stop route.
 - `march_commander(game, commander, territory, march_type)` is a one-stop route. `send_on_route(game, commander, stops, march_type)` takes 1 to 10 stops (`{territory_id, march_type?}`), creates an active `commander_routes` row, and launches the first leg. Only the first leg is validated at order time; later legs must be re-planned when the engine starts them.
@@ -1324,7 +1324,7 @@ Neptune's Pride has no terrain: ships fly straight between stars. Here soldiers 
 
 1. **One network.** Every castle, including river castles, is a node on a single connected trail network. Trails are generated paths that bend around mountains, forests and water; they are not roads. The generator guarantees connectivity and fails the build rather than ship a map with an unreachable castle.
 2. **Armies stay on trails.** A march has a start castle and a destination castle. The route is the cheapest path through the network by travel cost (trail length times its terrain multiplier, divided by the road speed bonus when that edge is roaded). The army walks the trails of that route, castle to castle. There is no straight-line march and no free travel in this mode.
-3. **Roads upgrade a trail.** A road is built between two castles that share a trail edge, as today (cost `6 x resources`, speed `sqrt(Stables + 3)` between two roaded castles). It follows the trail's path. A route's travel time is the sum over its edges, so a chain of roads makes a fast highway.
+3. **Roads upgrade a trail.** A road is built between two castles that share a trail edge, as today (cost `6 x resources`, speed `sqrt(Stables + 3)` between two roaded castles (trail-mode `plan_march` used a flat 3 until migration 20261023150000)). It follows the trail's path. A route's travel time is the sum over its edges, so a chain of roads makes a fast highway.
 4. **Rivers are walls.** No trail crosses a river. The only way over is through a river castle. The river itself is never crossable on foot: no fords, no bridges except the one built into a river castle.
 5. **River castles.** A river castle stands on the river with a fortified bank on each side and a bridge hall between them (the Twins). Rules:
    - Low value by design: Tier 1, 4 to 10 natural resources, a small starting garrison. They exist to be held for the crossing, not for production.
@@ -1485,3 +1485,6 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - Fixed: an auth event while the setup form was open sent the user home and wiped the form.
 
 - Setup hides seasons, random events and mercenaries: new games always send them off. The mechanics remain in the engine for a later release. Starting upgrade levels are no longer set in setup (castles keep their own levels). Guildhall and Watchtowers carry an Optional switch in the Realm areas list; off sets that area's research cost multiplier to 0, and Guildhall off also turns off terraforming.
+
+- Road speed fix: trail-mode `plan_march` now divides roaded edges by `sqrt(3 + Stables)`, matching free-travel mode and the spec. Road build cost is `6 x castle resources x infra_cost_mult` (expensive x3), so richer castles cost more.
+- Trails now prefer to reuse existing corridors (cost x0.35 on shared cells), so paths merge and diverge. Divergence points are returned as `art.junctions` for the client to draw as crossroads. They are visual only: the edge graph is still castle to castle, so armies do not stop or turn at a junction.

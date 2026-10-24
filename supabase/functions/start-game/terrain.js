@@ -148,6 +148,7 @@ function decorSeed(parts) {
 export const trailDebug = { reason: '' };
 const TRAIL_CAP = 1.9;
 const MAX_DETOUR = 2.4;
+const SHARE = 0.35;
 
 function planTrails(c, lenient = 0) {
   const wet = (sc) => (lenient ? sc.oceanFrac > lenient : sc.ocean);
@@ -437,6 +438,7 @@ function planTrails(c, lenient = 0) {
   for (const cr of crossings) openAround(cr, cell * 2.4);
   for (const p of points) openAround(p, sample(height, p.x, p.y) > MOUNT_T ? Math.max(cell * 1.1, spacing * 0.32) : cell * 1.1);
 
+  const used = new Uint8Array(G2);
   const gstamp = new Uint32Array(G2);
   const gscore = new Float64Array(G2);
   const came = new Int32Array(G2);
@@ -479,7 +481,7 @@ function planTrails(c, lenient = 0) {
           if (blocked[n] && !opened[n] && n !== t) continue;
           if (riverCell[n] && !opened[n]) continue;
           if (dx && dy && ((riverCell[cgy * G + nx] && !opened[cgy * G + nx]) || (riverCell[ny * G + cgx] && !opened[ny * G + cgx]))) continue;
-          const step = (dx && dy ? 1.4142 : 1) * (gcost[n] + gcost[cur]) * 0.5;
+          const step = (dx && dy ? 1.4142 : 1) * (gcost[n] * (used[n] ? SHARE : 1) + gcost[cur] * (used[cur] ? SHARE : 1)) * 0.5;
           const ng = gc + step;
           if (gstamp[n] !== stampId || ng < gscore[n]) {
             gstamp[n] = stampId;
@@ -494,6 +496,7 @@ function planTrails(c, lenient = 0) {
   };
 
   const finals = [];
+  const cellPaths = [];
   const edgeKind = (e) => {
     const ends = [e.a, e.b].filter((n) => n >= N0).map((n) => crossings[n - N0]);
     if (!ends.length) return 'land';
@@ -521,6 +524,10 @@ function planTrails(c, lenient = 0) {
     };
     const plen = (poly) => poly.reduce((s, p, k) => (k ? s + Math.hypot(p[0] - poly[k - 1][0], p[1] - poly[k - 1][1]) : 0), 0);
     if (pts && (crosses(pts) || plen(pts) > 2.1 * straight)) pts = null;
+    if (pts && cells) {
+      cellPaths.push(cells);
+      for (const k of cells) used[k] = 1;
+    }
     if (!pts) {
       const direct = [[A.x, A.y], [B.x, B.y]];
       const scD = scanLine(A, B);
@@ -562,8 +569,30 @@ function planTrails(c, lenient = 0) {
     trailDebug.reason = `paths left ${rs.size} components`;
     return null;
   }
+  const nbr = new Map();
+  for (const cs of cellPaths) {
+    for (let k = 0; k < cs.length; k++) {
+      const set = nbr.get(cs[k]) || new Set();
+      if (k) set.add(cs[k - 1]);
+      if (k < cs.length - 1) set.add(cs[k + 1]);
+      nbr.set(cs[k], set);
+    }
+  }
+  const stops = [...points, ...crossings];
+  const rawJ = [];
+  for (const [k, set] of nbr) {
+    if (set.size < 3) continue;
+    const jx = ((k % G) + 0.5) * cell;
+    const jy = (((k / G) | 0) + 0.5) * cell;
+    if (stops.some((q) => Math.hypot(q.x - jx, q.y - jy) < spacing * 0.35)) continue;
+    rawJ.push({ x: jx, y: jy });
+  }
+  const junctions = [];
+  for (const j of rawJ) {
+    if (!junctions.some((q) => Math.hypot(q.x - j.x, q.y - j.y) < spacing * 0.3)) junctions.push(j);
+  }
   const at = (q) => ({ x: q.x, y: q.y });
-  return { crossings, edges: finals, passes: crossings.filter((q) => q.pass).map(at), fords: crossings.filter((q) => !q.pass).map(at) };
+  return { junctions, crossings, edges: finals, passes: crossings.filter((q) => q.pass).map(at), fords: crossings.filter((q) => !q.pass).map(at) };
 }
 
 export function buildTerrain(o) {
@@ -961,6 +990,7 @@ export function buildTerrain(o) {
       m: mStr.join(''),
       rivers: riverPolys,
       fords: (trails ? trails.fords : fords).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
+      junctions: trails ? trails.junctions.map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]) : [],
       passes: (trails ? trails.passes.filter((p, i, arr) => arr.findIndex((q) => Math.hypot(q.x - p.x, q.y - p.y) < spacing * 0.15) === i) : passes).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]),
     },
     stats: {

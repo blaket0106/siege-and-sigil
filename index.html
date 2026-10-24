@@ -753,7 +753,7 @@
         ['h', 'Upgrade costs'],
         ['p', 'An upgrade costs base times (current level plus one), divided by the castle\'s resources. [[map#natural-wealth|Natural resources]] and your [[areas|Guildhall]] make upgrades cheaper, so the same gold goes further at a rich castle. Bulk upgrade spends a budget on the cheapest castles first.'],
         ['h', 'Roads'],
-        ['p', 'Build a road at two castles and [[marching|marches]] between them are three times faster. A road costs 10000 divided by the castle\'s resources, so build them at your rich castles and along your front line.'],
+        ['p', 'Build a road at two castles and [[marching|marches]] between them are faster by a factor of the square root of (3 + your Stables level): about 1.7 times at Stables 0, 2 times at 1 and 3 times at 6. A road costs 6 gold per natural resource of the castle, so richer castles cost more.'],
         ['h', 'Capturing castles'],
         ['p', 'A captured castle keeps its Recruitment, Prestige and roads but its Treasury is destroyed. You are paid 10 gold for each Treasury level destroyed. The castle starts with no garrison, so the army that took it must hold it.'],
       ] },
@@ -1774,7 +1774,7 @@
       const mirror = toggle({ icon: 'mirror', title: 'Mirrored lands', help: 'The map is mirrored on both axes so every house starts on identical ground. Needs 2, 4 or 8 seats.', onChange: changed });
       const mapPreset = cards(Object.entries(PRESET_INFO).map(([k, v]) => [k, v.split(':')[0], v.split(':')[1].trim().replace(/^./, (c) => c.toUpperCase()), `terrain_${k}`]), 'continental', changed, { compact: true, min: 150 });
       const travel = cards([['trails', 'Castle trails', 'Armies follow trails between castles. Rivers and mountains block except at crossings and passes.', 'travel_trails'], ['free', 'Free travel', 'March to any castle in range. Ground in between sets the time.', 'travel_free']], 'trails', changed, { compact: true, min: 240 });
-      const roads = cards([['cheap', 'Cheap roads', 'Roads cost little and triple march speed between built castles.', 'roads_cheap'], ['expensive', 'Costly roads', 'Roads are an investment.', 'roads_expensive'], ['disabled', 'No roads', 'Armies always march at base speed.', 'roads_disabled']], 'cheap', changed, { compact: true, min: 150 });
+      const roads = cards([['cheap', 'Cheap roads', 'Roads cost little and speed up marches between built castles. The boost grows with Stables.', 'roads_cheap'], ['expensive', 'Costly roads', 'Roads are an investment.', 'roads_expensive'], ['disabled', 'No roads', 'Armies always march at base speed.', 'roads_disabled']], 'cheap', changed, { compact: true, min: 150 });
       const randomRoads = cards([['none', 'None', 'Every road is built by players.', 'rand_none'], ['rare', 'Rare', 'About 1 in 10 neutral castles starts with a road.', 'rand_rare'], ['common', 'Common', 'About 3 in 10 neutral castles start with a road.', 'rand_common']], 'none', changed, { compact: true, min: 150 });
       const richness = cards([['sparse', 'Sparse', 'Upgrades are expensive. Wealth is rare.', 'res_sparse'], ['standard', 'Standard', 'A balanced spread of rich and poor castles.', 'res_standard'], ['plentiful', 'Plentiful', 'Most castles are rich and cheap to build on.', 'res_plentiful']], 'standard', changed, { compact: true, min: 150 });
       const home = cards([['close', 'Close', 'Houses start near the middle and meet early.', 'home_close'], ['medium', 'Medium', 'Houses start at a comfortable distance.', 'home_medium'], ['far', 'Far', 'Houses start near the edges, with room to grow.', 'home_far']], 'medium', changed, { compact: true, min: 150 });
@@ -3128,7 +3128,10 @@
         const gap = (x, y) => sv('g', { transform: `translate(${x},${y}) scale(${M()})` },
           sv('path', { d: 'M-9,5 L-4,-6 L0,1 L4,-6 L9,5 Z', fill: '#e8dcc2', stroke: '#2a2418', 'stroke-width': 1.2 }),
           sv('line', { x1: 0, y1: 1, x2: 0, y2: 5, stroke: '#2a2418', 'stroke-width': 1 }));
-        L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])));
+        const cross = (x, y) => sv('g', { transform: `translate(${x},${y}) scale(${M()})`, style: 'pointer-events:none' },
+          sv('circle', { r: 5, fill: '#c9a46a', stroke: '#2a2418', 'stroke-width': 1.2 }),
+          sv('path', { d: 'M-3,0 H3 M0,-3 V3', stroke: '#2a2418', 'stroke-width': 1.1 }));
+        L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])), ...(ms.art.junctions || []).map((f) => cross(f[0], f[1])));
         svg.parentElement.style.background = ms.game.fog_dark ? '#000' : '#0e2f4f';
         if (!svg.parentElement.querySelector('.legend')) {
           const dot = (style) => h('span', { class: 'ldot', style });
