@@ -990,7 +990,6 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .ccard.s { width: 34px; height: 44px; }
 .ccard.l { width: 118px; height: 158px; border-radius: 8px; padding: 3px; }
 .ccard .cbadge { position: absolute; z-index: 2; display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: rgba(10, 10, 14, 0.82); border: 1px solid var(--c2); color: var(--c2); font: 600 0.72rem var(--font-ui, serif); }
-.ccard .cbadge.sch { top: 6px; left: 6px; padding: 0; width: 24px; }
 .ccard .cbadge.rank { top: 6px; right: 6px; color: #f5dc94; border-color: #d6ab52; }
 .ccard .cbar { position: absolute; z-index: 2; left: 3px; right: 3px; bottom: 3px; display: flex; align-items: center; justify-content: center; gap: 5px; height: 22px; border-radius: 0 0 5px 5px; background: linear-gradient(180deg, rgba(10, 10, 14, 0.7), rgba(10, 10, 14, 0.92)); color: #f3e7c6; font: 600 0.85rem var(--font-ui, serif); border-top: 1px solid var(--c2); }
 .cprofile { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 8px; }
@@ -1004,3 +1003,14 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .hc-leader { display: flex; gap: 12px; align-items: flex-start; }
 .hc-leader .ccard.s { width: 64px; height: 85px; }
 .hc-leader .ccard.s .cart img { transform: scale(1.5); }
+
+.ccard .cbar { justify-content: space-between; padding: 0 8px; }
+.ccard .cbar .cschool { display: inline-flex; color: var(--c2); }
+.ccard .cbar .ctroops { display: inline-flex; align-items: center; gap: 5px; }
+.chron { margin: 8px 0 12px; }
+.chron h4 { margin: 0 0 6px; font-family: var(--font-display); letter-spacing: 0.08em; color: var(--gilt-hi, #f5dc94); }
+.chron-stats { color: var(--dim); margin-bottom: 6px; font-style: italic; }
+.chron-row { display: flex; gap: 10px; padding: 5px 0; border-top: 1px solid var(--rule-soft, rgba(214, 171, 82, 0.2)); line-height: 1.35; }
+.chron-row .ct { flex: none; width: 58px; color: var(--faint, #7e7259); font-size: 0.82rem; padding-top: 2px; }
+.chron-row.k-capture span:last-child { color: var(--gilt-hi, #f5dc94); }
+.chron-row.k-loss span:last-child, .chron-row.k-fell span:last-child, .chron-row.k-captured span:last-child { color: #d98a80; }

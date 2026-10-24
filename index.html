@@ -476,9 +476,8 @@
       const large = opts.size === 'l';
       return h('div', { class: `ccard ${large ? 'l' : 's'}${c.role === 'king' ? ' king' : ''}`, style: `--c1:${f.color};--c2:${f.color2}` },
         art,
-        large ? h('span', { class: 'cbadge sch', title: c.school }, pict(SCHOOL_ICON[c.school] || 'swords', 16)) : null,
         large && opts.rank != null ? h('span', { class: 'cbadge rank', title: 'Rank' }, `R${opts.rank}`) : null,
-        large && c.troops != null ? h('span', { class: 'cbar' }, pict('troops', 14), String(c.troops)) : null);
+        large ? h('span', { class: 'cbar' }, h('span', { class: 'cschool', title: c.school }, pict(SCHOOL_ICON[c.school] || 'swords', 14)), c.troops != null ? h('span', { class: 'ctroops', title: 'Troops carried' }, pict('troops', 14), String(c.troops)) : null) : null);
     }
 
     function houseCard(slug) {
@@ -856,6 +855,8 @@
         ['p', 'Pick a school and pay the price. You get a new commander with a name from your house\'s own culture and one level in a random ability of that school.'],
         ['h', 'Names, faces and backgrounds'],
         ['p', 'Every commander has a profile card: a portrait, an age, sometimes an epithet such as "Quillhand", and a short background made of where they grew up, something that happened to them, and a habit. Your house\'s starting king and commanders are its named [[lore|leaders]]. The card shows the commander\'s school, rank and troops. Select a commander to read the full profile. Portraits and backgrounds are for flavor only and do not change any ability.'],
+        ['h', 'The chronicle'],
+        ['p', 'Every commander keeps a chronicle of their story, shown under their background when you select one of your own. It records when they took up arms, the battles they won and lost, castles they stormed or held, sieges they broke, times they were taken prisoner or ransomed back, the skills they mastered, the name they earned after five victories, being crowned, and how they fell. The summary line counts their victories, defeats and castles taken. Each entry is stamped with the tick it happened on.'],
         ['table', { head: ['School', 'Abilities'], rows: [
           ['Battleschool', 'Valor (more [[battles#damage-per-round|damage]]), Tactics (strike first in the [[battles#fighting-in-the-open|field]]), Siegecraft (stronger [[sieges|sieges]])'],
           ['University', 'Muster (more troops), Steward (more gold), Scholar (more prestige)'],
@@ -2785,6 +2786,7 @@
       const ownerCol = owner ? colors.c : '#8e8a82';
       const tagY = Math.round(W * 0.2) + 10;
       const troop = showTroops ? String(t.troops) : '?';
+      const dotY = tagY + (showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? 54 : 31);
       const nameW = nameLabel.length * 8.4;
       const tw = 24 + nameW + (troop.length * 9 + 14);
       const x0 = -tw / 2;
@@ -2806,7 +2808,7 @@
           sv('text', { x: x0 + tw - 8, y: tagY + 15.5, 'text-anchor': 'end', 'font-size': 13, style: `fill:${showTroops ? '#f5dc94' : '#9a8a64'};font-family:Cinzel,serif;font-weight:700` }, troop)),
         showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'lbl-infra', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
         here.map((c, i) => sv('circle', {
-          cx: (i - (here.length - 1) / 2) * 16, cy: tagY + 31, r: c.role === 'king' ? 7 : 5.8, fill: colors.cmd(c.owner_player_id),
+          cx: (i - (here.length - 1) / 2) * 16, cy: dotY, r: c.role === 'king' ? 7 : 5.8, fill: colors.cmd(c.owner_player_id),
           stroke: cmdSel(c) ? '#fff' : (c.role === 'king' ? '#f5dc94' : '#000'), 'stroke-width': c.role === 'king' ? 2 : 1.4, style: 'cursor:pointer',
           onclick: (e) => { e.stopPropagation(); onCmd(c); },
         })));
@@ -4612,7 +4614,7 @@
             line('Owner', owner ? pname(owner) + (seen ? '' : ' (last seen)') : 'Unclaimed'),
             line('Troops', seen ? t.troops : 'Unknown'),
             seen && t.resources !== undefined && t.resources !== null && t.resources !== t.natural_resources ? line('Resources (with terraforming)', t.resources) : null,
-            seen ? line('Treasury / Industry / Prestige', `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
+            seen ? line('Treasury / Recruitment / Prestige', `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
             seen ? line('Road', t.has_road ? 'Yes' : 'No') : null,
             t.garrison_commander_id && seen ? line('Garrison leader', (ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || '') : null));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
@@ -4650,6 +4652,24 @@
               pr && pr.epithet ? h('div', { class: 'cepi' }, pr.epithet) : null,
               h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}${pr && pr.age ? ` · age ${pr.age}` : ''}${c.council_area ? ` · Councillor of the ${AREA_NAMES[c.council_area] || c.council_area}` : ''}${c.promoted ? ' · Veteran' : ''}`))));
           if (pr && pr.bio) parts.push(h('p', { class: 'cbio' }, pr.bio));
+          if (c.owner_player_id === ms.me.id) {
+            const box = h('div', { class: 'chron' }, h('h4', {}, 'Chronicle'), h('div', { class: 'chron-body' }, 'Reading the chronicle...'));
+            parts.push(box);
+            ms.chron = ms.chron || new Map();
+            const paint = (data) => {
+              const body = box.querySelector('.chron-body');
+              if (!body) return;
+              const entries = data.entries || [];
+              const draw = (all) => body.replaceChildren(...[
+                h('div', { class: 'chron-stats' }, `${data.wins} won, ${data.losses} lost, ${data.castles} castles taken`),
+                ...(all ? entries : entries.slice(0, 8)).map((e) => h('div', { class: `chron-row k-${e.kind}` }, h('span', { class: 'ct' }, `Tick ${e.tick}`), h('span', {}, e.text))),
+                !all && entries.length > 8 ? h('button', { type: 'button', class: 'link', onclick: () => draw(true) }, `Show all ${entries.length}`) : null].filter(Boolean));
+              draw(false);
+            };
+            const hit = ms.chron.get(c.id);
+            if (hit) paint(hit.data);
+            if (!hit || Date.now() - hit.at > 12000) sb.rpc('commander_chronicle', { p_commander_id: c.id }).then(({ data }) => { if (data) { ms.chron.set(c.id, { at: Date.now(), data }); paint(data); } });
+          }
           parts.push(h('div', { class: 'sec' },
             line('Rank', rankOf(c)),
             line('Troops', c.troops),
