@@ -292,6 +292,11 @@
       thornwick: ['#2F6B3A', '#D9D2B0', 'Thornwick'], veyra: ['#1F3A93', '#C0C8D4', 'Veyra'],
     };
 
+    function setHouse(f) {
+      const r = document.documentElement.style;
+      r.setProperty('--house', f.color);
+      r.setProperty('--house2', f.color2);
+    }
     function factionOf(slug) {
       const found = state.factions.find((f) => f.slug === slug);
       if (found) return found;
@@ -2902,6 +2907,7 @@
 
       const color = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color : '#6b6b78');
       const color2 = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color2 : '#2a2a35');
+      state.cleanup.push(() => { const r = document.documentElement.style; r.removeProperty('--house'); r.removeProperty('--house2'); });
       const pname = (pid) => (pid && ms.players.get(pid) ? ms.players.get(pid).display_name : 'Unclaimed');
       const dipStatus = (pid) => {
         const r = ms.dip.find((d) => d.player_a_id === pid || d.player_b_id === pid);
@@ -4694,6 +4700,7 @@
         ms.game = view.game;
         ms.players = new Map(view.players.map((p) => [p.id, p]));
         ms.me = ms.players.get(view.me);
+        if (ms.me) setHouse(factionOf(ms.me.faction_slug));
         ms.t = new Map(view.territories.map((t) => [t.id, t]));
         ms.standings = view.standings;
         ms.serverSources = view.sources;

@@ -805,11 +805,7 @@ button.primary:not(:disabled) { animation: sxshimmer 4s ease-in-out infinite; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-.home .panel, .home .banner, .room-head, .lobby-strip, .invites > * { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.home .banners .banner:nth-child(2) { animation-delay: 0.06s; }
-.home .banners .banner:nth-child(3) { animation-delay: 0.12s; }
-.home .banners .banner:nth-child(4) { animation-delay: 0.18s; }
-.home .banners .banner:nth-child(n+5) { animation-delay: 0.24s; }
+.home .panel, .room-head { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
 .panel > h2, .section-title h2 { background: linear-gradient(90deg, var(--gilt-hi), color-mix(in srgb, var(--gilt) 60%, var(--azure)) 140%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
 .section-title::after { background: linear-gradient(90deg, var(--gilt), var(--azure) 55%, transparent) center / 100% 1px no-repeat; }
@@ -818,7 +814,7 @@ button.primary:not(:disabled) { animation: sxshimmer 4s ease-in-out infinite; }
 .banner:hover:not(:disabled) { filter: brightness(1.2) saturate(1.2); box-shadow: 0 14px 26px -12px var(--tint, var(--gilt)); }
 .banner.new .plus { transition: transform 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
 .banner.new:hover:not(:disabled) .plus { transform: rotate(90deg) scale(1.2); }
-.banner.new { animation: rise 0.5s 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both, pulseGlow 3.4s 1.2s ease-in-out infinite; }
+.banner.new { animation: pulseGlow 3.4s ease-in-out infinite; }
 
 button { transition: transform 0.12s, filter 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s; }
 button:active:not(:disabled) { transform: translateY(1px) scale(0.985); }
@@ -854,23 +850,16 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .stat b { color: var(--gilt-hi); }
 .hud .stat:nth-of-type(odd) b { color: color-mix(in srgb, var(--vert) 45%, var(--gilt-hi)); }
 
-.side .sec { animation: rise 0.4s both; }
-.side .sec:nth-of-type(2) { animation-delay: 0.04s; }
-.side .sec:nth-of-type(3) { animation-delay: 0.08s; }
-.side .sec:nth-of-type(4) { animation-delay: 0.12s; }
-.side .sec:nth-of-type(n+5) { animation-delay: 0.16s; }
 .side .sec > b { color: var(--gilt-hi); background: linear-gradient(90deg, var(--gilt), var(--azure) 60%, transparent) bottom / 100% 1px no-repeat; }
 .side h3 { text-shadow: 0 0 18px color-mix(in srgb, var(--gilt) 40%, transparent); }
 .cmdrow { transition: transform 0.15s, border-color 0.2s, background 0.2s; }
 .cmdrow:hover:not(:disabled) { transform: translateX(4px); border-color: var(--azure); }
 .side .line { transition: background 0.2s; }
 .side .line:hover { background: linear-gradient(90deg, color-mix(in srgb, var(--gilt) 10%, transparent), transparent); }
-.chatline { animation: slideIn 0.3s both; }
 
 .mnavbtn { transition: color 0.2s, border-color 0.2s, background 0.2s, padding 0.2s; }
 .mnavbtn:hover:not(:disabled) { padding-left: 17px; border-left-color: var(--azure); }
 .mnavbtn.on, .mnavbtn.on:hover:not(:disabled) { padding-left: 15px; border-left-color: var(--gilt); background: linear-gradient(90deg, color-mix(in srgb, var(--gilt) 20%, transparent), transparent); }
-.mpane { animation: rise 0.35s both; }
 .mpane h2 { color: var(--gilt-hi); text-shadow: 0 0 22px color-mix(in srgb, var(--gilt) 35%, transparent); }
 .mpane h3 { color: color-mix(in srgb, var(--azure) 45%, var(--gilt-hi)); }
 .mnote { border-left-color: var(--gules-hi); background: linear-gradient(90deg, color-mix(in srgb, var(--gules) 16%, transparent), var(--recess) 70%); }
@@ -886,7 +875,7 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 .fcode { background: linear-gradient(90deg, var(--gilt-hi), var(--azure)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
-  .home .panel, .home .banner, .room-head, .lobby-strip, .invites > *, .banner.new, .pip.open, .side .sec, .chatline, .mpane, .friendbadge, .meter-track i, .meter-track .mine::after, .cbar i, .modal, .toast { animation: none; }
+  .home .panel, .room-head, .banner.new, .pip.open, .friendbadge, .meter-track i, .meter-track .mine::after, .cbar i, .modal, .toast { animation: none; }
   button, .banner, .cmdrow, .game { transition: none; }
 }
 
@@ -927,3 +916,29 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 :root[data-theme='light'] .modal.manual .mpane a, :root[data-theme='light'] .modal.manual .xref { color: var(--azure); }
 :root[data-theme='light'] .modal.manual .mpane h3 { color: var(--azure); }
 :root[data-theme='light'] .modal.manual .mpane th { background: color-mix(in srgb, var(--azure) 16%, transparent); }
+
+/* bolder: tinted surfaces and house color */
+:root { --house: var(--gilt); --house2: var(--gilt-lo); }
+.panel, .modal { box-shadow: var(--shadow), inset 0 0 90px -42px color-mix(in srgb, var(--panel-accent, var(--house)) 70%, transparent); }
+.panel:hover { box-shadow: var(--shadow), inset 0 0 90px -34px color-mix(in srgb, var(--panel-accent, var(--house)) 85%, transparent), 0 0 26px -6px var(--panel-accent, var(--house)); }
+.panel > h2::after { background: linear-gradient(90deg, var(--panel-accent, var(--house)), transparent); }
+.modal { border-top: 3px solid var(--house); }
+.sx-main, .sheet { box-shadow: inset 0 0 120px -60px color-mix(in srgb, var(--accent, var(--gilt)) 55%, transparent); }
+
+.hud { border-bottom: 3px solid var(--house); box-shadow: 0 6px 24px -10px var(--house); }
+.hud-id b { color: color-mix(in srgb, var(--house) 45%, white); text-shadow: 0 0 16px var(--house); }
+.meter-track .mine { background: linear-gradient(180deg, color-mix(in srgb, var(--house) 55%, white), var(--house) 50%, color-mix(in srgb, var(--house) 65%, black)); box-shadow: 0 0 14px var(--house); }
+.stat { border-color: color-mix(in srgb, var(--house) 65%, var(--gilt-lo)); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55), 0 0 12px -6px var(--house); }
+
+.side { border-left: 4px solid var(--house); box-shadow: -1px 0 0 #000, -14px 0 34px -12px var(--house), inset 60px 0 70px -60px color-mix(in srgb, var(--house) 55%, transparent); }
+.side h3 { color: color-mix(in srgb, var(--house) 40%, white); text-shadow: 0 0 22px var(--house); }
+.side .tabs { border-bottom: 2px solid color-mix(in srgb, var(--house) 60%, transparent); }
+.side .tabs button.on { border-bottom-color: var(--house); color: color-mix(in srgb, var(--house) 40%, white); background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--house) 28%, transparent)); }
+.side .sec > b { color: color-mix(in srgb, var(--house) 45%, white); background: linear-gradient(90deg, var(--house), transparent 80%) bottom / 100% 2px no-repeat; }
+.side .sec { padding: 10px 12px 12px; border-radius: 4px; background: linear-gradient(135deg, color-mix(in srgb, var(--house) 14%, transparent), transparent 70%); border: 1px solid color-mix(in srgb, var(--house) 22%, transparent); }
+.side .line span:last-child { color: var(--text); font-weight: 600; }
+.cmdrow:hover:not(:disabled) { border-color: var(--house); box-shadow: 0 0 14px -4px var(--house); }
+.side button.primary, .side button:not(.ghost):not(.link):not(.cmdrow):hover:not(:disabled) { box-shadow: 0 0 16px -5px var(--house); }
+
+:root[data-theme='light'] .hud-id b, :root[data-theme='light'] .side h3, :root[data-theme='light'] .side .sec > b, :root[data-theme='light'] .side .tabs button.on { color: color-mix(in srgb, var(--house) 75%, black); }
+:root[data-theme='light'] .panel, :root[data-theme='light'] .modal { box-shadow: var(--shadow), inset 0 0 90px -48px color-mix(in srgb, var(--panel-accent, var(--house)) 60%, transparent); }
