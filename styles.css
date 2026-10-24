@@ -1000,3 +1000,7 @@ button.primary:hover:not(:disabled) { animation: sheen 0.9s ease; }
 
 .ccard.s .cart img { transform: scale(1.75); transform-origin: 50% 24%; }
 .ccard.l { width: 132px; height: 176px; }
+
+.hc-leader { display: flex; gap: 12px; align-items: flex-start; }
+.hc-leader .ccard.s { width: 64px; height: 85px; }
+.hc-leader .ccard.s .cart img { transform: scale(1.5); }

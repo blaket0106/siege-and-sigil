@@ -465,7 +465,7 @@
     function cmdCard(c, opts = {}) {
       const f = factionOf(opts.faction);
       const art = h('div', { class: 'cart' });
-      const spec = c.profile && c.profile.look ? { id: c.id, school: c.school, role: c.role, age: c.profile.age, sex: c.profile.sex, look: c.profile.look, c1: f.color, c2: f.color2 } : null;
+      const spec = c.profile && c.profile.look ? { id: c.profile.look.seed || c.id, school: c.school, role: c.role, age: c.profile.age, sex: c.profile.sex, look: c.profile.look, c1: f.color, c2: f.color2 } : null;
       const cached = spec && portraitMod ? portraitMod.portraitPeek(spec) : null;
       if (cached) art.append(h('img', { src: cached, alt: '' }));
       else {
@@ -494,7 +494,9 @@
           f.known_for ? h('div', {}, h('small', {}, 'Known for'), h('b', {}, f.known_for)) : null,
           rival ? h('div', {}, h('small', {}, 'Old rival'), h('b', {}, `House ${rival.name}`)) : null) : null,
         leaders.length ? h('h3', {}, 'Leaders') : null,
-        ...leaders.map((x) => h('div', { class: 'hc-leader' }, h('b', {}, x.name), h('span', {}, x.title), h('p', {}, x.bio))));
+        ...leaders.map((x) => h('div', { class: 'hc-leader' },
+          cmdCard({ id: x.look.seed, name: x.name, school: x.school, role: x.ord === 1 ? 'king' : 'commander', profile: { sex: x.sex, age: x.age, look: x.look } }, { faction: slug }),
+          h('div', {}, h('b', {}, x.name), h('span', {}, x.title), h('p', {}, x.bio)))));
       modal(`House ${f.name}`, body, (close) => [h('button', { onclick: close }, 'Close')]);
     }
 
