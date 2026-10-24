@@ -66,6 +66,7 @@
       session: null,
       profile: null,
       factions: [],
+      leaders: [],
       view: 'auth',
       authTab: 'signin',
       roomId: null,
@@ -418,8 +419,10 @@
               class: 'fac' + (chosen === f.slug ? ' on' : ''),
               disabled: taken.includes(f.slug),
               onclick: () => { chosen = f.slug; onPick(f.slug); draw(); },
-            }, sigil(f.slug, 36), f.name, taken.includes(f.slug) ? h('small', {}, 'Taken') : null)),
+            }, sigil(f.slug, 36), f.name, taken.includes(f.slug) ? h('small', {}, 'Taken') : (f.motto ? h('small', {}, f.motto) : null))),
         ];
+        const cf = chosen ? state.factions.find((f) => f.slug === chosen) : null;
+        if (cf && cf.blurb) buttons.push(h('div', { class: 'fac-detail' }, h('p', {}, h('b', {}, `House ${cf.name}. `), cf.blurb), h('button', { type: 'button', class: 'link', onclick: () => houseCard(cf.slug) }, 'Read their history and leaders')));
         wrap.replaceChildren(...buttons);
       };
       draw();
@@ -433,8 +436,26 @@
 
     async function loadFactions() {
       if (state.factions.length) return;
-      const { data } = await sb.from('factions').select('*').order('name');
-      state.factions = data || [];
+      const [f, l] = await Promise.all([sb.from('factions').select('*').order('name'), sb.from('faction_leaders').select('*').order('ord')]);
+      state.leaders = l.data || [];
+      state.factions = f.data || [];
+    }
+
+    function houseCard(slug) {
+      const f = factionOf(slug);
+      const leaders = state.leaders.filter((x) => x.faction_slug === slug);
+      const rival = f.rival ? factionOf(f.rival) : null;
+      const body = h('div', { class: 'hc' },
+        h('div', { class: 'hc-head', style: `--hc1:${f.color};--hc2:${f.color2}` },
+          sigil(slug, 84),
+          h('div', {}, h('b', {}, `House ${f.name}`), f.motto ? h('em', {}, f.motto) : null, f.seat ? h('small', {}, `Seat: ${f.seat}`) : null)),
+        ...(f.history || '').split('\n\n').filter(Boolean).map((t) => h('p', {}, t)),
+        f.known_for || rival ? h('div', { class: 'hc-facts' },
+          f.known_for ? h('div', {}, h('small', {}, 'Known for'), h('b', {}, f.known_for)) : null,
+          rival ? h('div', {}, h('small', {}, 'Old rival'), h('b', {}, `House ${rival.name}`)) : null) : null,
+        leaders.length ? h('h3', {}, 'Leaders') : null,
+        ...leaders.map((x) => h('div', { class: 'hc-leader' }, h('b', {}, x.name), h('span', {}, x.title), h('p', {}, x.bio))));
+      modal(`House ${f.name}`, body, (close) => [h('button', { onclick: close }, 'Close')]);
     }
 
     const TOUCH_DEVICE = window.innerWidth < 900 || window.matchMedia('(pointer: coarse)').matches;
@@ -724,6 +745,16 @@
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]).'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions in the Info tab.'],
+      ] },
+      { id: 'lore', group: 'The world', title: 'History of the realm', blocks: [
+        ['p', 'For four hundred years the Aldermark was one realm, the Concord of the Eight Seals. Eight great houses each held a seal, and a castle belonged to whoever held a charter stamped with the Throne\'s seal and their own house\'s. The Great Roads joined every chartered castle, kept by Road-Wardens who set a milestone and a signpost at every crossroads.'],
+        ['h', 'The Hollow Year'],
+        ['p', 'Emperor Aldous died without naming an heir, and in the same week the Chancery that kept the charters burned. Every house claimed the right to seal the succession and none could prove it. Within a decade a charter meant nothing: a castle belonged to whoever could hold it. The seals themselves were scattered, and the Throne has stood empty ever since. The Hollow Year is year zero, and the realm now counts sixty years since.'],
+        ['h', 'The Hollow Crown'],
+        ['p', 'The roads still stand, patched and contested. The house that holds enough castles, and keeps troops and gold flowing along the old roads to the ones that matter, will have the realm\'s consent to seal a new charter. That is the game: the share of castles in the "Road to victory" bar is what the houses call taking the Throne.'],
+        ['note', 'Click a house below, a crest on the game screen or in Standings, or "Read their history and leaders" when choosing a house, to open that house\'s history and meet its leaders. A house\'s king and starting commanders are its named leaders. They play like any commander; nothing about them changes the rules yet.'],
+        ['h', 'The eight houses'],
+        ['houses'],
       ] },
       { id: 'map', group: 'The world', title: 'The map', blocks: [
         ['p', 'The realm is a set of castles joined by routes. Everything that matters happens at castles or on the routes between them.'],
@@ -1099,6 +1130,13 @@
       if (kind === 'list') return h('ul', {}, v.map((t) => h('li', {}, ...inline(t))));
       if (kind === 'diagram') return manualDiagram(v);
       if (kind === 'calc') return manualCalc();
+      if (kind === 'houses') {
+        const host = h('div', { class: 'mhouses' });
+        const paint = () => host.replaceChildren(...state.factions.map((f) => h('button', { type: 'button', class: 'mhouse', onclick: () => houseCard(f.slug) },
+          sigil(f.slug, 44), h('span', {}, h('b', {}, `House ${f.name}`), h('em', {}, f.motto || ''), h('small', {}, f.blurb || '')))));
+        loadFactions().then(paint);
+        return host;
+      }
       if (kind === 'table') return h('table', {}, h('thead', {}, h('tr', {}, v.head.map((c) => h('th', {}, c)))), h('tbody', {}, v.rows.map((r) => h('tr', {}, r.map((c) => h('td', {}, ...inline(c)))))));
       return null;
     };
@@ -3502,7 +3540,7 @@
           sel.value = group;
           const gcol = (GROUPS.find((x) => x[0] === group) || [])[2];
           return h('div', { style: cols },
-            h('span', { style: 'display:flex;align-items:center;gap:8px' }, sigil(p.faction_slug, 26), p.display_name, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'tag', style: 'color:var(--gules-hi)' }, 'out') : null),
+            h('span', { style: 'display:flex;align-items:center;gap:8px' }, h('button', { type: 'button', class: 'crestbtn', title: `House ${factionOf(p.faction_slug).name}: history and leaders`, 'aria-label': `House ${factionOf(p.faction_slug).name} history and leaders`, onclick: () => houseCard(p.faction_slug) }, sigil(p.faction_slug, 26)), p.display_name, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'tag', style: 'color:var(--gules-hi)' }, 'out') : null),
             h('b', {}, String(n)),
             h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: p.id === ms.me.id ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
             h('span', {}, p.id === ms.me.id ? 'You' : DIP_NAMES[dipStatus(p.id)] || dipStatus(p.id)),
@@ -3649,7 +3687,7 @@
         const stat = (label, value) => h('div', { class: 'stat' }, h('span', {}, label), h('b', {}, String(value)));
         hud.replaceChildren(...[
           h('button', { class: 'ghost', onclick: showHome, title: 'Back to games' }, 'Games'),
-          h('div', { class: 'hud-id' }, sigil(ms.me.faction_slug, 34),
+          h('div', { class: 'hud-id' }, h('button', { type: 'button', class: 'crestbtn', title: `House ${factionOf(ms.me.faction_slug).name}: history and leaders`, 'aria-label': 'House history and leaders', onclick: () => houseCard(ms.me.faction_slug) }, sigil(ms.me.faction_slug, 34)),
             h('div', {}, h('b', {}, g.name), h('div', { class: 'sub' }, g.status === 'finished' ? `Finished${winner ? ' · winner ' + winner.display_name : ''}` : `Tick ${g.current_tick}`, ' ', nextEl))),
           h('div', { class: 'meter', title: `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game.` },
             h('div', { class: 'meter-label' }, h('span', {}, 'Road to victory'), h('b', {}, `${mineN} of ${winAt}`)),
