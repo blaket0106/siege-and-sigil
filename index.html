@@ -2876,7 +2876,7 @@
       const hud = h('div', { class: 'hud' });
       const sideEl = h('div', { class: 'side' });
       const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
-      const L = { terrain: sv('g'), rivers: sv('g'), crossings: sv('g'), fog: sv('g'), cells: sv('g'), edges: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
+      const L = { terrain: sv('g'), rivers: sv('g'), crossings: sv('g'), fog: sv('g'), cells: sv('g'), edges: sv('g'), junctions: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g'), dyn: sv('g') };
       svg.append(sv('defs', {},
         sv('radialGradient', { id: 'gDirt' }, sv('stop', { offset: '0', 'stop-color': '#8a6a3c', 'stop-opacity': 0.62 }), sv('stop', { offset: '0.6', 'stop-color': '#6f5530', 'stop-opacity': 0.4 }), sv('stop', { offset: '1', 'stop-color': '#4a3a20', 'stop-opacity': 0 })),
         sv('radialGradient', { id: 'gShadow' }, sv('stop', { offset: '0', 'stop-color': '#000', 'stop-opacity': 0.5 }), sv('stop', { offset: '1', 'stop-color': '#000', 'stop-opacity': 0 })),
@@ -3131,7 +3131,8 @@
         const cross = (x, y) => sv('g', { transform: `translate(${x},${y}) scale(${M()})`, style: 'pointer-events:none' },
           sv('circle', { r: 5, fill: '#c9a46a', stroke: '#2a2418', 'stroke-width': 1.2 }),
           sv('path', { d: 'M-3,0 H3 M0,-3 V3', stroke: '#2a2418', 'stroke-width': 1.1 }));
-        L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])), ...(ms.art.junctions || []).map((f) => cross(f[0], f[1])));
+        L.crossings.replaceChildren(...(ms.art.fords || []).map((f) => bridge(f[0], f[1])), ...(ms.art.passes || []).map((f) => gap(f[0], f[1])));
+        L.junctions.replaceChildren(...(ms.art.junctions || []).map((f) => cross(f[0], f[1])));
         svg.parentElement.style.background = ms.game.fog_dark ? '#000' : '#0e2f4f';
         if (!svg.parentElement.querySelector('.legend')) {
           const dot = (style) => h('span', { class: 'ldot', style });
