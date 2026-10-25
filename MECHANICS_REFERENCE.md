@@ -1735,3 +1735,19 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - **AI chat:** a house that fought another house in the last 6 ticks may comment (winning attack, lost attack, held walls, lost castle); a Defensive house no longer uses the "Enjoy it while it lasts" taunt, using a watchful line instead.
 - **Phone header:** on narrow screens the Menu button now sits next to Games instead of overlaying the title.
 - **Not changed:** the lobby unread badge counts inbox reports only (the in-game Inbox count also includes unseen battles, kept in the browser); Quick start's castle count includes river-crossing castles, so 24 per house gives about 97.
+
+## 42. The Base Bundle, and AI That Plays to Win (migrations 20261024480000, 20261024490000)
+
+**The base bundle (decided October 2026; map size and speed are variants of it):**
+- Map size 10 (shown as 1x), castle trails, leagues on (`unit_scale` 10): one league = 1,500 map units = the spacing between neighbouring castles at 1x.
+- March speed basis 3, speed multiplier 1: about 0.35 leagues per tick, so a neighbouring castle is 2 to 4 ticks away and one march reaches 2.8 leagues at Stables 1 (range 300 + 120 x Stables units x 10).
+- 24 castles per house (the map has a few extra river-crossing castles), 4 starting castles with 10 troops each, starting gold 300, production every 24 ticks.
+- Neutral armory 0; neutral garrisons are `starting_garrison x tier` and never grow. Fog on, with castle owners always visible and troops, commanders and armies hidden outside scan range.
+- Variants change one thing at a time: map size (0.3x to 1.8x) changes spacing and therefore travel time; speed multiplier changes speed; fog, seasons, events and the rest are options.
+
+**AI behaviour (all houses try to win, including against human players):**
+- No tick or castle gates on the strike commander for Aggressive (from tick 20) or Balanced (from tick 40 with 6+ castles); Defensive strikes from 14+ castles and only at its higher confidence margin (x1.5). Weaker rivals (under 80% of the AI's castles), human or AI, are preferred targets.
+- `ai_muster` (runs before `ai_commanders` each turn): picks the idle commander nearest a rival, finds the nearest rival castle within 5 castle spacings that is reachable and in range, estimates the troops needed (defenders x 1.2 against the AI's damage), and if the staging castle holds less, sends up to four other commanders there with "drop all" orders after loading their castle's garrison, so the strike commander can take it next turn.
+- Smaller home reserves (Defensive 6, Balanced 2, Aggressive 1, plus threat-based extras), up to 12 + 2 x difficulty commanders moved per turn (was 6 + difficulty), `ai_hire` wants 5 or more commanders and hires up to 5 per turn at a ratio of 0.6 of owned castles (difficulty 3; was 0.35 and 3 per turn), and Aggressive houses spend up to 75% of surplus gold (was 50%).
+- `ai_pick_area`: Aggressive levels Armory and Barracks first, Balanced favours Armory, Defensive favours Armory and Watchtowers, rather than levelling the lowest area.
+- **Sim at the base, idle human seat, tick 165:** castles 35 (Aggressive), 29 (Defensive), 23 (Balanced), human 4; first house-vs-house battle tick 143, six by 165; no attack yet on the human, whose castles each held about 44 troops with Armory 3 (about 73 troops needed) while the nearest AI house was 1.1 leagues away with only 6 neutral castles left. Tick cost rose from about 240 ms (tick 60) to about 920 ms (tick 165).
