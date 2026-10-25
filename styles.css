@@ -1166,3 +1166,11 @@ svg.mk-far .mk-nt { display: none; }
   .hud > .hud-id { flex: 0 0 auto; min-width: 150px; max-width: 190px; }
   .hud-id .sub { overflow: hidden; text-overflow: ellipsis; }
 }
+
+@media (min-width: 900px) and (max-width: 1400px) {
+  .hud { gap: 6px 8px; }
+  .hud button { padding-left: 8px; padding-right: 8px; font-size: 0.82rem; }
+  .hud > .meter { flex: 0 1 150px; min-width: 110px; }
+  .hud-id b { max-width: 150px; }
+  .hud-id > div:last-child { min-width: 120px; }
+}
