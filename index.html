@@ -786,7 +786,7 @@
           'Click your starting castle and look at its three [[economy|upgrade tracks]].',
           'Spend your first gold on [[economy|Treasury]] at your richest castle, then on Recruitment. Income first, army second.',
           'Hire a [[commanders|commander]] from one of the three [[commanders#hiring|schools]] and move troops onto them.',
-          '[[marching|Capture]] a weak neutral castle next to you. Neutral castles only have a small garrison.',
+          '[[marching|Capture]] a neutral castle next to you. Neutral castles hold no troops and never grow any, so a single trooper takes one, and you can see how far each is by its trail.',
           'Open Standings and meet your neighbours ([[diplomacy|Diplomacy]]). A quiet border is worth more than one more army.',
         ]],
       ] },
@@ -813,8 +813,10 @@
           'Sounds mark a castle gained, a castle lost, and a new threat to your castles.',
           'Castles opens a table of every castle you hold with troops, income and who is threatening it. Home flies the map back to your starting castle.',
           'A red chip in the top bar means one of your castles is under threat. Click it to jump to the castle.',
+          'Menu, Intel charts castles, troops, commanders and buildings over time for every house, and can add them up by the groups you set in Empires. Menu, Recorder lists the war in order, and you can filter it by house or kind of event.',
           'Armies you can see show their troop count. Armies outside your scan range are not shown at all.',
-          'Finished games offer Watch replay on the story and final standings screens.',
+          'Finished games offer Watch replay on the story and final standings screens, with a score for every house and badges such as Conqueror and Iron Wall.',
+          'A castle you cannot hold can be given up from its Build section with Abandon castle. It becomes unclaimed and its troops are lost. You need another castle, no army of yours inside, and no siege against it.',
           'Zoomed out, castles and armies turn into coloured markers that stay readable at any distance. Names appear as you zoom in.',
           'Returning after time away shows a "since you were last here" summary, and an army arriving at a castle pops up a notice.',
           'On a phone the map sits above the side panel and the top bar scrolls sideways.',
@@ -897,6 +899,8 @@
           ['Library', 'Adds a bonus of prestige to one of your other areas every cycle'],
           ['Stables', 'How far an army can [[marching#range|march]] in one order'],
         ] }],
+        ['h', 'Research screen'],
+        ['p', 'Menu, Research lists every area with its level, how much prestige it holds, what the next level costs and how many production cycles that takes at your current prestige income. Only the active area earns from your castles, so use Make active to switch.'],
         ['p', 'Armory decides [[battles|battles]], so most winning players raise it early. Mint and Guildhall pay for themselves in a long game. [[marching#range|Stables]] matters most on big maps.'],
       ] },
       { id: 'commanders', group: 'Your forces', title: 'Commanders', blocks: [
@@ -1004,7 +1008,8 @@
           'At war you can send peace terms: gold, tribute or a castle.',
           'Allies can lock a marriage alliance that cannot be broken until it ends.',
           'A third player can offer to mediate between two players at war.',
-          'You can send gold to anyone.',
+          'You can send gold to anyone. Menu, Ledger lists every gift and payment and totals them by house.',
+          'Every AI house has a regard for you from -10 to +10, shown in Standings. Taking its castles and declaring war lower it. Gold, shared technology and an alliance raise it. The higher it is, the likelier it accepts your alliance and peace offers, and regard fades over about 120 ticks.',
         ]],
         ['h', 'Messages'],
         ['p', 'Open Chat and Messages to write privately to one or several players, human or AI, with an optional subject. A human answers when they read it. An AI answers on its next move, in the manner of its style and your standing with it (allied, at war or neither), and it picks up a few keywords: alliance, peace, gold or trade, and threats of war. An AI reply is a greeting or a stance, not a negotiation: to make a deal use the proposals in Standings.'],
@@ -1035,7 +1040,7 @@
           'Land shape and size, and how many castles each house starts with.',
           'Map style presets such as river valley, highlands, or a ring around a sea. They set how much water, high ground and mountain there is.',
           'Travel: [[map#trails-and-free-travel|trails or free travel]], and how far apart the capitals start.',
-          'Map size runs from Classic (0.3x) to Titanic (1.8x), with Standard (1x) as the base game. Larger maps mean longer marches and more room between castles; the number of castles stays the same.',
+          'Map size runs from Classic (0.3x) to Titanic (1.8x), with Standard (1x) as the base game. Standard spaces castles about twice as far apart as the earlier base, so a march between neighbours takes around 6 to 8 ticks. Larger maps mean longer marches and more room between castles; the number of castles stays the same.',
         ]],
         ['h', 'Rules'],
         ['list', [
@@ -1052,7 +1057,7 @@
           'In an Invite only game, only people with the code, the link or an invitation can join. A password, if you set one, still applies.',
         ]],
         ['h', 'Host tools'],
-        ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. A jump stops early when a hostile army you can see comes within 4 ticks of one of your castles, again on its last tick, and when one lays siege to a castle, so a warning is never lost inside a long jump. Armies in the fog never stop a jump. Each army stops a jump once per stage. Finished games can be replayed from the Replay bar.'],
+        ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. A jump stops early when a hostile army you can see comes within 4 ticks of one of your castles, again on its last tick, and when one lays siege to a castle, so a warning is never lost inside a long jump. Armies in the fog never stop a jump. A castle stops a jump at most once per stage in any 12 ticks, so a war on several fronts does not stop every tick. Finished games can be replayed from the Replay bar.'],
       ] },
       { id: 'glossary', group: 'Reference', title: 'Glossary', blocks: [
         ['p', 'Every term in the game, in one line, with a link to where it is explained.'],
@@ -1379,13 +1384,15 @@
     }
 
     async function summaryDialog(gameId) {
-      const [{ data, error }, roster] = await Promise.all([sb.rpc('game_summary', { p_game_id: gameId }), sb.rpc('room_players', { p_game_id: gameId })]);
+      const [{ data, error }, roster, awardsRes] = await Promise.all([sb.rpc('game_summary', { p_game_id: gameId }), sb.rpc('room_players', { p_game_id: gameId }), sb.rpc('game_awards', { p_game_id: gameId })]);
+      const awards = awardsRes.data || null;
+      const scoreOf = new Map(((awards && awards.scores) || []).map((x) => [x.player_id, x.score]));
       if (error) return toast(error.message);
       const mine = new Set((roster.data || []).filter((x) => x.is_me).map((x) => x.id));
       const rows = data.players.map((p) => h('div', { class: 'game' },
         h('div', {},
           h('div', { class: 'name' }, sigil(p.faction, 28), p.name, p.player_id === data.winner_player_id ? h('span', { class: 'tag gold' }, 'winner') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, mine.has(p.player_id) ? h('span', { class: 'tag green' }, 'you') : null),
-          h('div', { class: 'meta' }, `${p.castles} castles · ${p.troops} troops · ${p.battles} battles${p.eliminated_at_tick != null ? ` · eliminated at tick ${p.eliminated_at_tick}` : ''}`),
+          h('div', { class: 'meta' }, `${scoreOf.has(p.player_id) ? `Score ${scoreOf.get(p.player_id)} · ` : ''}${p.castles} castles · ${p.troops} troops · ${p.battles} battles${p.eliminated_at_tick != null ? ` · eliminated at tick ${p.eliminated_at_tick}` : ''}`),
           !p.is_ai && !mine.has(p.player_id)
             ? h('button', {
               class: 'small',
@@ -1397,7 +1404,7 @@
               }),
             }, 'Add friend')
             : null)));
-      modal(`${data.name}: final standings`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);margin-bottom:8px' }, `Ended at tick ${data.ticks}${data.reason ? ` (${data.reason})` : ''}`), h('div', { class: 'list', style: 'max-height:50vh;overflow-y:auto' }, ...rows)), (close) => [document.querySelector('.hud') ? h('button', { onclick: () => { close(); window.dispatchEvent(new Event('ss-replay')); } }, 'Watch replay') : null, h('button', { class: 'primary', onclick: close }, 'Close')].filter(Boolean));
+      modal(`${data.name}: final standings`, h('div', {}, h('div', { class: 'meta', style: 'color:var(--dim);margin-bottom:8px' }, `Ended at tick ${data.ticks}${data.reason ? ` (${data.reason})` : ''}`), h('div', { class: 'list', style: 'max-height:50vh;overflow-y:auto' }, ...rows), awards && awards.badges.length ? h('div', { style: 'margin-top:10px' }, h('b', {}, 'Badges'), ...awards.badges.map((b) => h('div', { class: 'line' }, h('span', { style: 'color:var(--text)' }, `${b.badge}: ${b.name}`), h('span', {}, `${b.note} (${b.value})`))), h('div', { class: 'tip' }, 'Score is 10 per castle held, 3 per castle taken, 1 per battle, and 50 for the winner.')) : null), (close) => [document.querySelector('.hud') ? h('button', { onclick: () => { close(); window.dispatchEvent(new Event('ss-replay')); } }, 'Watch replay') : null, h('button', { class: 'primary', onclick: close }, 'Close')].filter(Boolean));
     }
 
 
@@ -1996,7 +2003,7 @@
       const shape = cards(Object.entries(SHAPE_INFO).map(([k, [t, d]]) => [k, t, d, `shape_${k}`]), 'continent', changed, { min: 140 });
       const size = cards(Object.entries(SIZE_COUNT).map(([k, n]) => [k, { tiny: 'Tiny', compact: 'Compact', small: 'Small', standard: 'Standard', large: 'Large' }[k], `${n} castles per house`, rawPict(dotsMarkup(n))]), 'standard', changed, { compact: true, min: 130 });
       const scaleMarkup = (k) => { const s = 8 + 5 * k; return `<rect x="${24 - s / 2}" y="${24 - s / 2}" width="${s}" height="${s}" rx="2"/><circle cx="${24 - s / 4}" cy="${24 - s / 4}" r="1.8" fill="currentColor" stroke="none"/><circle cx="${24 + s / 4}" cy="${24 + s / 5}" r="1.8" fill="currentColor" stroke="none"/>`; };
-      const scale = cards([['3', 'Classic 0.3x', 'Room between castles', 1], ['6', 'Wide 0.6x', 'More room to maneuver', 2], ['10', 'Standard 1x', 'The base game: wide land and long marches', 3], ['12', 'Immense 1.2x', 'A true expanse', 4], ['15', 'Colossal 1.5x', 'Weeks of marching', 5], ['18', 'Titanic 1.8x', 'Enormous', 6]].map(([k, t, d, n]) => [k, t, d, rawPict(scaleMarkup(n))]), '10', changed, { compact: true, min: 130 });
+      const scale = cards([['6', 'Classic 0.3x', 'Room between castles', 1], ['12', 'Wide 0.6x', 'More room to maneuver', 2], ['20', 'Standard 1x', 'The base game: wide land and long marches', 3], ['24', 'Immense 1.2x', 'A true expanse', 4], ['30', 'Colossal 1.5x', 'Weeks of marching', 5], ['36', 'Titanic 1.8x', 'Enormous', 6]].map(([k, t, d, n]) => [k, t, d, rawPict(scaleMarkup(n))]), '20', changed, { compact: true, min: 130 });
       const style = cards([['scatter', 'Scattered', 'Castles spread evenly across the land.', 'layout_scatter'], ['continents', 'Clustered', 'Castles gather in regions with open ground between.', 'layout_clusters']], 'scatter', changed, { compact: true, min: 220 });
       const pattern = cards([['random', 'Natural', 'Neutral castles sit wherever the land allows.', 'layout_natural'], ['twin_rings', 'Twin rings', 'Two rings of neutral castles, a rich inner ring and a poorer outer one. Perfectly symmetrical.', 'layout_rings']], 'random', changed, { compact: true, min: 220 });
       const mirror = toggle({ icon: 'mirror', title: 'Mirrored lands', help: 'The map is mirrored on both axes so every house starts on identical ground. Needs 2, 4 or 8 seats.', onChange: changed });
@@ -2151,7 +2158,7 @@
           )],
         ['Houses', sec('', heading('Equip the houses', 'What every house begins with, what upgrades cost, and which realm areas start ahead.'),
           sxGroup('Starting estate', null, sxRow(sxField('Starting castles', starting, null), sxField('Starting gold', gold, 'Gold each house begins with.')), startHint,
-            sxRow(sxField('Troops per castle', garrison, 'Troops in every starting castle. Neutral castles are garrisoned in proportion.'), sxField('Starting commanders', cmdStart, 'Besides the king, each house starts with this many commanders.')),
+            sxRow(sxField('Troops per castle', garrison, 'Troops in every starting castle. Neutral castles hold none.'), sxField('Starting commanders', cmdStart, 'Besides the king, each house starts with this many commanders.')),
             sxField('Commander hire price', cmdCost, 'What it costs to hire another commander later.')),
           sxGroup('Upgrade prices', 'How much each kind of upgrade costs.', sxField('Treasury upgrades', devTreasury.el), sxField('Recruitment upgrades', devRecruit.el), sxField('Prestige upgrades', devPrestige.el)),
           sxGroup('Teaching other houses', 'Houses can teach each other realm area levels for gold.', tradeCost.el, tradeScan.el),
@@ -3107,7 +3114,7 @@
       return h('div', { class: 'articles' },
           art('The realm',
             ['Land', `${SHAPES[game.map_shape] || 'Continent'}, ${STYLES[game.map_style]}, ${SIZES[game.map_size]}`],
-            ['Scale', `${+(((game.world_scale || 1) / 10)).toFixed(2)}x${game.travel_mode === 'trails' ? ', castle trails' : game.free_travel ? ', free travel' : ', roads'}`],
+            ['Scale', `${+(((game.world_scale || 1) / 20)).toFixed(2)}x${game.travel_mode === 'trails' ? ', castle trails' : game.free_travel ? ', free travel' : ', roads'}`],
             ['Terrain', (PRESET_INFO[game.map_preset] || 'Continental').split(':')[0]],
             game.home_distance && game.home_distance !== 'medium' ? ['Home distance', (HOME_INFO[game.home_distance] || '').split(':')[0]] : null,
             ['Roads', `${game.roads_mode}${game.random_roads !== 'none' ? `, ${game.random_roads} random` : ''}`],
@@ -4056,30 +4063,120 @@
       const INTEL_METRICS = {
         castles: ['Castles', (r) => r.territories],
         troops: ['Troops', (r) => r.garrison_troops + r.commander_troops],
-        gold: ['Gold', (r) => r.gold],
+        gold: ['Gold (yours only)', (r) => r.gold],
         commanders: ['Commanders', (r) => r.commanders],
         buildings: ['Infrastructure levels', (r) => r.treasury_levels + r.industry_levels + r.prestige_levels],
       };
 
       const intelDialog = async () => {
-        const { data, error } = await sb.from('intel_snapshots').select('tick, payload').eq('game_id', gameId).order('tick');
+        const { data, error } = await sb.rpc('intel_live', { p_game_id: gameId });
         if (error) return toast(error.message);
         const metric = selectOf(Object.fromEntries(Object.entries(INTEL_METRICS).map(([k, v]) => [k, v[0]])), 'castles');
+        const mode = selectOf({ player: 'Each house', group: 'My groups (set in Empires)' }, 'player');
         const chart = h('div');
         const draw = () => {
           const fn = INTEL_METRICS[metric.value][1];
-          const series = [...ms.players.values()].map((p) => ({
-            name: p.display_name, color: color(p.id),
-            points: data.map((row) => { const r = row.payload.players.find((q) => q.player_id === p.id); return r ? [row.tick, fn(r)] : null; }).filter(Boolean),
-          })).filter((sr) => sr.points.length);
+          const value = (r) => { const v = fn(r); return Number.isFinite(v) ? v : null; };
+          let series;
+          if (mode.value === 'group') {
+            const groups = loadGroups();
+            series = GROUPS.filter((x) => x[0]).map(([k, name, col]) => {
+              const ids = [...ms.players.keys()].filter((id) => groups[id] === k);
+              if (!ids.length) return null;
+              return { name: `${name} (${ids.length})`, color: col, points: data.map((row) => {
+                const vals = ids.map((id) => { const r = row.payload.players.find((q) => q.player_id === id); return r ? value(r) : null; });
+                return vals.some((v) => v === null) ? null : [row.tick, vals.reduce((a, b) => a + b, 0)];
+              }).filter(Boolean) };
+            }).filter((sr) => sr && sr.points.length);
+          } else {
+            series = [...ms.players.values()].map((p) => ({
+              name: p.display_name, color: color(p.id),
+              points: data.map((row) => { const r = row.payload.players.find((q) => q.player_id === p.id); const v = r ? value(r) : null; return v === null ? null : [row.tick, v]; }).filter(Boolean),
+            })).filter((sr) => sr.points.length);
+          }
           chart.replaceChildren(
-            series.length ? lineChart(series, INTEL_METRICS[metric.value][0]) : h('div', { class: 'empty' }, 'No data yet.'),
+            series.length ? lineChart(series, INTEL_METRICS[metric.value][0]) : h('div', { class: 'empty' }, mode.value === 'group' ? 'No groups yet. Put houses in groups from Menu, Empires.' : 'No data yet.'),
             h('div', { class: 'row wrap2', style: 'margin-top:6px' }, series.map((sr) => h('span', { style: 'display:inline-flex;align-items:center;gap:6px;color:var(--dim)' }, h('i', { style: `width:14px;height:4px;border-radius:2px;background:${sr.color};display:inline-block` }), sr.name))));
         };
         metric.addEventListener('change', draw);
+        mode.addEventListener('change', draw);
         draw();
-        modal('Intel', data.length ? h('div', {}, h('label', {}, 'Measure'), metric, chart, h('div', { class: 'tip' }, 'One point per production cycle.'))
-          : h('div', { class: 'empty' }, 'Intel charts open when the game ends, or from the start in games without fog.'), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+        modal('Intel', data.length ? h('div', {}, h('label', {}, 'Measure'), metric, h('label', {}, 'Compare'), mode, chart, h('div', { class: 'tip' }, 'One point per production cycle. Totals only: where an army or castle stands is still hidden by the fog. Rival gold is never shown.'))
+          : h('div', { class: 'empty' }, 'Intel charts start after the first production cycle.'), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+      };
+
+      const researchDialog = async () => {
+        const { data, error } = await sb.rpc('research_info', { p_game_id: gameId });
+        if (error) return toast(error.message);
+        const per = data.income;
+        const live = canAct();
+        let closeR = () => {};
+        const etaOf = (a) => {
+          const left = Math.max(0, a.need - a.accumulated);
+          if (!a.active) return 'Not the active area';
+          if (per <= 0) return 'No prestige income';
+          const cycles = Math.max(1, Math.ceil(left / per));
+          const ticks = data.ticks_to_cycle + (cycles - 1) * data.cycle_ticks;
+          return `${cycles} cycle${cycles === 1 ? '' : 's'}, about ${ticks} ticks`;
+        };
+        const rows = data.areas.filter((a) => !a.disabled).map((a) => h('div', { class: 'sec', style: 'padding:8px 0' },
+          h('div', { class: 'line', style: 'border:none' }, h('b', {}, `${AREA_NAMES[a.area] || a.area}${a.active ? ' (active)' : ''}`), h('span', {}, `Level ${a.level}`)),
+          h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: 'mine', style: `width:${Math.min(100, (a.accumulated / Math.max(1, a.need)) * 100)}%` })),
+          h('div', { class: 'line', style: 'border:none;color:var(--dim)' }, h('span', {}, `${a.accumulated} of ${a.need} prestige`), h('span', {}, etaOf(a))),
+          live && !a.active ? h('button', { class: 'small', onclick: (e) => act(e.currentTarget, async () => { const r = await sb.rpc('set_active_area', { p_game_id: gameId, p_area: a.area }); if (r.error) throw r.error; closeR(); researchDialog(); }) }, 'Make active') : null));
+        closeR = modal('Research', h('div', {},
+          h('div', { class: 'tip' }, `Your castles earn ${per} prestige each production (every ${data.cycle_ticks} ticks, next in ${data.ticks_to_cycle}). It all goes to the active area${data.library_bonus ? `, and your Library adds about ${data.library_bonus} to a random area` : ''}.`),
+          ...rows,
+          h('div', { class: 'tip' }, 'The next level costs 144 x the current level x the game\'s research cost. More Prestige upgrades on your castles speed it up.')), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
+      };
+
+      const ledgerDialog = async () => {
+        const { data, error } = await sb.from('ledger').select('tick,type,amount,counterparty_player_id').eq('game_id', gameId).eq('player_id', ms.me.id).order('tick', { ascending: false }).limit(300);
+        if (error) return toast(error.message);
+        const LAB = { send_gold: 'Sent gold', receive_gold: 'Received gold', tech_fee: 'Technology fee', production: 'Production', starting_gold: 'Starting gold' };
+        const by = new Map();
+        let fees = 0;
+        data.forEach((r) => {
+          if (r.type === 'tech_fee') { fees += r.amount; return; }
+          if (r.counterparty_player_id == null) return;
+          const e = by.get(r.counterparty_player_id) || { sent: 0, got: 0 };
+          if (r.amount < 0) e.sent -= r.amount; else e.got += r.amount;
+          by.set(r.counterparty_player_id, e);
+        });
+        const sums = [...by.entries()].map(([pid, e]) => h('div', { class: 'line' }, h('span', { style: 'color:var(--text)' }, pname(pid)), h('span', {}, `gave ${e.sent}, received ${e.got}, net ${e.got - e.sent >= 0 ? '+' : ''}${e.got - e.sent}`)));
+        modal('Ledger', data.length ? h('div', {},
+          h('b', {}, 'By house'), ...sums,
+          fees ? h('div', { class: 'line' }, h('span', {}, 'Technology fees paid'), h('span', {}, String(-fees))) : null,
+          h('b', { style: 'display:block;margin-top:10px' }, 'Latest entries'),
+          h('div', { style: 'max-height:40vh;overflow-y:auto' }, data.slice(0, 60).map((r) => h('div', { class: 'line' }, h('span', {}, `Tick ${r.tick}: ${LAB[r.type] || r.type}${r.counterparty_player_id ? ` (${pname(r.counterparty_player_id)})` : ''}`), h('span', {}, `${r.amount > 0 ? '+' : ''}${r.amount}`))))) : h('div', { class: 'empty' }, 'No gold has passed between you and another house yet. Gifts of gold raise a house\'s regard for you.'), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
+      };
+
+      const recorderDialog = async () => {
+        const [mo, br] = await Promise.all([
+          sb.from('game_moments').select('tick,type,payload').eq('game_id', gameId).order('tick', { ascending: false }).limit(600),
+          sb.from('battle_reports').select('tick,kind,territory_name,report').eq('game_id', gameId).order('tick', { ascending: false }).limit(200),
+        ]);
+        if (mo.error) return toast(mo.error.message);
+        const SKIP = new Set(['game_started']);
+        const entries = [];
+        (mo.data || []).forEach((m) => { if (!SKIP.has(m.type)) entries.push({ tick: m.tick, type: m.type, text: momentText(m), pids: Object.values(m.payload || {}).filter((v, i, a) => typeof v === 'number' && ms.players.has(v)) }); });
+        (br.data || []).forEach((b) => { const sides = (b.report && b.report.sides) || []; entries.push({ tick: b.tick, type: 'battle', text: `${b.kind === 'sally' ? 'Sally' : 'Battle'} at ${b.territory_name}${b.report && b.report.captured ? ': castle taken' : ''}`, pids: sides.map((x) => x.player_id).filter((v) => v != null) }); });
+        entries.sort((x, y) => y.tick - x.tick);
+        const KIND = { all: 'Everything', fights: 'Fights and captures', diplomacy: 'Diplomacy', other: 'Other' };
+        const kindOf = (t) => (/castle_captured|siege|battle|commander_captured|king_killed|castle_abandoned/.test(t) ? 'fights' : /war|alliance|truce|nap|marriage|trade|mediation/.test(t) ? 'diplomacy' : 'other');
+        const who = selectOf({ all: 'Every house', ...Object.fromEntries([...ms.players.values()].map((p) => [String(p.id), p.display_name])) }, 'all');
+        const what = selectOf(KIND, 'all');
+        let shown = 80;
+        const list = h('div', { style: 'max-height:52vh;overflow-y:auto' });
+        const draw = () => {
+          const f = entries.filter((e) => (who.value === 'all' || e.pids.includes(Number(who.value))) && (what.value === 'all' || kindOf(e.type) === what.value));
+          list.replaceChildren(...(f.length ? f.slice(0, shown).map((e) => h('div', { class: 'line' }, h('span', { style: 'color:var(--dim);min-width:64px' }, `Tick ${e.tick}`), h('span', { style: 'text-align:right' }, e.text))) : [h('div', { class: 'empty' }, 'Nothing recorded for this filter.')]),
+            ...(f.length > shown ? [h('button', { class: 'small', onclick: () => { shown += 80; draw(); } }, `Show more (${f.length - shown} left)`)] : []));
+        };
+        who.addEventListener('change', () => { shown = 80; draw(); });
+        what.addEventListener('change', () => { shown = 80; draw(); });
+        draw();
+        modal('Recorder', h('div', {}, h('div', { class: 'row wrap2' }, who, what), list, h('div', { class: 'tip' }, 'Public events plus the battles you were in, newest first.')), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
       };
 
       const hostDialog = () => {
@@ -4171,7 +4268,10 @@
         const g = ms.game;
         closeMenu = modal('Menu', h('div', {},
           item('Empires', 'standings and relations', empiresDialog),
-          item('Intel', 'charts over time', intelDialog),
+          item('Intel', 'charts and group analysis', intelDialog),
+          item('Research', 'areas, progress and ETAs', researchDialog),
+          item('Ledger', 'gold given and received', ledgerDialog),
+          item('Recorder', 'history of the war', recorderDialog),
           item('Battle calculator', 'predict a fight', battleCalcDialog),
           item('Game rules', 'the articles of war', () => modal(`${g.name}: rules`, articlesOfWar(g, ms.players.size), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')])),
           g.status === 'finished' ? item('Replay', 'watch the castles change hands', startReplay) : null,
@@ -4269,6 +4369,13 @@
             disabled: gold < hire,
             onclick: order('hire_commander', { p_territory_id: t.id, p_school: sc.slug }, (d) => `${d.name} joins${d.role === 'king' ? ' as king' : ''}`),
           }, sc.name))));
+        out.push(h('div', { class: 'row wrap2', style: 'margin-top:12px' }, h('button', {
+          class: 'danger',
+          title: 'Give the castle up. It becomes unclaimed and loses its troops.',
+          onclick: (e) => {
+            if (confirm(`Abandon ${t.name}? It becomes unclaimed, its troops are lost, and anyone can take it. This cannot be undone.`)) order('abandon_castle', { p_territory_id: t.id }, (d) => `${d.abandoned} abandoned`)(e);
+          },
+        }, 'Abandon castle')));
         return h('div', { class: 'sec' }, out);
       };
 
@@ -4631,7 +4738,7 @@
         return e;
       };
 
-      const expectedNeutral = (t) => (t.owner_player_id === null && t.tier ? (ms.game.starting_garrison || 0) * t.tier : null);
+      const expectedNeutral = (t) => (t.owner_player_id === null && t.tier ? 0 : null);
       const defenceEstimate = (t, myArmory) => {
         const mountain = t.terrain === 'mountain' ? 1 : 0;
         if ((!ms.vis.has(t.id) || typeof t.troops !== 'number') && expectedNeutral(t)) return { troops: expectedNeutral(t), dmg: (ms.game.neutral_armory ?? 1) + 1 + mountain, exact: false, expected: true, stationed: 0 };
@@ -4848,7 +4955,7 @@
               out.push(h('div', { style: `margin-top:6px;color:${ok ? '#7fd08a' : 'var(--gules-hi)'}` }, ok ? `${best.name} has ${best.troops} troops: enough.` : `${best.name}, your strongest, has ${best.troops}. You need ${need - best.troops} more.`));
               if (ok && best.current_territory_id !== t.id) out.push(h('button', { class: 'primary', style: 'margin-top:6px', onclick: () => sendHere(best, t) }, `Send ${best.name}`));
             }
-            if (est.expected) out.push(h('div', { class: 'tip' }, 'Out of sight. An unclaimed castle holds its tier times the starting garrison, and that never grows, so this is reliable unless it was taken or changed.'));
+            if (est.expected) out.push(h('div', { class: 'tip' }, 'Out of sight. An unclaimed castle holds no troops and never grows any, so this is reliable unless it was taken or changed.'));
             else if (!est.exact) out.push(h('div', { class: 'tip' }, 'Estimate: assumes their Armory matches yours and their leader has no Valor. Real defence may be stronger.'));
           }
           box.replaceChildren(h('div', { class: 'sec' }, out));
@@ -5010,6 +5117,7 @@
           case 'truce_ended': return `The truce between ${pname(p.player_a)} and ${pname(p.player_b)} has ended`;
           case 'alliance_broken': return `${pname(p.by_player_id)} broke the alliance with ${pname(p.against_player_id)}`;
           case 'castle_captured': return `${pname(p.to_player_id)} captured ${p.territory}${p.from_player_id ? ' from ' + pname(p.from_player_id) : ''}`;
+          case 'castle_abandoned': return `${pname(p.player_id)} abandoned ${p.territory}`;
           case 'siege_started': return `${pname(p.by_player_id)} laid siege to ${p.territory}`;
           case 'siege_lifted': return `The siege of ${p.territory} was lifted ${p.by === 'sally' ? 'by a sally' : 'by relief forces'}`;
           case 'king_killed': return `${p.name}, king of ${pname(p.player_id)}, was killed`;
@@ -5326,9 +5434,11 @@
 
       const profileLine = (p) => {
         const pr = ms.profiles.get(p.id);
-        if (!pr) return null;
-        const detail = pr.honor === null ? '' : ` · Honor ${pr.honor} · Infamy ${pr.infamy} · ${pr.wins} wins in ${pr.games} games`;
-        return h('div', { style: 'color:var(--dim);font-size:.78rem;padding:2px 0 0 4px' }, `${pr.trust}${detail}`);
+        const rg = ms.regard && p.is_ai ? ms.regard[p.id] : null;
+        const regardTxt = rg == null ? '' : ` · Regard for you ${rg > 0 ? '+' : ''}${rg}`;
+        if (!pr && rg == null) return null;
+        const detail = !pr || pr.honor === null ? '' : ` · Honor ${pr.honor} · Infamy ${pr.infamy} · ${pr.wins} wins in ${pr.games} games`;
+        return h('div', { style: 'color:var(--dim);font-size:.78rem;padding:2px 0 0 4px', title: 'Regard runs from -10 to +10. Taking their castles and declaring war lower it; gifts of gold or technology and alliance raise it. A higher regard makes them likelier to accept your offers.' }, `${pr ? pr.trust : ''}${detail}${regardTxt}`.replace(/^ · /, ''));
       };
 
       const offerCall = (fn, args, message) => (e) => act(e.currentTarget, async () => {
@@ -5903,6 +6013,8 @@
           const repRes = await sb.rpc('player_reputations', { p_game_id: gameId });
           ms.repAt = Date.now();
           ms.profiles = new Map((repRes.data || []).map((x) => [x.player_id, x]));
+          const rgRes = await sb.rpc('regards', { p_game_id: gameId });
+          ms.regard = rgRes.error ? null : rgRes.data;
         }
         ms.chat = ch.data.slice().reverse();
         ms.threads = new Map(th.data.map((t) => [t.id, { id: t.id, parts: [], msgs: [], read: null }]));
