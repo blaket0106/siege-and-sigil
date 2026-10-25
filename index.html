@@ -42,7 +42,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, neutral_armory, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
+    const GAME_COLS = 'id, name, status, neutral_armory, unit_scale, league, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
 
     function watchGame(gameId, onRefresh) {
       const channel = sb.channel('game:' + gameId, { config: { private: true } })
@@ -927,6 +927,9 @@
         ['p', 'Select a [[commanders|commander]] and choose March, then click a destination. The map shows the path, the time to arrive and the cost.'],
         ['h', 'Range'],
         ['p', 'One order can cover only so much distance. Your [[areas|Stables]] level sets that distance. A single hop to a neighbouring castle is always allowed. Castles you can reach glow on the map.'],
+        ['p', 'Distance is measured in leagues. One league is the spacing between neighbouring castles on a standard map. Range, scan radius and march speed are fixed in leagues and leagues per tick, so a bigger map means castles lie more leagues apart and journeys take longer. Games created before leagues keep their old scaling.'],
+        ['h', 'The ruler'],
+        ['p', 'Press Ruler in the top bar and click two castles. It shows the straight-line distance in leagues, how long the trip takes on foot and by road, your range, and the Stables level you need to reach it in one march. The ETA uses the commander you have selected, or your king.'],
         ['h', 'March types'],
         ['list', [
           'Assault: the army [[battles|fights]] on arrival.',
@@ -3280,8 +3283,11 @@
       const rankOf = (c) => Object.values(ms.abil.get(c.id) || {}).reduce((a, b) => a + b, 0);
 
       const S = () => (ms.game && ms.game.world_scale) || 1;
+      const U = () => ((ms.game && ms.game.league ? ms.game.unit_scale : ms.game && ms.game.world_scale) || 1);
+      const LEAGUE = 1500;
+      const leagueText = (d) => `${(d / LEAGUE).toFixed(1)}`;
       const M = () => Math.pow(S(), 0.5);
-      const rangeOf = (stables) => (trailsOn() ? (300 + 120 * stables) * S() : ms.game.free_travel ? (210 + 60 * stables) * S() : 90 + 60 * stables);
+      const rangeOf = (stables) => (trailsOn() ? (300 + 120 * stables) * U() : ms.game.free_travel ? (210 + 60 * stables) * U() : (90 + 60 * stables) * (ms.game.league ? U() : 1));
       const trailsOn = () => ms.game.travel_mode === 'trails';
       const myStables = () => (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
       const reachableFrom = (tid) => {
@@ -3453,8 +3459,44 @@
 
       const commanderSeen = () => true;
 
+      const rulerPick = async (id) => {
+        const r = ms.ruler;
+        if (!r.a || r.b) { ms.ruler = { a: id, b: null, data: null }; render(); drawSide(); return; }
+        r.b = id;
+        render();
+        drawSide();
+        const cmd = ms.sel && ms.sel.type === 'c' ? ms.sel.id : null;
+        const { data, error } = await sb.rpc('ruler', { p_game_id: gameId, p_from: r.a, p_to: r.b, p_commander_id: cmd });
+        if (ms.ruler !== r) return;
+        r.data = error ? { error: error.message } : data;
+        drawSide();
+      };
+
+      const rulerPanel = () => {
+        const r = ms.ruler;
+        const nm = (id) => (id && ms.t.get(id) ? ms.t.get(id).name : null);
+        const out = [h('div', { class: 'row', style: 'justify-content:space-between' }, h('b', {}, 'Ruler'), h('button', { class: 'small', onclick: () => { ms.ruler = null; render(); drawSide(); } }, 'Close'))];
+        if (!r.a) out.push(h('div', { class: 'tip' }, 'Click a castle to start measuring.'));
+        else if (!r.b) out.push(h('div', { class: 'tip' }, `${nm(r.a)} to... click a second castle.`));
+        else if (!r.data) out.push(h('div', { class: 'tip' }, `${nm(r.a)} to ${nm(r.b)}: measuring...`));
+        else if (r.data.error) out.push(h('div', { class: 'tip' }, r.data.error));
+        else {
+          const d = r.data;
+          out.push(h('div', { class: 'tip', style: 'margin:0 0 6px' }, `${nm(r.a)} to ${nm(r.b)}, straight line.`),
+            line('Distance', `${d.leagues} leagues`),
+            line('On foot', d.eta_foot ? tickText(d.eta_foot) : 'No commander to measure with'),
+            line('By road', d.roads ? (d.eta_road ? tickText(d.eta_road) : '-') : 'No road between them'),
+            line('Your range', `${d.range_leagues} leagues (Stables ${d.stables})`),
+            line('Stables needed', d.stables_needed > d.stables ? `${d.stables_needed} (you have ${d.stables})` : d.stables_needed ? `${d.stables_needed} (you have enough)` : 'Any level'),
+            h('div', { style: `margin-top:6px;color:${d.in_range ? '#7fd08a' : 'var(--gules-hi)'}` }, d.in_range ? 'Within your range now.' : 'Out of your range in one march.'),
+            h('div', { class: 'tip' }, 'Click a castle to measure again. ETAs use your selected commander, or your king.'));
+        }
+        return h('div', { class: 'sec' }, out);
+      };
+
       const select = (type, id) => {
         if (ms.dragged) return;
+        if (ms.ruler && type === 't') return rulerPick(id);
         if (ms.marching && type === 't') return ms.stops.length ? addStop(id) : previewTo(id);
         ms.marching = false;
         ms.preview = null;
@@ -3725,6 +3767,16 @@
             pv.push(sv('polyline', { points: (trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id))).map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4.5, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
           }
           pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 70 * M(), fill: 'none', stroke: tone, 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }));
+        }
+        if (ms.ruler && ms.ruler.a) {
+          const ra = ms.t.get(ms.ruler.a);
+          const rb = ms.ruler.b ? ms.t.get(ms.ruler.b) : null;
+          if (ra) pv.push(sv('circle', { cx: ra.x, cy: ra.y, r: 60 * M(), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3, 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }));
+          if (ra && rb) {
+            pv.push(sv('line', { x1: ra.x, y1: ra.y, x2: rb.x, y2: rb.y, stroke: '#f5dc94', 'stroke-width': 3, 'stroke-dasharray': '10 8', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }),
+              sv('circle', { cx: rb.x, cy: rb.y, r: 60 * M(), fill: 'none', stroke: '#f5dc94', 'stroke-width': 3, 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }),
+              sv('g', { transform: `translate(${(ra.x + rb.x) / 2},${(ra.y + rb.y) / 2})`, style: 'pointer-events:none' }, sv('g', { class: 'mk-i' }, sv('rect', { x: -52, y: -12, width: 104, height: 24, rx: 4, fill: 'rgba(16,11,6,0.9)', stroke: '#f5dc94' }), sv('text', { y: 5, 'font-size': 12, fill: '#f5dc94', style: 'font-family:Cinzel,serif;font-weight:700;text-anchor:middle;stroke:none' }, `${leagueText(Math.hypot(ra.x - rb.x, ra.y - rb.y))} leagues`))));
+          }
         }
         L.preview.replaceChildren(...pv);
 
@@ -4128,6 +4180,7 @@
           h('button', { class: 'ghost hud-opt', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.textContent = on ? 'Sound on' : 'Sound off'; } }, Sfx.on ? 'Sound on' : 'Sound off'),
           TOUCH_DEVICE ? null : h('button', { onclick: toggle3D }, ms.view3d ? '2D map' : '3D map'),
           h('button', { class: 'ghost', onclick: castlesDialog, title: 'Every castle in one table' }, 'Castles'),
+          h('button', { class: ms.ruler ? 'primary' : 'ghost', onclick: () => { ms.ruler = ms.ruler ? null : { a: null, b: null, data: null }; ms.marching = false; ms.preview = null; ms.stops = []; render(); drawSide(); drawHud(); }, title: 'Measure the distance between two castles' }, 'Ruler'),
           h('button', { class: 'ghost', onclick: () => ms.goHome && ms.goHome(), title: 'Back to your castles' }, 'Home'),
           h('button', { class: 'primary hud-menu', onclick: menuDialog }, 'Menu'),
           h('button', { class: 'ghost', onclick: helpDialog }, 'Help')].filter(Boolean));
@@ -4356,7 +4409,7 @@
             line('Route', plan.path.filter((id) => !ms.t.get(id).is_junction).map((id) => ms.t.get(id).name).join(' > ')),
             line('Travel', `${plan.travel_ticks} ticks`),
             line('Arrives', `tick ${plan.arrival_tick}${eta}`),
-            line('Distance / range', `${Math.round(plan.raw_length)} / ${plan.range}`),
+            line('Distance / range', `${leagueText(plan.raw_length)} / ${leagueText(plan.range)} leagues`),
             line('In range', plan.in_range ? (plan.raw_length > plan.range ? 'Yes (single hop)' : 'Yes') : 'No')));
           const friendly = dest.owner_player_id && isFriend(dest.owner_player_id);
           if (!friendly) {
@@ -5078,7 +5131,7 @@
           const seen = ms.vis.has(t.id);
           const owner = (seen || t.owner_player_id !== undefined) ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
           const near = mineList.length ? Math.min(...mineList.map((m) => Math.hypot(m.x - t.x, m.y - t.y))) : 0;
-          return { t, seen, owner, troops: seen && typeof t.troops === 'number' ? t.troops : null, near: Math.round(near / (150 * S()) * 10) / 10, threat: !!(ms.threats && ms.threats.includes(t.id)) };
+          return { t, seen, owner, troops: seen && typeof t.troops === 'number' ? t.troops : null, near: Math.round(near / LEAGUE * 10) / 10, threat: !!(ms.threats && ms.threats.includes(t.id)) };
         });
         const wrap = h('div', {});
         const filterSel = selectOf({ all: 'All castles', mine: 'Yours', rivals: 'Other houses', neutral: 'Unclaimed', targets: 'Targets I can see' }, 'all');
@@ -5089,7 +5142,7 @@
           list = list.sort((a, b) => { const x = val(a); const y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * state2.dir || a.t.id - b.t.id; });
           const th = (key, label) => h('th', { style: 'cursor:pointer;white-space:nowrap', onclick: () => { if (state2.sort === key) state2.dir *= -1; else { state2.sort = key; state2.dir = key === 'name' || key === 'owner' || key === 'near' ? 1 : -1; } draw(); } }, label + (state2.sort === key ? (state2.dir < 0 ? ' v' : ' ^') : ''));
           wrap.replaceChildren(h('div', { class: 'row', style: 'margin-bottom:8px' }, filterSel), h('div', { class: 'ctable-wrap' }, h('table', { class: 'ctable' },
-            h('thead', {}, h('tr', {}, th('name', 'Castle'), th('owner', 'House'), th('troops', 'Troops'), th('tier', 'Tier'), th('income', 'T / R / P'), th('near', 'From you'))),
+            h('thead', {}, h('tr', {}, th('name', 'Castle'), th('owner', 'House'), th('troops', 'Troops'), th('tier', 'Tier'), th('income', 'T / R / P'), th('near', 'From you (leagues)'))),
             h('tbody', {}, list.map((r) => h('tr', { class: r.threat ? 'threat' : '', onclick: () => { if (closeCastles) closeCastles(); select('t', r.t.id); if (ms.focusOn) ms.focusOn(r.t.id); } },
               h('td', {}, h('span', { class: 'cdot', style: `background:${r.owner ? color(r.owner) : '#8a8478'}` }), r.t.name, r.threat ? ' !' : ''),
               h('td', {}, r.owner ? pname(r.owner) : ownerUnknown(r.t, r.seen) ? 'Unknown' : 'Unclaimed'),
@@ -5097,7 +5150,7 @@
               h('td', { class: 'num' }, String(r.t.tier || 1)),
               h('td', { class: 'num' }, r.seen && r.t.treasury_level != null ? `${r.t.treasury_level} / ${r.t.industry_level} / ${r.t.prestige_level}` : '?'),
               h('td', { class: 'num' }, r.near ? `${r.near}` : '-')))))),
-            h('div', { class: 'tip' }, 'Click a column to sort and a row to look at the castle. "From you" is the distance from your nearest castle in castle spacings.'));
+            h('div', { class: 'tip' }, 'Click a column to sort and a row to look at the castle. "From you" is the distance from your nearest castle in leagues.'));
         };
         filterSel.addEventListener('change', () => { state2.filter = filterSel.value; draw(); });
         draw();
@@ -5453,6 +5506,7 @@
           if (canAct() && ms.players.size > 2) parts.push(h('div', { class: 'sec' }, h('button', { onclick: mediationDialog }, 'Offer mediation')));
           parts.push(h('div', { class: 'sec', style: 'color:var(--dim);font-size:.8rem' }, 'Click a castle or commander for details. Drag to pan, scroll to zoom. A gold ring marks a king.'));
         }
+        if (ms.ruler) parts.unshift(rulerPanel());
         sideEl.replaceChildren(sideTabs(), ...parts.filter(Boolean));
       };
 
