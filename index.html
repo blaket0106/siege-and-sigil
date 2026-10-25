@@ -807,7 +807,7 @@
         ['note', 'Click any castle or army to select it and see its actions in the Info tab.'],
         ['h', 'Finding your way'],
         ['list', [
-          'The Next move box at the top of the Info tab tells you what to do first: put troops under a commander, then which neutral castle you can take now, with a button to send them. When troops are short it can send the army to collect a richer castle\'s garrison on arrival. Once neutral castles are gone it offers rival castles you can beat, and when a castle of yours is under threat it offers to send help.',
+          'The Next move box at the top of the Info tab tells you what to do first: put troops under a commander, then which neutral castle you can take now, with a button to send them. When troops are short it can send the army to collect a richer castle\'s garrison on arrival. It looks at every free army, not just the strongest: a castle you lost comes first (retake), then unclaimed castles near any of your armies, then rival castles you can beat. When a castle of yours is under threat it shows the enemy force, who is holding it, and a button to send the nearest army that can march there. An army already standing in a threatened castle is never told to leave.',
           'Your gold box shows what the next production pays and how many ticks away it is.',
           'Quick start on the home screen makes a four-house game with three AI rivals and begins it at once.',
           'Sounds mark a castle gained, a castle lost, and a new threat to your castles.',
@@ -1050,7 +1050,7 @@
           'In an Invite only game, only people with the code, the link or an invitation can join. A password, if you set one, still applies.',
         ]],
         ['h', 'Host tools'],
-        ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. Finished games can be replayed from the Replay bar.'],
+        ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. A jump stops early when a hostile army comes within 4 ticks of one of your castles or lays siege to one, so a warning is never lost inside a long jump. Each army stops a jump once. Finished games can be replayed from the Replay bar.'],
       ] },
       { id: 'glossary', group: 'Reference', title: 'Glossary', blocks: [
         ['p', 'Every term in the game, in one line, with a link to where it is explained.'],
@@ -4097,7 +4097,7 @@
                 let idle = 0;
                 while (tick < start + n) {
                   btn.textContent = `Jumping ${tick - start}/${n}`;
-                  await new Promise((res) => setTimeout(res, 1500));
+                  await new Promise((res) => setTimeout(res, 800));
                   const q = await sb.from('games').select('current_tick, jump_remaining, status').eq('id', gameId).single();
                   if (q.error) { idle += 1; if (idle > 20) throw q.error; continue; }
                   idle = q.data.current_tick === tick ? idle + 1 : 0;
@@ -4105,7 +4105,7 @@
                   if (q.data.jump_remaining === 0 || q.data.status !== 'active') break;
                   if (idle > 40) throw new Error('The jump is not progressing. Check back in a moment.');
                 }
-                toast(`Now at tick ${tick}`, true);
+                toast(tick < start + n ? `Stopped at tick ${tick}: a hostile army is closing on one of your castles` : `Now at tick ${tick}`, true);
               } finally { btn.textContent = label; ms.jumping = false; }
             });
           }
@@ -4190,7 +4190,7 @@
             h('div', { class: 'meter-label' }, h('span', {}, 'Road to victory'), h('b', {}, `${mineN} of ${winAt}`)),
             h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))),
           g.paused_at && g.status === 'active' ? h('span', { class: 'tag gold' }, 'Paused') : null,
-          ms.threats && ms.threats.length ? h('button', { class: 'ghost', style: 'color:#ff7a68;border-color:#ff4a3a', title: 'Hostile armies are heading for your castles. Click to look at the first one.', onclick: () => { const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); } }, `${ms.threats.length} under threat`) : null,
+          ms.threats && ms.threats.length ? h('button', { class: 'ghost hud-threat', style: 'color:#ff7a68;border-color:#ff4a3a', title: 'Hostile armies are heading for your castles. Click to look at the first one.', onclick: () => { const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); } }, `${ms.threats.length} under threat`) : null,
           g.seasons_enabled && g.status === 'active' ? h('span', { class: 'tag gold' }, seasonLabel(g)) : null,
           g.time_limit_ticks && g.status === 'active' ? h('span', { class: 'tag' }, `Ends at tick ${g.time_limit_ticks}`) : null,
           ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { class: 'tag', style: 'color:var(--gules-hi);border-color:var(--gules)' }, 'Eliminated') : null,
@@ -4662,7 +4662,7 @@
         const idleNK = idleAll.find((c) => c.role !== 'king');
         const best = idleNK && idleAll[0] && idleNK.troops >= 0.6 * idleAll[0].troops ? idleNK : idleAll[0] || null;
         const box = h('div', {});
-        const paint = async (st) => {
+        const paint = async (stats) => {
           const lines = [];
           let guideSeen = true;
           try { guideSeen = !!localStorage.getItem(`ss-guide-${gameId}`) || ms.game.current_tick > 20; } catch {}
@@ -4683,63 +4683,99 @@
                   select('c', pick.id);
                 }) }, `Take ${n} troops with ${pick.name}`));
             }
-          } else if (st && best.current_territory_id != null && ms.t.get(best.current_territory_id)) {
-            const from = ms.t.get(best.current_territory_id);
-            const dmg = st.damage;
-            const reach = trailsOn() ? trailReach(from.id) : null;
-            const inReach = (t) => (reach ? reach.has(t.id) : ms.game.free_travel ? Math.hypot(t.x - from.x, t.y - from.y) <= rangeOf(myStables()) : true);
-            const cands = [...ms.t.values()]
-              .filter((t) => !t.is_junction && t.owner_player_id === null && ((ms.vis.has(t.id) && typeof t.troops === 'number') || expectedNeutral(t)) && inReach(t))
-              .map((t) => { const seenT = ms.vis.has(t.id) && typeof t.troops === 'number'; const gar = seenT ? t.troops : expectedNeutral(t); return { t, gar, est: !seenT, need: troopsNeeded(gar, (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), dmg), d: Math.hypot(t.x - from.x, t.y - from.y) }; })
-              .sort((x, y) => x.d - y.d).slice(0, 6);
-            const rivalC = [...ms.t.values()]
-              .filter((t) => !t.is_junction && t.owner_player_id && !isFriend(t.owner_player_id) && ms.vis.has(t.id) && typeof t.troops === 'number' && inReach(t))
-              .map((t) => { const e2 = defenceEstimate(t, st.armory); return e2 ? { t, gar: e2.troops, est: !e2.exact, rival: true, need: troopsNeeded(e2.troops, e2.dmg, dmg), d: Math.hypot(t.x - from.x, t.y - from.y) } : null; })
-              .filter(Boolean).sort((x, y) => x.need - y.need).slice(0, 4);
-            if (!cands.length) cands.push(...rivalC);
-            let ready = null;
-            for (const x of cands.filter((c2) => best.troops >= c2.need).slice(0, 4)) {
-              if (await validMarch(best, x.t.id)) { ready = x; break; }
+          } else if (stats.size) {
+            const targeted = new Set();
+            ms.cmd.forEach((c) => {
+              if (c.owner_player_id !== ms.me.id) return;
+              const mv = ms.mov.get(c.id);
+              if (mv) targeted.add(mv.to_territory_id);
+              const rt = ms.routes.get(c.id);
+              if (rt && rt.status === 'active') (rt.stops || []).forEach((sp) => targeted.add(sp.territory_id));
+            });
+            const optsFor = (a, st) => {
+              const from = ms.t.get(a.current_territory_id);
+              const reach = trailsOn() ? trailReach(from.id) : null;
+              const inReach = (t) => (reach ? reach.has(t.id) : ms.game.free_travel ? Math.hypot(t.x - from.x, t.y - from.y) <= rangeOf(myStables()) : true);
+              const out = [];
+              ms.t.forEach((t) => {
+                if (t.is_junction || t.id === from.id || t.owner_player_id === ms.me.id || (t.owner_player_id && isFriend(t.owner_player_id)) || targeted.has(t.id) || !inReach(t)) return;
+                const d = Math.hypot(t.x - from.x, t.y - from.y);
+                if (t.owner_player_id === null) {
+                  const seenT = ms.vis.has(t.id) && typeof t.troops === 'number';
+                  const gar = seenT ? t.troops : expectedNeutral(t);
+                  if (gar == null) return;
+                  out.push({ a, t, gar, est: !seenT, kind: 'neutral', need: troopsNeeded(gar, (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), st.damage), d });
+                } else if (ms.vis.has(t.id) && typeof t.troops === 'number') {
+                  const e2 = defenceEstimate(t, st.armory);
+                  if (e2) out.push({ a, t, gar: e2.troops, est: !e2.exact, kind: ms.lost && ms.lost.has(t.id) ? 'retake' : 'rival', need: troopsNeeded(e2.troops, e2.dmg, st.damage), d });
+                }
+              });
+              return out;
+            };
+            const rank = { retake: 0, neutral: 1, rival: 2 };
+            const actors = [...idleAll.filter((c) => c.role !== 'king'), ...idleAll.filter((c) => c.role === 'king')]
+              .filter((c) => !(ms.threats || []).includes(c.current_territory_id) && stats.has(c.id) && ms.t.get(c.current_territory_id)).slice(0, 3);
+            const ready = [];
+            const pending = [];
+            for (const a of actors) {
+              const opts = optsFor(a, stats.get(a.id));
+              pending.push(...opts);
+              const cand = opts.filter((o) => a.troops >= o.need).sort((x, y) => rank[x.kind] - rank[y.kind] || (x.kind === 'rival' ? x.need - y.need : x.d - y.d)).slice(0, 3);
+              for (const o of cand) {
+                if (await validMarch(a, o.t.id)) { ready.push(o); break; }
+              }
             }
-            const easiest = cands.slice().sort((x, y) => x.need - y.need)[0];
-            if (ready) {
-              const kingBlind = best.role === 'king' && (ready.est || ready.rival);
-              lines.push(h('div', {}, `${best.name} has ${best.troops} troops. ${ready.rival ? `${ready.t.name}, held by ${pname(ready.t.owner_player_id)}, needs about ${ready.need}` : `${ready.t.name} needs ${ready.need}${ready.est ? ' (expected, out of sight)' : ''}`}, ${best.troops === ready.need ? 'so you have just enough. Add a few more troops to be safe.' : 'so you can take it now.'}`),
+            ready.sort((x, y) => rank[x.kind] - rank[y.kind] || x.d - y.d);
+            const pick = ready[0];
+            if (pick) {
+              const a = pick.a;
+              const kingBlind = a.role === 'king' && (pick.est || pick.kind !== 'neutral');
+              const what = pick.kind === 'neutral'
+                ? `${pick.t.name} needs ${pick.need}${pick.est ? ' (expected, out of sight)' : ''}`
+                : `${pick.t.name}, ${pick.kind === 'retake' ? 'which you lost to' : 'held by'} ${pname(pick.t.owner_player_id)}, needs about ${pick.need}`;
+              lines.push(h('div', {}, `${a.name} has ${a.troops} troops. ${what}, ${a.troops === pick.need ? 'so you have just enough. Add a few more troops to be safe.' : pick.kind === 'retake' ? 'so you can retake it now.' : 'so you can take it now.'}`),
                 kingBlind ? h('div', { style: 'color:var(--gules-hi);margin-top:4px' }, 'Your king would lead this, and the garrison is not certain. If it loses, the king dies. Raise another army with a commander first if you can.') : null,
                 h('div', { class: 'row wrap2', style: 'margin-top:6px' },
-                  h('button', { class: kingBlind ? '' : 'primary', onclick: () => sendHere(best, ready.t) }, `Send ${best.name} to ${ready.t.name}`),
-                  h('button', { class: 'ghost', onclick: () => { select('t', ready.t.id); ms.focusOn && ms.focusOn(ready.t.id); } }, 'Look first')));
-            } else if (!easiest) {
-              lines.push(h('div', {}, `No unclaimed castle you can see is within ${best.name}'s range. Take a closer one first, or raise Stables to march farther.`));
-            } else if (easiest) {
-              const targeted = new Set();
-              ms.cmd.forEach((c) => {
-                if (c.owner_player_id !== ms.me.id) return;
-                const mv = ms.mov.get(c.id);
-                if (mv) targeted.add(mv.to_territory_id);
-                const rt = ms.routes.get(c.id);
-                if (rt && rt.status === 'active') (rt.stops || []).forEach((sp) => targeted.add(sp.territory_id));
-              });
-              const pool = [...ms.t.values()].filter((t) => mine(t) && t.id !== best.current_territory_id && typeof t.troops === 'number' && inReach(t) && !targeted.has(t.id));
+                  h('button', { class: kingBlind ? '' : 'primary', onclick: () => sendHere(a, pick.t) }, `${pick.kind === 'retake' ? 'Retake with' : 'Send'} ${a.name}${pick.kind === 'retake' ? '' : ` to ${pick.t.name}`}`),
+                  h('button', { class: 'ghost', onclick: () => { select('t', pick.t.id); ms.focusOn && ms.focusOn(pick.t.id); } }, 'Look first')));
+            } else if (!pending.length) {
+              lines.push(h('div', {}, actors.length ? 'No castle you can see is within reach of any of your free armies. Raise Stables to march farther, or take a closer castle first.' : 'Your free armies are holding threatened castles.'));
+            } else {
+              const easiest = pending.slice().sort((x, y) => (x.need - x.a.troops) - (y.need - y.a.troops) || x.d - y.d)[0];
+              const a = easiest.a;
+              const pool = [...ms.t.values()].filter((t) => mine(t) && t.id !== a.current_territory_id && typeof t.troops === 'number' && !targeted.has(t.id) && !(ms.threats || []).includes(t.id));
               let rich = null;
-              for (const t of pool.filter((t2) => t2.troops > 3).sort((x, y) => y.troops - x.troops).slice(0, 3)) {
-                if (await validMarch(best, t.id)) { rich = t; break; }
+              const aFrom = ms.t.get(a.current_territory_id);
+              const aReach = trailsOn() ? trailReach(aFrom.id) : null;
+              for (const t of pool.filter((t2) => t2.troops > 3 && (!aReach || aReach.has(t2.id))).sort((x, y) => y.troops - x.troops).slice(0, 3)) {
+                if (await validMarch(a, t.id)) { rich = t; break; }
               }
               const spare = pool.reduce((a2, t) => a2 + Math.max(0, t.troops - 1), 0);
-              lines.push(h('div', {}, `${best.name} has ${best.troops} troops. The easiest target, ${easiest.t.name}, needs ${easiest.need}.${spare + best.troops >= easiest.need && rich ? ` Your other castles hold ${spare} spare troops, enough to get there. Send the army to collect them.` : ' Raise Recruitment and wait for the next cycle.'}`),
+              lines.push(h('div', {}, `${a.name} has ${a.troops} troops. The easiest target, ${easiest.t.name}, needs ${easiest.need}.${spare + a.troops >= easiest.need && rich ? ` Your other castles hold ${spare} spare troops, enough to get there. Send the army to collect them.` : ' Raise Recruitment and wait for the next cycle.'}`),
                 h('div', { class: 'row wrap2', style: 'margin-top:6px' },
-                  spare + best.troops >= easiest.need && rich ? h('button', { class: 'primary', onclick: () => sendHere(best, rich, true) }, `Send ${best.name} to collect ${rich.name}'s ${rich.troops} troops`) : null,
+                  spare + a.troops >= easiest.need && rich ? h('button', { class: 'primary', onclick: () => sendHere(a, rich, true) }, `Send ${a.name} to collect ${rich.name}'s ${rich.troops} troops`) : null,
                   h('button', { class: 'ghost', onclick: () => { select('t', easiest.t.id); ms.focusOn && ms.focusOn(easiest.t.id); } }, `Look at ${easiest.t.name}`)));
             }
           }
-          if (best && ms.threats && ms.threats.length) {
-            const thr = ms.t.get(ms.threats[0]);
-            if (thr) {
-              const can = best.current_territory_id !== thr.id && await validMarch(best, thr.id);
-              lines.unshift(h('div', { style: 'color:#ff7a68' }, `${thr.name} is under threat.${ms.threats.length > 1 ? ` ${ms.threats.length - 1} more castle${ms.threats.length === 2 ? '' : 's'} too.` : ''} Reinforce it or bring an army to hold it.`),
-                h('div', { class: 'row wrap2', style: 'margin:6px 0 8px' }, can ? h('button', { class: 'primary', onclick: () => sendHere(best, thr) }, `Send ${best.name} to ${thr.name}`) : null,
-                  h('button', { class: 'ghost', onclick: () => { select('t', thr.id); ms.focusOn && ms.focusOn(thr.id); } }, 'Look at it')));
+          for (const thrId of (ms.threats || []).slice(0, 2).reverse()) {
+            const thr = ms.t.get(thrId);
+            if (!thr) continue;
+            const incoming = ms.cmd.filter((c) => c.owner_player_id !== ms.me.id && !isFriend(c.owner_player_id) && commanderSeen(c, tickF()) && typeof c.troops === 'number'
+              && ((c.status === 'sieging' && c.current_territory_id === thr.id) || (c.status === 'moving' && ms.mov.get(c.id) && ms.mov.get(c.id).to_territory_id === thr.id))).reduce((s, c) => s + c.troops, 0);
+            const here = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.current_territory_id === thr.id);
+            const holding = here.reduce((s, c) => s + (c.troops || 0), 0) + (thr.troops || 0);
+            const helpers = idleAll.filter((c) => c.current_territory_id !== thr.id && !(ms.threats || []).includes(c.current_territory_id) && ms.t.get(c.current_territory_id))
+              .sort((x, y) => Math.hypot(ms.t.get(x.current_territory_id).x - thr.x, ms.t.get(x.current_territory_id).y - thr.y) - Math.hypot(ms.t.get(y.current_territory_id).x - thr.x, ms.t.get(y.current_territory_id).y - thr.y));
+            let help = null;
+            for (const c of helpers.slice(0, 3)) {
+              if (await validMarch(c, thr.id)) { help = c; break; }
             }
+            const sub = `${incoming ? `About ${incoming} enemy troops are coming. ` : ''}${thr.name} holds ${holding}${here.length ? `, with ${here.map((c) => c.name).join(' and ')} standing there` : ''}.${here.length ? ' Keep them there.' : ''}`;
+            const short = incoming && holding <= incoming;
+            lines.unshift(h('div', { style: 'color:#ff7a68' }, `${thr.name} is under threat.`),
+              h('div', { class: 'tip' }, sub + (help ? ` ${help.name} can reach it${short && help.troops + holding <= incoming ? ' but may not be enough' : ''}.` : short ? ' None of your free armies can march there.' : '')),
+              h('div', { class: 'row wrap2', style: 'margin:6px 0 8px' }, help ? h('button', { class: 'primary', onclick: () => sendHere(help, thr) }, `Send ${help.name} to ${thr.name}`) : null,
+                h('button', { class: 'ghost', onclick: () => { select('t', thr.id); ms.focusOn && ms.focusOn(thr.id); } }, 'Look at it')));
           }
           if (best) {
             takeOrders.filter((c) => c.id !== best.id).slice(0, 3).forEach((extra) => {
@@ -4750,10 +4786,13 @@
           if (ms.me.gold >= 120) lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `You hold ${ms.me.gold} gold. Spend it with Upgrade everywhere below, or hire a commander at a castle.`));
           box.replaceChildren(...(lines.length ? [h('div', { class: 'sec' }, h('b', {}, 'Next move'), ...lines)] : []));
         };
-        if (!best) { paint(null); return box; }
-        const e = attackStats([best.id]);
-        paint(e.data);
-        if (!e.data && e.p) e.p.then(paint);
+        if (!best) { paint(new Map()); return box; }
+        const actorIds = [...idleAll.filter((c) => c.role !== 'king'), ...idleAll.filter((c) => c.role === 'king')].slice(0, 5).map((c) => c.id);
+        const es = actorIds.map((id) => [id, attackStats([id])]);
+        const gather = () => new Map(es.filter(([, e]) => e.data).map(([id, e]) => [id, e.data]));
+        paint(gather());
+        const waiting = es.map(([, e]) => e.p).filter(Boolean);
+        if (waiting.length) Promise.all(waiting).then(() => paint(gather()));
         return box;
       };
 
@@ -5748,11 +5787,13 @@
         if (prevOwn && ms.me) {
           let gained = 0;
           let lostN = 0;
+          ms.lost = ms.lost || new Set();
           ms.t.forEach((t, id) => {
             const was = prevOwn.get(id);
+            if (t.owner_player_id === ms.me.id) ms.lost.delete(id);
             if (was === undefined || was === t.owner_player_id) return;
             if (t.owner_player_id === ms.me.id) gained++;
-            else if (was === ms.me.id) lostN++;
+            else if (was === ms.me.id) { lostN++; ms.lost.add(id); }
           });
           if (lostN) Sfx.lost(); else if (gained) Sfx.fanfare();
         }

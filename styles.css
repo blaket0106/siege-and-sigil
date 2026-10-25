@@ -1139,7 +1139,10 @@ svg.mk-on .terrain-layer { filter: saturate(0.6) brightness(0.82); }
   .hud-id > div:last-child { min-width: 150px; }
 }
 @media (min-width: 900px) and (max-width: 1400px) {
-  .hud .hud-opt { display: none; }
+  .hud .hud-opt, .hud label.check.hud-opt { display: none; }
+  .hud-id b { max-width: 130px; }
+  .hud > .meter { flex: 0 1 150px; min-width: 100px; }
+  .hud .tag { padding-left: 6px; padding-right: 6px; }
 }
 @media (max-width: 760px) {
   .hud .hud-opt { display: none; }
@@ -1147,6 +1150,7 @@ svg.mk-on .terrain-layer { filter: saturate(0.6) brightness(0.82); }
   .hud-id .sub { white-space: nowrap; }
   .hud .hud-menu { position: static; order: -1; }
   .hud > button:first-child { order: -2; }
+  .hud .hud-threat { order: -1; }
 }
 
 .legend { z-index: 6; }
