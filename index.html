@@ -1615,7 +1615,7 @@
       };
 
       const refresh = async () => {
-        if (state.view !== 'home') return;
+        if (state.view !== 'home' || document.hidden) return;
         const [open, mine, inv] = await Promise.all([
           sb.rpc('list_open_games'),
           sb.rpc('my_games'),
@@ -2054,7 +2054,7 @@
         const ai = seats.filter((s) => s.kind === 'ai').length;
         const chips = [`${seats.length} houses${ai ? ` (${ai} AI)` : ''}`, `${castles} castles`, SHAPE_INFO[shape.value][0], SPEED_CARDS.find((c) => c[0] === speed.value)[1], { open: 'Open game', friends: 'Friends only', invite: 'Invite only' }[visibility.value]];
         summaryEl.replaceChildren(h('b', {}, name.value.trim() || 'New campaign'), ...chips.map((c) => h('span', { class: 'chip' }, c)));
-        victoryOut.textContent = `${victory.value}% of castles (${Math.ceil((castles * Number(victory.value)) / 100)} of ${castles})`;
+        victoryOut.textContent = `${victory.value}% of all castles (about ${Math.ceil((castles * Number(victory.value)) / 100)} of ${castles}; river crossings add 10 to 15 castles, so the exact target is set when the map is built)`;
       };
       const syncRules = () => {
         starting.input.max = String(MAX_START[size.value]);
@@ -4085,7 +4085,7 @@
         const paused = !!g.paused_at;
         const jump = (n) => (e) => {
           if (confirm(`Jump ${n} tick${n === 1 ? '' : 's'} ahead now? Production, movement and battles all run, and it cannot be undone.`)) {
-            act(e.currentTarget, async () => { let data; const btn = e.currentTarget; const label = btn.textContent; try { for (let left = n; left > 0; left -= 3) { btn.textContent = `Jumping ${n - left}/${n}`; const r = await sb.rpc('admin_jump_ticks', { p_game_id: gameId, p_ticks: Math.min(3, left) }); if (r.error) throw r.error; data = r.data; if (data.status !== 'active') break; } } finally { btn.textContent = label; } toast(`Now at tick ${data.tick}`, true); });
+            act(e.currentTarget, async () => { let data; const btn = e.currentTarget; const label = btn.textContent; ms.jumping = true; try { for (let left = n; left > 0; left -= 3) { btn.textContent = `Jumping ${n - left}/${n}`; const r = await sb.rpc('admin_jump_ticks', { p_game_id: gameId, p_ticks: Math.min(3, left) }); if (r.error) throw r.error; data = r.data; if (data.status !== 'active') break; } } finally { btn.textContent = label; ms.jumping = false; } toast(`Now at tick ${data.tick}`, true); });
           }
         };
         modal('Host tools', h('div', {},
@@ -4626,7 +4626,9 @@
         if (!canAct() || ms.game.status !== 'active') return null;
         const mine = (t) => t.owner_player_id === ms.me.id && !t.is_junction;
         const idleCmds = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.current_territory_id != null);
-        const best = strongestIdle();
+        const idleAll = idleCmds.filter((c) => c.troops > 0).sort((x, y) => y.troops - x.troops);
+        const idleNK = idleAll.find((c) => c.role !== 'king');
+        const best = idleNK && idleAll[0] && idleNK.troops >= 0.6 * idleAll[0].troops ? idleNK : idleAll[0] || null;
         const box = h('div', {});
         const paint = (st) => {
           const lines = [];
@@ -4635,14 +4637,14 @@
           if (!guideSeen) {
             lines.push(h('div', { class: 'tip', style: 'margin:0 0 8px' }, 'New here? ', h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); helpDialog('basics'); } }, 'Read the two-minute guide'), ' or ', h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); try { localStorage.setItem(`ss-guide-${gameId}`, '1'); } catch {} drawSide(); } }, 'hide this')));
           }
-          const takeOrders = idleCmds.filter((c) => !(c.troops > 0) && ms.t.get(c.current_territory_id) && mine(ms.t.get(c.current_territory_id)) && ms.t.get(c.current_territory_id).troops > 1)
+          const takeOrders = idleCmds.filter((c) => c.troops < 5 && ms.t.get(c.current_territory_id) && mine(ms.t.get(c.current_territory_id)) && ms.t.get(c.current_territory_id).troops >= (c.troops > 0 ? 8 : 2))
             .sort((x, y) => ms.t.get(y.current_territory_id).troops - ms.t.get(x.current_territory_id).troops);
           if (!best) {
             const pick = takeOrders[0];
             if (pick) {
               const home = ms.t.get(pick.current_territory_id);
               const n = home.troops - 1;
-              lines.push(h('div', {}, `Your commanders are not leading any troops yet. ${home.name} holds ${home.troops}. Put ${n} of them under ${pick.name}, then march to a neutral castle.`),
+              lines.push(h('div', {}, `${ms.cmd.some((c) => c.owner_player_id === ms.me.id && c.troops > 0) ? 'Your armies are out.' : 'Your commanders are not leading any troops yet.'} ${home.name} holds ${home.troops}. Put ${n} of them under ${pick.name}${ms.cmd.some((c) => c.owner_player_id === ms.me.id && c.troops > 0) ? ' to raise another army.' : ', then march to a neutral castle.'}`),
                 h('button', { class: 'primary', style: 'margin-top:6px', onclick: (e) => act(e.currentTarget, async () => {
                   const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: pick.id, p_amount: n });
                   if (error) throw error;
@@ -4666,15 +4668,26 @@
             const ready = cands.filter((x) => best.troops >= x.need)[0];
             const easiest = cands.slice().sort((x, y) => x.need - y.need)[0];
             if (ready) {
-              lines.push(h('div', {}, `${best.name} has ${best.troops} troops. ${ready.rival ? `${ready.t.name}, held by ${pname(ready.t.owner_player_id)}, needs about ${ready.need}` : `${ready.t.name} needs ${ready.need}${ready.est ? ' (expected, out of sight)' : ''}`}, so you can take it now.`),
+              const kingBlind = best.role === 'king' && (ready.est || ready.rival);
+              lines.push(h('div', {}, `${best.name} has ${best.troops} troops. ${ready.rival ? `${ready.t.name}, held by ${pname(ready.t.owner_player_id)}, needs about ${ready.need}` : `${ready.t.name} needs ${ready.need}${ready.est ? ' (expected, out of sight)' : ''}`}, ${best.troops === ready.need ? 'so you have just enough. Add a few more troops to be safe.' : 'so you can take it now.'}`),
+                kingBlind ? h('div', { style: 'color:var(--gules-hi);margin-top:4px' }, 'Your king would lead this, and the garrison is not certain. If it loses, the king dies. Raise another army with a commander first if you can.') : null,
                 h('div', { class: 'row wrap2', style: 'margin-top:6px' },
-                  h('button', { class: 'primary', onclick: () => sendHere(best, ready.t) }, `Send ${best.name} to ${ready.t.name}`),
+                  h('button', { class: kingBlind ? '' : 'primary', onclick: () => sendHere(best, ready.t) }, `Send ${best.name} to ${ready.t.name}`),
                   h('button', { class: 'ghost', onclick: () => { select('t', ready.t.id); ms.focusOn && ms.focusOn(ready.t.id); } }, 'Look first')));
             } else if (!easiest) {
               lines.push(h('div', {}, `No unclaimed castle you can see is within ${best.name}'s range. Take a closer one first, or raise Stables to march farther.`));
             } else if (easiest) {
-              const rich = [...ms.t.values()].filter((t) => mine(t) && t.id !== best.current_territory_id && typeof t.troops === 'number' && t.troops > 3).sort((x, y) => y.troops - x.troops)[0];
-              const spare = [...ms.t.values()].filter((t) => mine(t) && t.id !== best.current_territory_id && typeof t.troops === 'number').reduce((a2, t) => a2 + Math.max(0, t.troops - 1), 0);
+              const targeted = new Set();
+              ms.cmd.forEach((c) => {
+                if (c.owner_player_id !== ms.me.id) return;
+                const mv = ms.mov.get(c.id);
+                if (mv) targeted.add(mv.to_territory_id);
+                const rt = ms.routes.get(c.id);
+                if (rt && rt.status === 'active') (rt.stops || []).forEach((sp) => targeted.add(sp.territory_id));
+              });
+              const pool = [...ms.t.values()].filter((t) => mine(t) && t.id !== best.current_territory_id && typeof t.troops === 'number' && inReach(t) && !targeted.has(t.id));
+              const rich = pool.filter((t) => t.troops > 3).sort((x, y) => y.troops - x.troops)[0];
+              const spare = pool.reduce((a2, t) => a2 + Math.max(0, t.troops - 1), 0);
               lines.push(h('div', {}, `${best.name} has ${best.troops} troops. The easiest target, ${easiest.t.name}, needs ${easiest.need}.${spare + best.troops >= easiest.need && rich ? ` Your other castles hold ${spare} spare troops, enough to get there. Send the army to collect them.` : ' Raise Recruitment and wait for the next cycle.'}`),
                 h('div', { class: 'row wrap2', style: 'margin-top:6px' },
                   spare + best.troops >= easiest.need && rich ? h('button', { class: 'primary', onclick: () => sendHere(best, rich, true) }, `Send ${best.name} to collect ${rich.name}'s ${rich.troops} troops`) : null,
@@ -4691,11 +4704,10 @@
             }
           }
           if (best) {
-            const extra = takeOrders.filter((c) => c.id !== best.id)[0];
-            if (extra) {
+            takeOrders.filter((c) => c.id !== best.id).slice(0, 3).forEach((extra) => {
               const home = ms.t.get(extra.current_territory_id);
-              lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `${extra.name} is idle at ${home.name}, which holds ${home.troops}. `, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); select('c', extra.id); } }, 'Give them troops')));
-            }
+              lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `${extra.role === 'king' ? 'Your king' : extra.name} stands with ${extra.troops} troops at ${home.name}, which holds ${home.troops}. `, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); select('c', extra.id); } }, 'Give them troops')));
+            });
           }
           if (ms.me.gold >= 120) lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `You hold ${ms.me.gold} gold. Spend it with Upgrade everywhere below, or hire a commander at a castle.`));
           box.replaceChildren(...(lines.length ? [h('div', { class: 'sec' }, h('b', {}, 'Next move'), ...lines)] : []));
@@ -5649,6 +5661,7 @@
       const LITE_FETCH = new Set([0, 1, 2, 3, 8, 9]);
       const load = async (opts = {}) => {
         if (state.view !== 'map' || state.roomId !== gameId) return;
+        if (ms.jumping && !opts.force) return;
         const lite = !!opts.lite && !!ms.lastRes;
         const fetchers = [
           () => sb.rpc('get_game_view', { p_game_id: gameId }),
@@ -5661,7 +5674,7 @@
           () => (ms.edgesAll && !ms.fogDark ? Promise.resolve({ data: ms.edgesAll }) : sb.rpc('get_game_edges', { p_game_id: gameId })),
           () => sb.rpc('my_diplomacy_offers', { p_game_id: gameId }),
           () => sb.rpc('my_world_events', { p_game_id: gameId }),
-          () => sb.rpc('my_council', { p_game_id: gameId }),
+          () => Promise.resolve({ data: [] }),
         ];
         const res = await Promise.all(fetchers.map((f, i) => (lite && !LITE_FETCH.has(i) ? Promise.resolve(ms.lastRes[i]) : f())));
         ms.lastRes = res;
@@ -5670,7 +5683,14 @@
         const [vw, mo, ib, br, ch, th, pt, ed, of, we, cn] = res;
         if (vw.error && vw.error.message.includes('not in this game')) { toast('That game is no longer available.'); return showHome(); }
         const failed = res.find((r) => r.error);
-        if (failed) { toast(failed.error.message); return; }
+        if (failed) {
+          if (!ms.loadRetry) {
+            ms.loadRetry = true;
+            setTimeout(() => { ms.loadRetry = false; load({ force: true }); }, 3000);
+          }
+          if (!ms.lastRes || !ms.game) toast(failed.error.message);
+          return;
+        }
         const view = vw.data;
         const threadIds = th.data.map((t) => t.id);
         const tm = lite && ms.lastTm ? ms.lastTm : threadIds.length
@@ -5769,8 +5789,11 @@
         } else {
           ms.turn = null;
         }
-        const repRes = await sb.rpc('player_reputations', { p_game_id: gameId });
-        ms.profiles = new Map((repRes.data || []).map((x) => [x.player_id, x]));
+        if (!ms.repAt || Date.now() - ms.repAt > 60000 || ms.tab === 'info' && !ms.sel && Date.now() - ms.repAt > 20000) {
+          const repRes = await sb.rpc('player_reputations', { p_game_id: gameId });
+          ms.repAt = Date.now();
+          ms.profiles = new Map((repRes.data || []).map((x) => [x.player_id, x]));
+        }
         ms.chat = ch.data.slice().reverse();
         ms.threads = new Map(th.data.map((t) => [t.id, { id: t.id, parts: [], msgs: [], read: null }]));
         pt.data.forEach((x) => {
