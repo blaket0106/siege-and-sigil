@@ -2027,7 +2027,7 @@
       const gold = stepper({ min: 0, max: 5000, value: 300, step: 50, unit: 'gold', onChange: changed });
       const garrison = stepper({ min: 0, max: 200, value: 10, step: 5, unit: 'troops', onChange: changed });
       const cmdStart = stepper({ min: 0, max: 5, value: 2, onChange: changed });
-      const cmdCost = stepper({ min: 0, max: 1000, value: 100, step: 10, unit: 'gold', onChange: changed });
+      const cmdCost = stepper({ min: 0, max: 1000, value: 25, step: 5, unit: 'gold', onChange: changed });
       const costCards = () => cards([['0.5', 'Cheap', 'Half price', 'cost_cheap'], ['1', 'Standard', 'Full price', 'cost_standard'], ['2', 'Costly', 'Double price', 'cost_expensive']], '1', changed, { compact: true, min: 110 });
       const devTreasury = costCards();
       const devRecruit = costCards();
