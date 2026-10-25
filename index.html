@@ -929,7 +929,7 @@
         ['p', 'One order can cover only so much distance. Your [[areas|Stables]] level sets that distance. A single hop to a neighbouring castle is always allowed. Castles you can reach glow on the map.'],
         ['p', 'Distance is measured in leagues. One league is the spacing between neighbouring castles on a standard map. Range, scan radius and march speed are fixed in leagues and leagues per tick, so a bigger map means castles lie more leagues apart and journeys take longer. Games created before leagues keep their old scaling.'],
         ['h', 'The ruler'],
-        ['p', 'Press Ruler in the top bar and click two castles. It shows the straight-line distance in leagues, how long the trip takes on foot and by road, your range, and the Stables level you need to reach it in one march. The ETA uses the commander you have selected, or your king.'],
+        ['p', 'Press Ruler in the top bar and click two castles. It shows the straight-line distance in leagues, how long the trip takes on foot and by road, your range, and the Stables level you need to reach it in one march. The ETA uses the commander you have selected, or your king. On trail and road maps it measures the route the march would take, through castles you hold, so it agrees with the march preview. If there is no such route it says so.'],
         ['h', 'March types'],
         ['list', [
           'Assault: the army [[battles|fights]] on arrival.',
@@ -1005,7 +1005,7 @@
           'You can send gold to anyone.',
         ]],
         ['h', 'Messages'],
-        ['p', 'Open Chat and Messages to write privately to one or several players, human or AI, with an optional subject. A human answers when they read it. An AI answers on its next move, in the manner of its style and your standing with it (allied, at war or neither). An AI reply is a greeting or a stance, not a negotiation: to make a deal use the proposals in Standings.'],
+        ['p', 'Open Chat and Messages to write privately to one or several players, human or AI, with an optional subject. A human answers when they read it. An AI answers on its next move, in the manner of its style and your standing with it (allied, at war or neither), and it picks up a few keywords: alliance, peace, gold or trade, and threats of war. An AI reply is a greeting or a stance, not a negotiation: to make a deal use the proposals in Standings.'],
         ['h', 'Honor'],
         ['p', 'Honor is your reputation across games. Breaking a pact or alliance, or attacking during a grace period, costs honor. It is public on the Roll of Honor.'],
       ] },
@@ -3485,13 +3485,14 @@
         else {
           const d = r.data;
           out.push(h('div', { class: 'tip', style: 'margin:0 0 6px' }, `${nm(r.a)} to ${nm(r.b)}, straight line.`),
-            line('Distance', `${d.leagues} leagues`),
+            line('Distance', d.follows_trails ? `${d.leagues} leagues along the trails (${d.straight_leagues} straight)` : `${d.leagues} leagues`),
+            d.route_error ? h('div', { style: 'color:var(--gules-hi);margin:2px 0' }, d.route_error.replace(/^no route: /, 'No march route: ')) : null,
             line('On foot', d.eta_foot ? tickText(d.eta_foot) : 'No commander to measure with'),
             line('By road', d.roads ? (d.eta_road ? tickText(d.eta_road) : '-') : 'No road between them'),
             line('Your range', `${d.range_leagues} leagues (Stables ${d.stables})`),
             line('Stables needed', d.stables_needed > d.stables ? `${d.stables_needed} (you have ${d.stables})` : d.stables_needed ? `${d.stables_needed} (you have enough)` : 'Any level'),
-            h('div', { style: `margin-top:6px;color:${d.in_range ? '#7fd08a' : 'var(--gules-hi)'}` }, d.in_range ? 'Within your range now.' : 'Out of your range in one march.'),
-            h('div', { class: 'tip' }, 'Click a castle to measure again. ETAs use your selected commander, or your king.'));
+            h('div', { style: `margin-top:6px;color:${d.in_range ? '#7fd08a' : 'var(--gules-hi)'}` }, d.in_range ? 'Within your range now.' : d.route_error ? 'You cannot march there in one order.' : 'Out of your range in one march.'),
+            h('div', { class: 'tip' }, 'On a trail map the distance and ETA follow the route the march would take, through castles you hold. Click a castle to measure again. ETAs use your selected commander, or your king.'));
         }
         return h('div', { class: 'sec' }, out);
       };
@@ -4590,9 +4591,11 @@
         return e;
       };
 
+      const expectedNeutral = (t) => (t.owner_player_id === null && t.tier ? (ms.game.starting_garrison || 0) * t.tier : null);
       const defenceEstimate = (t, myArmory) => {
-        if (!ms.vis.has(t.id) || typeof t.troops !== 'number') return null;
         const mountain = t.terrain === 'mountain' ? 1 : 0;
+        if ((!ms.vis.has(t.id) || typeof t.troops !== 'number') && expectedNeutral(t)) return { troops: expectedNeutral(t), dmg: (ms.game.neutral_armory ?? 1) + 1 + mountain, exact: false, expected: true, stationed: 0 };
+        if (!ms.vis.has(t.id) || typeof t.troops !== 'number') return null;
         if (t.owner_player_id == null) return { troops: t.troops, dmg: (ms.game.neutral_armory ?? 1) + 1 + mountain, exact: true, stationed: 0 };
         const here = ms.cmd.filter((c) => c.current_territory_id === t.id && c.status === 'idle' && c.owner_player_id === t.owner_player_id && commanderSeen(c, tickF()) && typeof c.troops === 'number');
         return { troops: t.troops + here.reduce((a, c) => a + c.troops, 0), dmg: myArmory + 1 + mountain, exact: false, stationed: here.length };
@@ -4641,13 +4644,13 @@
             const reach = trailsOn() ? trailReach(from.id) : null;
             const inReach = (t) => (reach ? reach.has(t.id) : ms.game.free_travel ? Math.hypot(t.x - from.x, t.y - from.y) <= rangeOf(myStables()) : true);
             const cands = [...ms.t.values()]
-              .filter((t) => !t.is_junction && t.owner_player_id == null && ms.vis.has(t.id) && typeof t.troops === 'number' && inReach(t))
-              .map((t) => ({ t, need: troopsNeeded(t.troops, (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), dmg), d: Math.hypot(t.x - from.x, t.y - from.y) }))
+              .filter((t) => !t.is_junction && t.owner_player_id === null && ((ms.vis.has(t.id) && typeof t.troops === 'number') || expectedNeutral(t)) && inReach(t))
+              .map((t) => { const seenT = ms.vis.has(t.id) && typeof t.troops === 'number'; const gar = seenT ? t.troops : expectedNeutral(t); return { t, gar, est: !seenT, need: troopsNeeded(gar, (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), dmg), d: Math.hypot(t.x - from.x, t.y - from.y) }; })
               .sort((x, y) => x.d - y.d).slice(0, 6);
             const ready = cands.filter((x) => best.troops >= x.need)[0];
             const easiest = cands.slice().sort((x, y) => x.need - y.need)[0];
             if (ready) {
-              lines.push(h('div', {}, `${best.name} has ${best.troops} troops. ${ready.t.name} needs ${ready.need}, so you can take it now.`),
+              lines.push(h('div', {}, `${best.name} has ${best.troops} troops. ${ready.t.name} needs ${ready.need}${ready.est ? ' (expected, out of sight)' : ''}, so you can take it now.`),
                 h('div', { class: 'row wrap2', style: 'margin-top:6px' },
                   h('button', { class: 'primary', onclick: () => sendHere(best, ready.t) }, `Send ${best.name} to ${ready.t.name}`),
                   h('button', { class: 'ghost', onclick: () => { select('t', ready.t.id); ms.focusOn && ms.focusOn(ready.t.id); } }, 'Look first')));
@@ -4701,7 +4704,8 @@
               out.push(h('div', { style: `margin-top:6px;color:${ok ? '#7fd08a' : 'var(--gules-hi)'}` }, ok ? `${best.name} has ${best.troops} troops: enough.` : `${best.name}, your strongest, has ${best.troops}. You need ${need - best.troops} more.`));
               if (ok && best.current_territory_id !== t.id) out.push(h('button', { class: 'primary', style: 'margin-top:6px', onclick: () => sendHere(best, t) }, `Send ${best.name}`));
             }
-            if (!est.exact) out.push(h('div', { class: 'tip' }, 'Estimate: assumes their Armory matches yours and their leader has no Valor. Real defence may be stronger.'));
+            if (est.expected) out.push(h('div', { class: 'tip' }, 'Out of sight. An unclaimed castle holds its tier times the starting garrison, and that never grows, so this is reliable unless it was taken or changed.'));
+            else if (!est.exact) out.push(h('div', { class: 'tip' }, 'Estimate: assumes their Armory matches yours and their leader has no Valor. Real defence may be stronger.'));
           }
           box.replaceChildren(h('div', { class: 'sec' }, out));
         };
@@ -4715,7 +4719,7 @@
         const box = h('div', {});
         const paint = (st) => {
           const est = defenceEstimate(dest, st ? st.armory : 1);
-          if (!est || !st) { box.replaceChildren(h('div', { class: 'tip' }, 'The defenders are not visible, so the result cannot be predicted.')); return; }
+          if (!est || !st) { box.replaceChildren(h('div', { class: 'tip' }, 'The defenders are not visible, so the result cannot be predicted.'), c.role === 'king' ? h('div', { style: 'color:var(--gules-hi);margin-top:4px' }, 'Your king leads this army. If it loses, the king dies. Scout the castle first, or send another commander.') : null); return; }
           const rounds = combatSim(c.troops, st.damage, est.troops, est.dmg, true);
           const last = rounds[rounds.length - 1];
           const win = last[1] === 0 && last[0] > 0;

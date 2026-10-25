@@ -1145,7 +1145,8 @@ svg.mk-on .terrain-layer { filter: saturate(0.6) brightness(0.82); }
   .hud .hud-opt { display: none; }
   .hud-id b { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hud-id .sub { white-space: nowrap; }
-  .hud .hud-menu { position: sticky; right: 0; z-index: 2; }
+  .hud .hud-menu { position: static; order: -1; }
+  .hud > button:first-child { order: -2; }
 }
 
 .legend { z-index: 6; }
