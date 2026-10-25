@@ -43,6 +43,7 @@ All items are generic — no IP dependencies. Built items are listed with where 
 - **Territory shading (watch)** — a region tint for ownership. Not built; revisit if testing shows ownership is still hard to read with the castle glow and ring. Neptune's Pride does not tint regions, so this is not required to match it.
 - **AI attitude indicator (parking lot)** — show how each AI feels about you in Standings, with what raises or lowers it, like Neptune's Pride's regard meter. Needs AI diplomacy to react to player behaviour first. Decided October 2026 to revisit later.
 - **Pace and spacing review (next playtest)** — with leagues in, evaluate ticks per hop, castle spacing in leagues, castles per house and production together, and decide the base bundle (speed basis, spacing, castles per house, production) and which settings are variants of it. Decided October 2026: the base is one tuned bundle (see MECHANICS_REFERENCE.md section 42) with map size and speed as named variants. Re-check it against each playtest.
+- **NP parity gaps (Playtest H, parking lot)** — regard meter with gifts of technology or credits, research screen with ETAs, ledger of debts between players, Analysis screen comparing groups of players, history Recorder, per-player Badges and Scores, carrier Default Action, user-set map label zoom thresholds, Abandon Star. Pick V1 vs later after the next review.
 
 ---
 
