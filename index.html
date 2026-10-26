@@ -940,7 +940,7 @@
       { id: 'map', group: 'The world', title: 'The map', blocks: [
         ['h', 'Selecting things'],
         ['list', [
-          'Click or tap near a castle to select it; the nearest castle to your pointer wins, so you do not need to hit the sprite exactly. A marching or besieging army on top of a castle is selected before the castle; commanders resting inside a castle are reached from the castle panel.',
+          'Click or tap near a castle to select it; the nearest castle to your pointer wins, so you do not need to hit the sprite exactly. A marching or besieging army on top of a castle is selected before the castle, except while you are choosing a march destination or measuring with the ruler, when the castle always wins; commanders resting inside a castle are reached from the castle panel.',
           'The selected castle is drawn above its neighbours with a moving gilt ring. A castle that changes hands flashes a ring once. A castle under threat pulses its red ring three times and then keeps it.',
           'Troop badges show only counts you know: a number, a tilde for the count you last saw, or nothing when you have never seen inside.',
           'Switching between the 2D and 3D map crossfades. Under reduced motion none of this animates.',
@@ -6344,7 +6344,7 @@
         const touch = e.pointerType === 'touch' || TOUCH_DEVICE;
         let hit = null;
         let best = touch ? 30 : 22;
-        ms.cmd.forEach((c) => {
+        if (!ms.marching && !ms.ruler) ms.cmd.forEach((c) => {
           if (!commanderSeen(c, tf) || c.status === 'idle') return;
           const pos = cmdPos(c, tf);
           if (!pos) return;
