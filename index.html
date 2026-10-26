@@ -876,6 +876,12 @@
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers. The map controls beside it recentre the map on your castles, switch between the 2D and 3D map, show scan rings and toggle sound.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions. The address bar follows your selection, so a link to a castle or commander can be shared or bookmarked.'],
+        ['h', 'On a phone'],
+        ['list', [
+          'The map sits on top and the panel is a sheet below it with a handle. Tap the handle to cycle between a strip of tabs, half the screen and most of the screen, or drag it up and down. Selecting a castle raises the sheet to half if it was down.',
+          'The top bar keeps Road to victory, Treasury and Proposals as numbers; Castles, Ruler and Help are reached from the Menu. The map controls hold a Legend button, since the legend is hidden by default to leave room for the map.',
+          'Screens such as Research or the Menu fill the window. Everything you can tap is at least 44 px tall.',
+        ]],
         ['h', 'The secondary screens'],
         ['list', [
           'Research lists every realm area with its level, progress bar, prestige collected and an estimate: the time to the next level for the active area, and the time it would take if you made another area active. Make active switches at once.',
@@ -3404,7 +3410,23 @@
       const modeEl = h('div', { class: 'modebar', hidden: true });
       const mapCtl = h('div', { class: 'mapctl' });
       const wrap = h('div', { class: 'mapwrap' }, svg, stage3d, modeEl, mapCtl);
-      mount(h('div', { class: 'maproot' }, hud, h('div', { class: 'mapbody' + (PREFS.side === 'left' ? ' sideleft' : '') }, wrap, sideEl)));
+      const sheetBar = h('div', { class: 'sheetbar', role: 'button', tabindex: '0', 'aria-label': 'Resize the panel', title: 'Drag or tap to resize the panel' }, h('i'));
+      const mapBody = h('div', { class: 'mapbody' + (PREFS.side === 'left' ? ' sideleft' : ''), 'data-sheet': 'half' }, wrap, sheetBar, sideEl);
+      mount(h('div', { class: 'maproot' }, hud, mapBody));
+      const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
+      const SHEETS = ['peek', 'half', 'full'];
+      const setSheet = (s) => { ms.sheet = s; mapBody.dataset.sheet = s; };
+      const stepSheet = (dir) => { const i = SHEETS.indexOf(ms.sheet || 'half'); setSheet(SHEETS[Math.max(0, Math.min(SHEETS.length - 1, i + dir))]); };
+      ms.sheet = 'half';
+      let sheetY = null;
+      sheetBar.addEventListener('pointerdown', (e) => { sheetY = e.clientY; sheetBar.setPointerCapture(e.pointerId); });
+      sheetBar.addEventListener('pointerup', (e) => {
+        if (sheetY === null) return;
+        const dy = e.clientY - sheetY;
+        sheetY = null;
+        if (dy < -30) stepSheet(1); else if (dy > 30) stepSheet(-1); else setSheet(ms.sheet === 'peek' ? 'half' : ms.sheet === 'half' ? 'full' : 'peek');
+      });
+      sheetBar.addEventListener('keydown', (e) => { if (e.key === 'ArrowUp') stepSheet(1); else if (e.key === 'ArrowDown') stepSheet(-1); else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSheet(ms.sheet === 'peek' ? 'half' : ms.sheet === 'half' ? 'full' : 'peek'); } });
 
       try {
         if (!localStorage.getItem('ss-help-seen')) {
@@ -3657,6 +3679,7 @@
         ms.navDir = 'fwd';
         if (type) ms.tab = 'info';
         if (location.hash !== hashFor()) history.pushState(null, '', hashFor());
+        if (type && isPhone() && ms.sheet === 'peek') setSheet('half');
         render();
         drawSide();
       };
@@ -4552,6 +4575,7 @@
           h('button', { type: 'button', class: 'ib', title: 'Back to your castles', 'aria-label': 'Back to your castles', onclick: () => ms.goHome && ms.goHome() }, icon('home')),
           TOUCH_DEVICE ? null : h('button', { type: 'button', class: ms.view3d ? 'on' : '', 'aria-pressed': ms.view3d ? 'true' : 'false', onclick: toggle3D, title: ms.view3d ? 'Switch to the 2D map' : 'Switch to the 3D map' }, ms.view3d ? '2D' : '3D'),
           g.fog_of_war ? h('button', { type: 'button', class: ms.rings ? 'on' : '', 'aria-pressed': ms.rings ? 'true' : 'false', onclick: () => { ms.rings = !ms.rings; render(); }, title: 'Show scan rings' }, 'Rings') : null,
+          h('button', { type: 'button', class: 'legend-btn' + (ms.legendOpen ? ' on' : ''), 'aria-pressed': ms.legendOpen ? 'true' : 'false', onclick: () => { ms.legendOpen = !ms.legendOpen; wrap.classList.toggle('legend-open', ms.legendOpen); drawHud(); }, title: 'Show the legend' }, 'Legend'),
           h('button', { type: 'button', class: 'ib', title: Sfx.on ? 'Sound on' : 'Sound off', 'aria-label': 'Toggle sound', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.replaceChildren(icon(on ? 'sound' : 'mute')); e.currentTarget.title = on ? 'Sound on' : 'Sound off'; } }, icon(Sfx.on ? 'sound' : 'mute'))))]);
         updateCountdown();
       };
