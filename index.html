@@ -342,12 +342,37 @@
         bodyEl.replaceChildren(...[opts.render ? opts.render(k) : body].flat().filter(Boolean));
       };
       show(opts.tab || (opts.tabs ? opts.tabs[0][0] : null));
-      closeFn = modal(title, h('div', { class: 'scr' }, opts.sub ? h('p', { class: 'scr-sub' }, opts.sub) : null, tabsEl, opts.toolbar || null, bodyEl), () => []);
-      const dlg = document.querySelector('.overlay:last-of-type .modal');
-      if (dlg) {
-        dlg.classList.add('screen');
-        if (opts.wide) dlg.classList.add('wide');
-        dlg.querySelector('h2').after(h('button', { type: 'button', class: 'ib scr-close', 'aria-label': 'Close', title: 'Close', onclick: () => closeFn() }, icon('close')));
+      const content = h('div', { class: 'scr' }, opts.sub ? h('p', { class: 'scr-sub' }, opts.sub) : null, tabsEl, opts.toolbar || null, bodyEl);
+      const host = opts.modal ? null : document.querySelector('.mapwrap');
+      if (host) {
+        const prev = host.querySelector('.dock');
+        if (prev && prev._close) prev._close();
+        const dock = h('div', { class: `modal screen dock${opts.wide ? ' wide' : ''}`, role: 'dialog', 'aria-label': title });
+        let closed = false;
+        const onKey = (e) => {
+          if (!dock.isConnected) { document.removeEventListener('keydown', onKey, true); return; }
+          if (e.key === 'Escape') { e.stopImmediatePropagation(); closeFn(); }
+        };
+        closeFn = () => {
+          if (closed) return;
+          closed = true;
+          document.removeEventListener('keydown', onKey, true);
+          dock.classList.remove('in');
+          setTimeout(() => dock.remove(), 220);
+        };
+        dock._close = closeFn;
+        dock.append(h('h2', {}, title), h('button', { type: 'button', class: 'ib scr-close', 'aria-label': 'Close', title: 'Close', onclick: () => closeFn() }, icon('close')), content);
+        document.addEventListener('keydown', onKey, true);
+        host.append(dock);
+        requestAnimationFrame(() => dock.classList.add('in'));
+      } else {
+        closeFn = modal(title, content, () => []);
+        const dlg = document.querySelector('.overlay:last-of-type .modal');
+        if (dlg) {
+          dlg.classList.add('screen');
+          if (opts.wide) dlg.classList.add('wide');
+          dlg.querySelector('h2').after(h('button', { type: 'button', class: 'ib scr-close', 'aria-label': 'Close', title: 'Close', onclick: () => closeFn() }, icon('close')));
+        }
       }
       return { close: () => closeFn(), show, body: bodyEl };
     }
@@ -862,7 +887,7 @@
         ['p', 'The home screen is where you pick up your campaigns and start new ones.'],
         ['list', [
           'The strip at the top is you: your crest, your name (click it to rename), and your record of campaigns, victories and [[diplomacy#honor|honor]]. Quick start raises a four-house game against three AI rivals in one click. Raise a campaign opens the full setup.',
-          'Your campaigns are cards. Each shows the house you play, a state (the current tick, In the lobby, Choose your start, Paused or Finished), when the next tick lands, how many ticks have passed since your last visit, and a count of unread reports and messages. Campaigns that need you sort first.',
+          'Your campaigns are cards. Each shows the house you play, a state (the current tick, In the lobby, Choose your start, Paused or Finished), when the next production lands, how many ticks have passed since your last visit, and a count of unread reports and messages. Campaigns that need you sort first.',
           'Invitations from friends appear above your campaigns with Join and Decline.',
           'Open lobbies lists games waiting for players, with the seats already taken shown as sigils. Join by code takes the short code a host shares with you.',
           'The roll of honor ranks players by honor across finished campaigns.',
@@ -873,14 +898,14 @@
         ['p', 'This is the map screen, where you spend nearly all of a game. The numbers in the picture match the list below it.'],
         ['diagram', 'screen'],
         ['table', { head: ['', 'What it shows'], rows: [
-          ['1', 'The back arrow to your games, your crest, the game name and the time to the next tick. The Treasury figure beside it shows the gold the next production will pay, how many ticks away it is, and the clock time until it lands.'],
+          ['1', 'The back arrow to your games, your crest, the game name and the current tick. The Treasury figure beside it shows the gold the next production will pay, how many ticks away it is, and the clock time until it lands.'],
           ['2', 'Road to victory: how close the leader is to the castle share that wins ([[basics#what-wins-the-game|how you win]]). Proposals waiting for your answer and castles under threat appear beside it; click either to jump to them.'],
           ['3', 'Your gold and what the next production cycle adds ([[economy#how-production-works|production]]).'],
-          ['4', 'Castles (every castle in one table), Ruler, Menu and Help. The menu is in three groups: Your realm (Research, Castles, Ledger), The war (Intel, Recorder, Battle calculator, and Replay once a game ends) and This game (Game rules, Host tools, Options, How to play). Every one of these opens the same kind of screen: a title, a close button top right, tabs where there are two views, and a scrolling body. On a phone a screen fills the window.'],
+          ['4', 'Castles (every castle in one table), Ruler, Menu and Help. The menu is in three groups: Your realm (Research, Castles, Ledger), The war (Intel, Recorder, Battle calculator, and Replay once a game ends) and This game (Game rules, Host tools, Options, How to play). The menu drops down under the button and does not dim the map. Most items open as a panel docked against the map: a title, a close button top right, tabs where there are two views, and a scrolling body. The map stays visible and live beside it, and you can click it. Opening another item replaces the panel, and Escape closes it. Options and How to play open as a dialog. On a phone the panel is a sheet over the lower part of the screen.'],
           ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
-          ['8', 'The side panel. Realm is your home view: Next move first, then offers and events, Upgrade everywhere with its preview, realm areas with the cycles to the next level under each, and the standings. A castle opens with its state as chips (yours, king\'s seat, under threat, besieged, crossing), its troops and levels, then Build with the three upgrade prices, the commanders standing there with a March shortcut, and everything else folded: defence and production, trails, threats, supply lines, your note and its history. A commander opens with the portrait, troops, rank and what they are doing now, then Orders, with abilities and the chronicle folded. Folds remember whether you left them open. Selecting a castle or commander opens it on top with a back arrow and a close button; the browser back button and Escape also step back. News lists events, Inbox holds messages and reports, Chat is the game channel.'],
+          ['8', 'The side panel. Realm is your home view: offers and events, Upgrade everywhere with its preview, realm areas with the cycles to the next level under each, and the standings. A castle opens with its state as chips (yours, king\'s seat, under threat, besieged, crossing), its troops and levels, then Build with the three upgrade prices, the commanders standing there with a March shortcut, and everything else folded: defence and production, trails, threats, supply lines, your note and its history. A commander opens with the portrait, troops, rank and what they are doing now, then Orders, with abilities and the chronicle folded. Folds remember whether you left them open. Selecting a castle or commander opens it on top with a back arrow and a close button; the browser back button and Escape also step back. News lists events, Inbox holds messages and reports, Chat is the game channel.'],
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers. The map controls beside it recentre the map on your castles, switch between the 2D and 3D map, show scan rings and toggle sound.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions. The address bar follows your selection, so a link to a castle or commander can be shared or bookmarked.'],
@@ -888,12 +913,12 @@
         ['list', [
           'The map sits on top and the panel is a sheet below it with a handle. Tap the handle to cycle between a strip of tabs, half the screen and most of the screen, or drag it up and down. Selecting a castle raises the sheet to half if it was down.',
           'The top bar keeps Road to victory, Treasury and Proposals as numbers; Castles, Ruler and Help are reached from the Menu. The map controls hold a Legend button, since the legend is hidden by default to leave room for the map.',
-          'Screens such as Research or the Menu fill the window. Everything you can tap is at least 44 px tall.',
+          'Panels such as Research open as a sheet over the lower part of the screen, with the map above. Everything you can tap is at least 44 px tall.',
         ]],
         ['h', 'Waiting, nothing and trouble'],
         ['list', [
           'While a game opens, the map shows Drawing the realm until the first picture is ready. Panels that fetch something, such as a castle report or a chronicle, show grey placeholder lines until it arrives.',
-          'An empty list says what will appear there and, where it helps, offers the next thing to do, such as opening Next move.',
+          'An empty list says what will appear there.',
           'If the connection drops, a bar under the top bar says so and the game keeps retrying; orders fail until it returns. If the realm cannot load at all, the map offers Try again.',
           'Sound is off until you turn it on. The first time you take a castle with sound off, a message offers to turn it on. Captures, losses, threats and new ticks each have their own sound; the toggle is in the map controls and in Options.',
         ]],
@@ -912,7 +937,6 @@
         ]],
         ['h', 'Finding your way'],
         ['list', [
-          'The Next move box at the top of the Info tab tells you what to do first: put troops under a commander, then which neutral castle you can take now, with a button to send them. When troops are short it can send the army to collect a richer castle\'s garrison on arrival. It lists orders for up to three armies at once, and when troops sit in castles with no commander it tells you to hire one, because troops only fight under a commander. It looks at every free army, not just the strongest: a castle you lost comes first (retake), then unclaimed castles near any of your armies, then rival castles you can beat. When a castle of yours is under threat it shows the enemy force, who is holding it, and a button to send the nearest army that can march there. An army already standing in a threatened castle is never told to leave. Your king is offered as a helper only when no commander can go, with a warning, and one army is never offered for two castles at once.',
           'Your gold box shows what the next production pays and how many ticks away it is.',
           'Quick start on the home screen makes a four-house game with three AI rivals and begins it at once.',
           'Sounds mark a castle gained, a castle lost, and a new threat to your castles.',
@@ -1050,7 +1074,6 @@
           'Open a commander and press March, or press the March shortcut beside a commander in a castle panel. A bar across the top of the map says what to click; Escape or Cancel ends it.',
           'Click the destination. The panel shows whether it is in range of one order, the route, the arrival tick and the predicted result of an assault.',
           'If the castle is out of range in one order but a path runs through castles you or an ally hold, the panel offers March in N legs, which sends the army stop by stop, and Edit route, which opens the same stops in the route editor so you can change them. If no such path exists, the panel says so: raise Stables or take a closer castle first.',
-          'Next move makes the same offer when nothing is in reach of a single order: it names the nearest castle you can take in several legs and the castles the army passes through.',
         ]],
         ['p', 'Select a [[commanders|commander]] and choose March, then click a destination. The map shows the path, the time to arrive and the cost.'],
         ['h', 'Range'],
@@ -1749,7 +1772,6 @@
         return at + (left - 1) * TICK_MS[g.tick_speed];
       };
       const fillLive = () => {
-        campGrid.querySelectorAll('[data-at]').forEach((el) => { el.textContent = `Next tick in ${fmtLeft(Number(el.dataset.at) - Date.now())}`; });
         campGrid.querySelectorAll('[data-prod]').forEach((el) => { el.textContent = `Production in ${fmtLeft(Number(el.dataset.prod) - Date.now())}`; });
       };
       const stateOf = (g) => {
@@ -1769,7 +1791,7 @@
         const at = nextTickAt(g);
         const cta = { lobby: 'Open the lobby', picking: 'Choose your start', active: 'Resume', finished: 'Read the story' }[g.status] || 'Open';
         const lines = [];
-        if (g.status === 'active') lines.push(at ? h('span', { class: 'cl', 'data-at': String(at) }) : h('span', { class: 'cl' }, g.paused_at ? 'Paused by the host' : SPEEDS[g.tick_speed] || ''));
+        if (g.status === 'active' && (!at || g.paused_at)) lines.push(h('span', { class: 'cl' }, g.paused_at ? 'Paused by the host' : SPEEDS[g.tick_speed] || ''));
         const prodAt = g.status === 'active' ? productionAt(g) : null;
         if (prodAt) lines.push(h('span', { class: 'cl', 'data-prod': String(prodAt) }));
         if (since) lines.push(h('span', { class: 'cl hot' }, `${pluralN(since, 'tick')} since your last visit`));
@@ -4157,11 +4179,6 @@
         L.dyn.replaceChildren(...out);
       };
 
-      const fmtCountdown = (ms_) => {
-        const s = Math.max(0, Math.round(ms_ / 1000));
-        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      };
-
       const nextEl = h('span');
       const productionLeft = () => {
         const g = ms.game;
@@ -4184,8 +4201,7 @@
           nextEl.textContent = end === null ? 'turn-based' : (end > 0 ? `turn ends in ${fmtDuration(end)}` : 'turn due');
           return;
         }
-        const due = Date.parse(g.last_tick_processed_at) + interval - Date.now();
-        nextEl.textContent = due > 0 ? `next tick in ${fmtCountdown(due)}` : 'tick due';
+        nextEl.textContent = '';
       };
 
       const canAct = () => ms.game.status === 'active' && ms.me.eliminated_at_tick == null;
@@ -4565,12 +4581,14 @@
       window.addEventListener('ss-replay', onReplay);
       state.cleanup.push(() => window.removeEventListener('ss-replay', onReplay));
 
-      const menuDialog = () => {
-        let scr = null;
-        const item = (title, note, fn) => h('button', { type: 'button', class: 'menu-item', onclick: () => { scr.close(); fn(); } }, h('b', {}, title), h('span', {}, note));
+      let closeMenu = () => {};
+      const menuDialog = (e) => {
+        const btn = e && e.currentTarget;
+        if (document.querySelector('.menu-pop')) { closeMenu(); return; }
+        const item = (title, note, fn) => h('button', { type: 'button', class: 'menu-item', onclick: () => { closeMenu(); fn(); } }, h('b', {}, title), h('span', {}, note));
         const group = (title, ...items) => (items.filter(Boolean).length ? h('div', { class: 'menu-group' }, h('h3', {}, title), h('div', { class: 'menu-items' }, items)) : null);
         const g = ms.game;
-        scr = screen('Menu', h('div', {},
+        const pop = h('div', { class: 'menu-pop', role: 'menu', 'aria-label': 'Menu' },
           group('Your realm',
             item('Research', 'areas, progress and ETAs', researchDialog),
             item('Castles', 'every castle in one table', castlesDialog),
@@ -4584,7 +4602,24 @@
             item('Game rules', 'the articles of war', () => screen(`${g.name}: rules`, articlesOfWar(g, ms.players.size), { wide: true })),
             g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', 'pause or jump ticks', hostDialog) : null,
             item('Options', 'default order, panel side, map text, sound', optionsDialog),
-            item('How to play', 'the field manual', () => helpDialog()))));
+            item('How to play', 'the field manual', () => helpDialog())));
+        const r = btn ? btn.getBoundingClientRect() : { bottom: 56, right: window.innerWidth - 12 };
+        pop.style.top = `${Math.round(r.bottom + 8)}px`;
+        pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+        const onDown = (ev) => { if (!pop.contains(ev.target) && !(btn && btn.contains(ev.target))) closeMenu(); };
+        const onKey = (ev) => { if (!pop.isConnected) { document.removeEventListener('keydown', onKey, true); return; } if (ev.key === 'Escape') { ev.stopImmediatePropagation(); closeMenu(); } };
+        closeMenu = () => {
+          document.removeEventListener('mousedown', onDown, true);
+          document.removeEventListener('keydown', onKey, true);
+          pop.classList.remove('in');
+          setTimeout(() => pop.remove(), 160);
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        };
+        document.addEventListener('mousedown', onDown, true);
+        document.addEventListener('keydown', onKey, true);
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        document.body.append(pop);
+        requestAnimationFrame(() => pop.classList.add('in'));
       };
 
       const drawHud = () => {
@@ -4629,7 +4664,7 @@
           keep('r', h('div', { class: 'hud-r' },
             h('button', { type: 'button', class: 'ghost', onclick: castlesDialog, title: 'Every castle in one table' }, 'Castles'),
             h('button', { type: 'button', class: ms.ruler ? 'primary' : 'ghost', 'aria-pressed': ms.ruler ? 'true' : 'false', onclick: toggleRuler, title: 'Measure the distance between two castles' }, 'Ruler'),
-            h('button', { type: 'button', class: 'primary hud-menu', onclick: menuDialog }, 'Menu'),
+            h('button', { type: 'button', class: 'primary hud-menu', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: menuDialog }, 'Menu'),
             h('button', { type: 'button', class: 'ghost', onclick: () => helpDialog(), title: 'How to play' }, 'Help')))]);
         place(mapCtl, [keep('m', h('div', { class: 'mapctl-in' },
           h('button', { type: 'button', class: 'ib', title: 'Back to your castles', 'aria-label': 'Back to your castles', onclick: () => ms.goHome && ms.goHome() }, icon('home')),
@@ -5151,18 +5186,6 @@
 
       const strongestIdle = () => ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.troops > 0).sort((a, b) => b.troops - a.troops)[0] || null;
 
-      const validMarch = async (c, tid) => {
-        ms.pvCache = ms.pvCache || new Map();
-        const k = `${c.id}:${tid}:${ms.game.current_tick}`;
-        if (ms.pvCache.has(k)) return ms.pvCache.get(k);
-        let r;
-        try { r = await sb.rpc('preview_march', { p_game_id: gameId, p_commander_id: c.id, p_to_territory_id: tid }); } catch { return true; }
-        if (r.error && /timeout|50\d|fetch|network/i.test(`${r.error.message || ''}${r.error.code || ''}${r.status || ''}`)) return true;
-        const ok = !r.error && !!r.data && !!r.data.in_range;
-        ms.pvCache.set(k, ok);
-        return ok;
-      };
-
       const legsTo = (fromId, destId, maxLegs = 6) => {
         if (!trailsOn()) return null;
         const dest = ms.t.get(destId);
@@ -5211,200 +5234,6 @@
         render();
         drawSide();
         previewTo(t.id);
-      };
-
-      const nextMoveSection = () => {
-        if (!canAct() || ms.game.status !== 'active') return null;
-        const mine = (t) => t.owner_player_id === ms.me.id && !t.is_junction;
-        const idleCmds = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.current_territory_id != null);
-        const idleAll = idleCmds.filter((c) => c.troops > 0).sort((x, y) => y.troops - x.troops);
-        const idleNK = idleAll.find((c) => c.role !== 'king');
-        const best = idleNK && idleAll[0] && idleNK.troops >= 0.6 * idleAll[0].troops ? idleNK : idleAll[0] || null;
-        const box = ms.nmBox || (ms.nmBox = h('div', { class: 'nmbox' }));
-        const paintInner = async (stats) => {
-          const lines = [];
-          let guideSeen = true;
-          try { guideSeen = !!localStorage.getItem(`ss-guide-${gameId}`) || ms.game.current_tick > 20; } catch {}
-          if (!guideSeen) {
-            lines.push(h('div', { class: 'tip', style: 'margin:0 0 8px' }, 'New here? ', h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); helpDialog('basics'); } }, 'Read the two-minute guide'), ' or ', h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); try { localStorage.setItem(`ss-guide-${gameId}`, '1'); } catch {} drawSide(); } }, 'hide this')));
-          }
-          const takeOrders = idleCmds.filter((c) => c.troops < 5 && ms.t.get(c.current_territory_id) && mine(ms.t.get(c.current_territory_id)) && ms.t.get(c.current_territory_id).troops >= (c.troops > 0 ? 8 : 2))
-            .sort((x, y) => ms.t.get(y.current_territory_id).troops - ms.t.get(x.current_territory_id).troops);
-          if (!best) {
-            const pick = takeOrders[0];
-            if (pick) {
-              const home = ms.t.get(pick.current_territory_id);
-              const n = home.troops - 1;
-              lines.push(h('div', {}, `${ms.cmd.some((c) => c.owner_player_id === ms.me.id && c.troops > 0) ? 'Your armies are out.' : 'Your commanders are not leading any troops yet.'} ${home.name} holds ${home.troops}. Put ${n} of them under ${pick.name}${ms.cmd.some((c) => c.owner_player_id === ms.me.id && c.troops > 0) ? ' to raise another army.' : ', then march to a neutral castle.'}`),
-                h('button', { class: 'primary', style: 'margin-top:6px', onclick: (e) => act(e.currentTarget, async () => {
-                  const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: pick.id, p_amount: n });
-                  if (error) throw error;
-                }, () => {
-                  const prev = [pick.troops, home.troops];
-                  pick.troops += n; home.troops -= n;
-                  return () => { pick.troops = prev[0]; home.troops = prev[1]; };
-                }) }, `Take ${n} troops with ${pick.name}`));
-            }
-          } else if (stats.size) {
-            const targeted = new Set();
-            ms.cmd.forEach((c) => {
-              if (c.owner_player_id !== ms.me.id) return;
-              const mv = ms.mov.get(c.id);
-              if (mv) targeted.add(mv.to_territory_id);
-              const rt = ms.routes.get(c.id);
-              if (rt && rt.status === 'active') (rt.stops || []).forEach((sp) => targeted.add(sp.territory_id));
-            });
-            const optsFor = (a, st) => {
-              const from = ms.t.get(a.current_territory_id);
-              const reach = trailsOn() ? trailReach(from.id) : null;
-              const inReach = (t) => (reach ? reach.has(t.id) : ms.game.free_travel ? Math.hypot(t.x - from.x, t.y - from.y) <= rangeOf(myStables()) : true);
-              const out = [];
-              ms.t.forEach((t) => {
-                if (t.is_junction || t.id === from.id || t.owner_player_id === ms.me.id || (t.owner_player_id && isFriend(t.owner_player_id)) || targeted.has(t.id) || !inReach(t)) return;
-                const d = Math.hypot(t.x - from.x, t.y - from.y);
-                if (t.owner_player_id === null) {
-                  const seenT = ms.vis.has(t.id) && typeof t.troops === 'number';
-                  const gar = seenT ? t.troops : expectedNeutral(t);
-                  if (gar == null) return;
-                  out.push({ a, t, gar, est: !seenT, kind: 'neutral', need: troopsNeeded(gar, (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), st.damage), d });
-                } else if (ms.vis.has(t.id) && typeof t.troops === 'number') {
-                  const e2 = defenceEstimate(t, st.armory);
-                  if (e2) out.push({ a, t, gar: e2.troops, est: !e2.exact, kind: ms.lost && ms.lost.has(t.id) ? 'retake' : 'rival', need: troopsNeeded(e2.troops, e2.dmg, st.damage), d });
-                }
-              });
-              return out;
-            };
-            const rank = { retake: 0, neutral: 1, rival: 2 };
-            const actors = [...idleAll.filter((c) => c.role !== 'king'), ...idleAll.filter((c) => c.role === 'king')]
-              .filter((c) => !(ms.threats || []).includes(c.current_territory_id) && stats.has(c.id) && ms.t.get(c.current_territory_id)).slice(0, 3);
-            const ready = [];
-            const pending = [];
-            for (const a of actors) {
-              const opts = optsFor(a, stats.get(a.id));
-              pending.push(...opts);
-              const cand = opts.filter((o) => a.troops >= o.need).sort((x, y) => rank[x.kind] - rank[y.kind] || (x.kind === 'rival' ? x.need - y.need : x.d - y.d)).slice(0, 3);
-              for (const o of cand) {
-                if (await validMarch(a, o.t.id)) { ready.push(o); break; }
-              }
-            }
-            ready.sort((x, y) => rank[x.kind] - rank[y.kind] || x.d - y.d);
-            const pick = ready[0];
-            if (pick) {
-              const a = pick.a;
-              const kingBlind = a.role === 'king' && (pick.est || pick.kind !== 'neutral');
-              const what = pick.kind === 'neutral'
-                ? `${pick.t.name} needs ${pick.need}${pick.est ? ' (expected, out of sight)' : ''}`
-                : `${pick.t.name}, ${pick.kind === 'retake' ? 'which you lost to' : 'held by'} ${pname(pick.t.owner_player_id)}, needs about ${pick.need}`;
-              lines.push(h('div', {}, `${a.name} has ${a.troops} troops. ${what}, ${a.troops === pick.need ? 'so you have just enough. Add a few more troops to be safe.' : pick.kind === 'retake' ? 'so you can retake it now.' : 'so you can take it now.'}`),
-                kingBlind ? h('div', { style: 'color:var(--gules-hi);margin-top:4px' }, 'Your king would lead this, and the garrison is not certain. If it loses, the king dies. Raise another army with a commander first if you can.') : null,
-                h('div', { class: 'row wrap2', style: 'margin-top:6px' },
-                  h('button', { class: kingBlind ? '' : 'primary', onclick: () => sendHere(a, pick.t) }, `${pick.kind === 'retake' ? 'Retake with' : 'Send'} ${a.name}${pick.kind === 'retake' ? '' : ` to ${pick.t.name}`}`),
-                  h('button', { class: 'ghost', onclick: () => { select('t', pick.t.id); ms.focusOn && ms.focusOn(pick.t.id); } }, 'Look first')));
-              const taken = new Set([pick.t.id]);
-              ready.filter((o) => o.a.id !== pick.a.id && !taken.has(o.t.id) && taken.add(o.t.id)).slice(0, 2).forEach((o) => {
-                lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `${o.a.name} (${o.a.troops} troops) could ${o.kind === 'retake' ? 'retake' : 'take'} ${o.t.name}, which needs ${o.need}. `, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); sendHere(o.a, o.t); } }, 'Send')));
-              });
-            } else if (!pending.length) {
-              let far = null;
-              for (const a of actors) {
-                const from = ms.t.get(a.current_territory_id);
-                const st = stats.get(a.id);
-                const garOf = (t) => {
-                  if (t.owner_player_id === null) { const seenT = ms.vis.has(t.id) && typeof t.troops === 'number'; return seenT ? t.troops : expectedNeutral(t); }
-                  return ms.vis.has(t.id) && typeof t.troops === 'number' ? t.troops : null;
-                };
-                const cands = [...ms.t.values()].filter((t) => !t.is_junction && t.id !== from.id && t.owner_player_id !== ms.me.id && !(t.owner_player_id && isFriend(t.owner_player_id)) && !targeted.has(t.id) && garOf(t) != null)
-                  .sort((x, y) => (x.owner_player_id === null ? 0 : 1) - (y.owner_player_id === null ? 0 : 1) || Math.hypot(x.x - from.x, x.y - from.y) - Math.hypot(y.x - from.x, y.y - from.y)).slice(0, 6);
-                for (const t of cands) {
-                  const legs = legsTo(from.id, t.id);
-                  if (!legs) continue;
-                  let need = Infinity;
-                  if (t.owner_player_id === null) need = troopsNeeded(garOf(t), (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), st.damage);
-                  else { const e2 = defenceEstimate(t, st.armory); if (e2) need = troopsNeeded(e2.troops, e2.dmg, st.damage); }
-                  if (a.troops >= need) { far = { a, t, legs, need, est: t.owner_player_id === null && !(ms.vis.has(t.id) && typeof t.troops === 'number') }; break; }
-                }
-                if (far) break;
-              }
-              if (far) {
-                const via = far.legs.slice(0, -1).map((l) => ms.t.get(l.id).name).join(', ');
-                lines.push(h('div', {}, `${far.a.name} has ${far.a.troops} troops. ${far.t.name} needs ${far.need}${far.est ? ' (expected, out of sight)' : ''} and is ${far.legs.length} legs away${via ? `, through ${via}` : ''}.`,
-                  h('div', { class: 'row wrap2', style: 'margin-top:6px' },
-                    h('button', { class: 'primary', onclick: sendLegs(far.a, far.legs, 'assault') }, `Send ${far.a.name} to ${far.t.name} in ${far.legs.length} legs`),
-                    h('button', { class: 'ghost', onclick: () => { select('t', far.t.id); ms.focusOn && ms.focusOn(far.t.id); } }, 'Look first'))));
-              } else {
-                lines.push(h('div', {}, actors.length ? 'No castle you can see is within reach of any of your free armies, even in several legs. Raise Stables to march farther, or scout for a closer castle.' : 'Your free armies are holding threatened castles.'));
-              }
-            } else {
-              const easiest = pending.slice().sort((x, y) => (x.need - x.a.troops) - (y.need - y.a.troops) || x.d - y.d)[0];
-              const a = easiest.a;
-              const pool = [...ms.t.values()].filter((t) => mine(t) && t.id !== a.current_territory_id && typeof t.troops === 'number' && !targeted.has(t.id) && !(ms.threats || []).includes(t.id));
-              let rich = null;
-              const aFrom = ms.t.get(a.current_territory_id);
-              const aReach = trailsOn() ? trailReach(aFrom.id) : null;
-              for (const t of pool.filter((t2) => t2.troops > 3 && (!aReach || aReach.has(t2.id))).sort((x, y) => y.troops - x.troops).slice(0, 3)) {
-                if (await validMarch(a, t.id)) { rich = t; break; }
-              }
-              const spare = pool.reduce((a2, t) => a2 + Math.max(0, t.troops - 1), 0);
-              lines.push(h('div', {}, `${a.name} has ${a.troops} troops. The easiest target, ${easiest.t.name}, needs ${easiest.need}.${spare + a.troops >= easiest.need && rich ? ` Your other castles hold ${spare} spare troops, enough to get there. Send the army to collect them.` : ' Raise Recruitment and wait for the next cycle.'}`),
-                h('div', { class: 'row wrap2', style: 'margin-top:6px' },
-                  spare + a.troops >= easiest.need && rich ? h('button', { class: 'primary', onclick: () => sendHere(a, rich, true) }, `Send ${a.name} to collect ${rich.name}'s ${rich.troops} troops`) : null,
-                  h('button', { class: 'ghost', onclick: () => { select('t', easiest.t.id); ms.focusOn && ms.focusOn(easiest.t.id); } }, `Look at ${easiest.t.name}`)));
-            }
-          }
-          const usedHelp = new Set();
-          for (const thrId of (ms.threats || []).slice(0, 2).reverse()) {
-            const thr = ms.t.get(thrId);
-            if (!thr) continue;
-            const incoming = ms.cmd.filter((c) => c.owner_player_id !== ms.me.id && !isFriend(c.owner_player_id) && commanderSeen(c, tickF()) && typeof c.troops === 'number'
-              && ((c.status === 'sieging' && c.current_territory_id === thr.id) || (c.status === 'moving' && ms.mov.get(c.id) && ms.mov.get(c.id).to_territory_id === thr.id))).reduce((s, c) => s + c.troops, 0);
-            const here = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle' && c.current_territory_id === thr.id);
-            const holding = here.reduce((s, c) => s + (c.troops || 0), 0) + (thr.troops || 0);
-            const helpers = idleAll.filter((c) => !usedHelp.has(c.id) && c.current_territory_id !== thr.id && !(ms.threats || []).includes(c.current_territory_id) && ms.t.get(c.current_territory_id))
-              .sort((x, y) => (x.role === 'king') - (y.role === 'king') || Math.hypot(ms.t.get(x.current_territory_id).x - thr.x, ms.t.get(x.current_territory_id).y - thr.y) - Math.hypot(ms.t.get(y.current_territory_id).x - thr.x, ms.t.get(y.current_territory_id).y - thr.y));
-            let help = null;
-            for (const c of helpers.slice(0, 3)) {
-              if (await validMarch(c, thr.id)) { help = c; usedHelp.add(c.id); break; }
-            }
-            const sub = `${incoming ? `About ${incoming} enemy troops are coming. ` : ''}${thr.name} holds ${holding}${here.length ? `, with ${here.map((c) => c.name).join(' and ')} standing there` : ''}.${here.length ? ' Keep them there.' : ''}`;
-            const short = incoming && holding <= incoming;
-            lines.unshift(h('div', { style: 'color:#ff7a68' }, `${thr.name} is under threat.`),
-              h('div', { class: 'tip' }, sub + (help ? ` ${help.name} can reach it${short && help.troops + holding <= incoming ? ' but may not be enough' : ''}.${help.role === 'king' ? ' This is your king. If the castle falls with the king in it, the king dies.' : ''}` : short ? ' None of your free armies can march there.' : '')),
-              h('div', { class: 'row wrap2', style: 'margin:6px 0 8px' }, help ? h('button', { class: help.role === 'king' ? '' : 'primary', onclick: () => sendHere(help, thr) }, `Send ${help.name} to ${thr.name}`) : null,
-                h('button', { class: 'ghost', onclick: () => { select('t', thr.id); ms.focusOn && ms.focusOn(thr.id); } }, 'Look at it')));
-          }
-          if (best) {
-            takeOrders.filter((c) => c.id !== best.id).slice(0, 3).forEach((extra) => {
-              const home = ms.t.get(extra.current_territory_id);
-              lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `${extra.role === 'king' ? 'Your king' : extra.name} stands with ${extra.troops} troops at ${home.name}, which holds ${home.troops}. `, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); select('c', extra.id); } }, 'Give them troops')));
-            });
-          }
-          {
-            const manned = new Set(idleCmds.map((c) => c.current_territory_id));
-            const bare = [...ms.t.values()].filter((t) => mine(t) && !manned.has(t.id) && typeof t.troops === 'number' && t.troops > 5).sort((x, y) => y.troops - x.troops);
-            const idleTroops = bare.reduce((n, t) => n + t.troops - 1, 0);
-            const cost = ms.game.commander_cost;
-            if (bare.length && idleTroops >= 15 && ms.me.gold >= cost) {
-              const t0 = bare[0];
-              lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `${idleTroops} troops sit in castles with no commander, and troops only fight under a commander. Hire one (${cost} gold) at ${t0.name}, which holds ${t0.troops}. `, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); select('t', t0.id); ms.focusOn && ms.focusOn(t0.id); } }, `Open ${t0.name}`)));
-            }
-          }
-          if (ms.me.gold >= 120) lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `You hold ${ms.me.gold} gold. Spend it with Upgrade everywhere below, or hire a commander at a castle.`));
-          box.replaceChildren(...(lines.length ? [h('div', { class: 'sec' }, h('b', {}, 'Next move'), ...lines)] : []));
-        };
-        const paint = async (stats) => {
-          try { await paintInner(stats); } catch {
-            if (!box.childElementCount) box.replaceChildren(h('div', { class: 'sec' }, h('b', {}, 'Next move'), h('div', { class: 'tip' }, 'Checking the roads.')));
-          }
-        };
-        if (!best) { paint(new Map()); return box; }
-        const actorIds = [...idleAll.filter((c) => c.role !== 'king'), ...idleAll.filter((c) => c.role === 'king')].slice(0, 5).map((c) => c.id);
-        const es = actorIds.map((id) => [id, attackStats([id])]);
-        const armoryLvl = ((ms.areas || []).find((a2) => a2.area === 'armory') || { level: 1 }).level;
-        const gather = () => new Map(es.filter(([, e]) => e.data || !e.p).map(([id, e]) => [id, e.data || { armory: armoryLvl, damage: Math.max(1, armoryLvl) }]));
-        paint(gather());
-        const waiting = es.map(([, e]) => e.p).filter(Boolean);
-        if (waiting.length) Promise.all(waiting).then(() => paint(gather()));
-        return box;
       };
 
       const assaultSection = (t) => {
@@ -6116,7 +5945,7 @@
         if (ms.tab === 'news') {
           patchSide([sideTabs(), h('div', { class: 'sec' }, ms.moments.length
             ? ms.moments.map((m) => feedRow(m.tick, momentText(m)))
-            : emptyState('Nothing has happened yet. Captures, sieges, wars and alliances across the realm are listed here as they happen.', { label: 'Open Next move', fn: () => { ms.tab = 'info'; goRoot(); } }))]);
+            : emptyState('Nothing has happened yet. Captures, sieges, wars and alliances across the realm are listed here as they happen.'))]);
           return;
         }
         if (ms.tab === 'chat') {
@@ -6137,7 +5966,7 @@
           const open = ms.report ? ms.battles.find((x) => x.id === ms.report) : null;
           let body;
           if (ms.inboxTab === 'battles') {
-            body = open ? battleDetail(open) : [ms.battles.length ? ms.battles.map(battleRow) : emptyState('No battles yet. The first clash is reported here with both sides, every round and the result.', canAct() ? { label: 'Open Next move', fn: () => { ms.tab = 'info'; goRoot(); } } : null)];
+            body = open ? battleDetail(open) : [ms.battles.length ? ms.battles.map(battleRow) : emptyState('No battles yet. The first clash is reported here with both sides, every round and the result.')];
           } else {
             body = [h('div', { class: 'sec' }, ms.inbox.length
               ? ms.inbox.map((i) => feedRow(i.tick, i.title, ms.newIds.has(i.id)))
@@ -6240,7 +6069,6 @@
         } else {
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
           const [areas, upgrade, surrender] = realmSection();
-          parts.push(nextMoveSection());
           const offers = offersSection();
           if (offers) offers.dataset.sec = 'offers';
           parts.push(offers);

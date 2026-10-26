@@ -1649,3 +1649,24 @@ button.pending::after { content: ''; position: absolute; inset: 0; margin: auto;
 /* Realm tab: inline area ETA and spend preview */
 .side .line .eta { display: block; font-weight: 400; font-size: .74rem; color: var(--dim); font-style: italic; text-align: right; }
 .side .spend-plan { margin-top: 6px; }
+
+.dock.modal.screen { background: var(--ink-1, #17110b); backdrop-filter: none; position: absolute; top: 0; bottom: 0; right: 0; z-index: 30; width: clamp(380px, 46%, 580px); max-width: none; max-height: none; height: auto; border-radius: 0; border-width: 0 0 0 1px; box-shadow: -14px 0 36px rgba(0, 0, 0, 0.55); animation: none; opacity: 0; transform: translateX(28px); transition: transform 0.22s var(--ease, ease-out), opacity 0.22s var(--ease, ease-out); }
+.dock.modal.screen.wide { width: clamp(480px, 78%, 920px); }
+.dock.modal.screen.in { opacity: 1; transform: none; }
+.mapbody.sideleft .dock.modal.screen { right: auto; left: 0; border-width: 0 1px 0 0; box-shadow: 14px 0 36px rgba(0, 0, 0, 0.55); transform: translateX(-28px); }
+.mapbody.sideleft .dock.modal.screen.in { transform: none; }
+.dock.modal.screen > h2 { padding-right: 56px; }
+.dock .scr-body { flex: 1; }
+.menu-pop { position: fixed; z-index: 80; width: min(340px, calc(100vw - 16px)); max-height: calc(100vh - 80px); overflow-y: auto; padding: 14px 14px 4px; background: var(--ink-1, #17110b); border: 1px solid var(--gilt-lo); border-radius: var(--radius); box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.6)); opacity: 0; transform: translateY(-6px); transition: opacity 0.16s var(--ease, ease-out), transform 0.16s var(--ease, ease-out); }
+.menu-pop.in { opacity: 1; transform: none; }
+.menu-pop .menu-group { margin-bottom: 12px; }
+.menu-pop .menu-items { grid-template-columns: 1fr; gap: 4px; }
+.menu-pop .menu-item { min-height: 0; padding: 8px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.menu-pop .menu-item span { font-size: 0.78rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.menu-pop .menu-item b { white-space: nowrap; }
+@media (max-width: 760px) {
+  .dock.modal.screen, .dock.modal.screen.wide { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 64vh; border-width: 1px 0 0; border-radius: 14px 14px 0 0; box-shadow: 0 -14px 36px rgba(0, 0, 0, 0.55); transform: translateY(28px); z-index: 60; }
+  .mapbody.sideleft .dock.modal.screen { left: 0; transform: translateY(28px); }
+  .dock.modal.screen.in, .mapbody.sideleft .dock.modal.screen.in { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .dock.modal.screen, .menu-pop { transition: none; transform: none; } }
