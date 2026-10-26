@@ -105,14 +105,22 @@
       host.replaceChildren(...next);
     }
 
-    function toast(message, ok) {
+    function toast(message, ok, action) {
       const host = document.getElementById('toasts');
       const t = h('div', { class: 'toast' + (ok ? ' ok' : ''), role: 'status' }, h('span', {}, message),
+        action ? h('button', { type: 'button', class: 'small', onclick: () => { t.remove(); action.fn(); } }, action.label) : null,
         h('button', { type: 'button', class: 'ib', 'aria-label': 'Dismiss', onclick: () => t.remove() }, icon('close')));
       if (ok) Sfx.ok(); else Sfx.bad();
       while (host.children.length >= 3) host.firstChild.remove();
       host.append(t);
-      setTimeout(() => t.remove(), 5500);
+      setTimeout(() => t.remove(), action ? 12000 : 5500);
+    }
+
+    function emptyState(text, action) {
+      return h('div', { class: 'empty2' }, h('p', {}, text), action ? h('button', { type: 'button', onclick: action.fn }, action.label) : null);
+    }
+    function skeleton(rows = 3) {
+      return h('div', { class: 'skel', 'aria-busy': 'true', 'aria-label': 'Loading' }, Array.from({ length: rows }, (_, i) => h('i', { style: `width:${[86, 62, 74, 55][i % 4]}%` })));
     }
 
     function confirmDialog(message, label, opts = {}) {
@@ -882,6 +890,13 @@
           'The top bar keeps Road to victory, Treasury and Proposals as numbers; Castles, Ruler and Help are reached from the Menu. The map controls hold a Legend button, since the legend is hidden by default to leave room for the map.',
           'Screens such as Research or the Menu fill the window. Everything you can tap is at least 44 px tall.',
         ]],
+        ['h', 'Waiting, nothing and trouble'],
+        ['list', [
+          'While a game opens, the map shows Drawing the realm until the first picture is ready. Panels that fetch something, such as a castle report or a chronicle, show grey placeholder lines until it arrives.',
+          'An empty list says what will appear there and, where it helps, offers the next thing to do, such as opening Next move.',
+          'If the connection drops, a bar under the top bar says so and the game keeps retrying; orders fail until it returns. If the realm cannot load at all, the map offers Try again.',
+          'Sound is off until you turn it on. The first time you take a castle with sound off, a message offers to turn it on. Captures, losses, threats and new ticks each have their own sound; the toggle is in the map controls and in Options.',
+        ]],
         ['h', 'The secondary screens'],
         ['list', [
           'Research lists every realm area with its level, progress bar, prestige collected and an estimate: the time to the next level for the active area, and the time it would take if you made another area active. Make active switches at once.',
@@ -1617,7 +1632,7 @@
     }
 
     async function friendsDialog() {
-      const body = h('div', { class: 'friends' }, h('div', { class: 'empty' }, 'Loading'));
+      const body = h('div', { class: 'friends' }, skeleton(3));
       const codeInput = h('input', { type: 'text', placeholder: 'ABCD-1234', maxlength: '9', 'aria-label': 'Friend code', autocomplete: 'off' });
       let data = null;
       let social = null;
@@ -1702,7 +1717,7 @@
       const campGrid = h('div', { class: 'camps' });
       const inviteStrip = h('div', { class: 'invites' });
       const openList = h('div', { class: 'lobbies' });
-      const boardList = h('div', { class: 'honor-list' }, h('div', { class: 'empty' }, 'Loading'));
+      const boardList = h('div', { class: 'honor-list' }, skeleton(3));
       const codeInput = h('input', { type: 'text', id: 'joincode', placeholder: 'Code, such as K7M2-9QX4', maxlength: '12', 'aria-label': 'Game code', autocomplete: 'off' });
       codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = codeInput.value.trim(); if (v) joinByCode(v); } });
       const campaignsB = h('b', {}, String(profile.total_games ?? 0));
@@ -1872,7 +1887,7 @@
     }
 
     async function inviteFriendsDialog(gameId) {
-      const body = h('div', { class: 'friends' }, h('div', { class: 'empty' }, 'Loading'));
+      const body = h('div', { class: 'friends' }, skeleton(3));
       const sent = new Set();
       const draw = (data) => {
         if (!data.friends.length) { body.replaceChildren(h('div', { class: 'empty' }, 'You have no friends yet. Open Friends from the top bar to add some, or share the code or link instead.')); return; }
@@ -3408,11 +3423,19 @@
       svg.append(...Object.values(L));
       const stage3d = h('div', { class: 'map3d-host', style: 'display:none' });
       const modeEl = h('div', { class: 'modebar', hidden: true });
+      const mapLoad = h('div', { class: 'maploading' }, h('i'), h('span', {}, 'Drawing the realm'));
+      const connEl = h('div', { class: 'connbar', hidden: true });
       const mapCtl = h('div', { class: 'mapctl' });
-      const wrap = h('div', { class: 'mapwrap' }, svg, stage3d, modeEl, mapCtl);
+      const wrap = h('div', { class: 'mapwrap' }, svg, stage3d, modeEl, mapCtl, mapLoad);
       const sheetBar = h('div', { class: 'sheetbar', role: 'button', tabindex: '0', 'aria-label': 'Resize the panel', title: 'Drag or tap to resize the panel' }, h('i'));
       const mapBody = h('div', { class: 'mapbody' + (PREFS.side === 'left' ? ' sideleft' : ''), 'data-sheet': 'half' }, wrap, sheetBar, sideEl);
-      mount(h('div', { class: 'maproot' }, hud, mapBody));
+      mount(h('div', { class: 'maproot' }, hud, connEl, mapBody));
+      const setConn = (text) => { connEl.hidden = !text; connEl.textContent = text || ''; };
+      const onOffline = () => setConn('You are offline. Orders will fail until the connection returns.');
+      const onOnline = () => { setConn(null); load({ force: true }); };
+      window.addEventListener('offline', onOffline);
+      window.addEventListener('online', onOnline);
+      state.cleanup.push(() => { window.removeEventListener('offline', onOffline); window.removeEventListener('online', onOnline); });
       const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
       const SHEETS = ['peek', 'half', 'full'];
       const setSheet = (s) => { ms.sheet = s; mapBody.dataset.sheet = s; };
@@ -4955,7 +4978,7 @@
       };
 
       const growthSection = (c) => {
-        const box = h('div', { class: 'sec' }, h('b', {}, 'Abilities'), h('div', { class: 'growth-body' }, h('div', { class: 'empty' }, 'Loading...')));
+        const box = h('div', { class: 'sec' }, h('b', {}, 'Abilities'), h('div', { class: 'growth-body' }, skeleton(3)));
         ms.growth = ms.growth || new Map();
         const paint = (g) => {
           const body = box.querySelector('.growth-body');
@@ -5358,7 +5381,7 @@
         if (t.owner_player_id == null || !ms.vis.has(t.id)) return null;
         const own = t.owner_player_id === ms.me.id;
         if (!own && dipStatus(t.owner_player_id) !== 'allied') return null;
-        const box = h('div', {}, h('div', { class: 'sec' }, h('div', { class: 'empty' }, 'Reading the castle...')));
+        const box = h('div', {}, h('div', { class: 'sec' }, skeleton(4)));
         ms.crep = ms.crep || new Map();
         const paint = (r) => {
           if (!r) return;
@@ -5417,7 +5440,7 @@
       };
 
       const castleHistory = (t) => {
-        const box = h('div', { class: 'sec chron' }, h('h4', {}, `History of ${t.name}`), h('div', { class: 'chron-body' }, h('div', { class: 'empty' }, 'Reading the records...')));
+        const box = h('div', { class: 'sec chron' }, h('h4', {}, `History of ${t.name}`), h('div', { class: 'chron-body' }, skeleton(3)));
         ms.chist = ms.chist || new Map();
         const paint = (entries) => {
           const body = box.querySelector('.chron-body');
@@ -6011,7 +6034,7 @@
         if (ms.tab === 'news') {
           patchSide([sideTabs(), h('div', { class: 'sec' }, ms.moments.length
             ? ms.moments.map((m) => feedRow(m.tick, momentText(m)))
-            : h('div', { class: 'empty' }, 'Nothing has happened yet.'))]);
+            : emptyState('Nothing has happened yet. Captures, sieges, wars and alliances across the realm are listed here as they happen.', { label: 'Open Next move', fn: () => { ms.tab = 'info'; goRoot(); } }))]);
           return;
         }
         if (ms.tab === 'chat') {
@@ -6032,11 +6055,11 @@
           const open = ms.report ? ms.battles.find((x) => x.id === ms.report) : null;
           let body;
           if (ms.inboxTab === 'battles') {
-            body = open ? battleDetail(open) : [ms.battles.length ? ms.battles.map(battleRow) : h('div', { class: 'empty' }, 'No battles yet.')];
+            body = open ? battleDetail(open) : [ms.battles.length ? ms.battles.map(battleRow) : emptyState('No battles yet. The first clash is reported here with both sides, every round and the result.', canAct() ? { label: 'Open Next move', fn: () => { ms.tab = 'info'; goRoot(); } } : null)];
           } else {
             body = [h('div', { class: 'sec' }, ms.inbox.length
               ? ms.inbox.map((i) => feedRow(i.tick, i.title, ms.newIds.has(i.id)))
-              : h('div', { class: 'empty' }, 'No reports yet.'))];
+              : emptyState('No reports yet. Each production cycle, every battle you fight and every proposal you receive arrives here.'))];
           }
           patchSide([sideTabs(), bar, ...body.flat()]);
           return;
@@ -6108,7 +6131,7 @@
           parts.push(commanderActions(c));
           if (c.current_territory_id) parts.push(h('div', { class: 'sec' }, h('button', { class: 'cmdrow', onclick: () => select('t', c.current_territory_id) }, `At ${(ms.t.get(c.current_territory_id) || {}).name || 'a castle'}`, h('span', { style: 'color:var(--dim);margin-left:auto' }, 'Open castle'))));
           if (own) {
-            const box = h('div', { class: 'chron' }, h('div', { class: 'chron-body' }, 'Reading the chronicle...'));
+            const box = h('div', { class: 'chron' }, h('div', { class: 'chron-body' }, skeleton(3)));
             ms.chron = ms.chron || new Map();
             const paint = (data) => {
               const body = box.querySelector('.chron-body');
@@ -6376,9 +6399,13 @@
             ms.loadRetry = true;
             setTimeout(() => { ms.loadRetry = false; load({ force: true }); }, 3000);
           }
-          if (!ms.lastRes || !ms.game) toast(failed.error.message);
+          ms.loadFails = (ms.loadFails || 0) + 1;
+          if (!ms.game) mapLoad.replaceChildren(h('span', {}, 'The realm did not load.'), h('button', { type: 'button', class: 'small', onclick: () => load({ force: true }) }, 'Try again'));
+          else if (ms.loadFails >= 2 && navigator.onLine) setConn('Lost the connection to the realm. Retrying.');
           return;
         }
+        ms.loadFails = 0;
+        if (navigator.onLine) setConn(null);
         const view = vw.data;
         const threadIds = th.data.map((t) => t.id);
         const tm = lite && ms.lastTm ? ms.lastTm : threadIds.length
@@ -6411,6 +6438,14 @@
             else if (was === ms.me.id) { lostN++; ms.lost.add(id); }
           });
           if (lostN) Sfx.lost(); else if (gained) Sfx.fanfare();
+          if (gained && !Sfx.on) {
+            let asked = false;
+            try { asked = !!localStorage.getItem('ss-sound-nudge'); } catch {}
+            if (!asked) {
+              try { localStorage.setItem('ss-sound-nudge', '1'); } catch {}
+              toast('A castle is yours. The game has sound for captures, threats and new ticks.', true, { label: 'Turn sound on', fn: () => { if (!Sfx.on) Sfx.toggle(); Sfx.fanfare(); drawHud(); } });
+            }
+          }
           if (ms.flash.size) setTimeout(() => { if (state.view === 'map' && state.roomId === gameId) render(); }, 1700);
         }
         ms.standings = view.standings;
@@ -6575,6 +6610,7 @@
         if (stale()) return;
         render();
         drawSide();
+        if (!mapLoad.hidden) { mapLoad.classList.add('done'); setTimeout(() => { mapLoad.hidden = true; }, 350); }
       };
 
       await load();
