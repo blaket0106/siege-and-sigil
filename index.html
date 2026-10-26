@@ -873,7 +873,7 @@
         ['p', 'This is the map screen, where you spend nearly all of a game. The numbers in the picture match the list below it.'],
         ['diagram', 'screen'],
         ['table', { head: ['', 'What it shows'], rows: [
-          ['1', 'The back arrow to your games, your crest, the game name and the time to the next tick.'],
+          ['1', 'The back arrow to your games, your crest, the game name and the time to the next tick. The Treasury figure beside it shows the gold the next production will pay, how many ticks away it is, and the clock time until it lands.'],
           ['2', 'Road to victory: how close the leader is to the castle share that wins ([[basics#what-wins-the-game|how you win]]). Proposals waiting for your answer and castles under threat appear beside it; click either to jump to them.'],
           ['3', 'Your gold and what the next production cycle adds ([[economy#how-production-works|production]]).'],
           ['4', 'Castles (every castle in one table), Ruler, Menu and Help. The menu is in three groups: Your realm (Research, Castles, Ledger), The war (Intel, Recorder, Battle calculator, and Replay once a game ends) and This game (Game rules, Host tools, Options, How to play). Every one of these opens the same kind of screen: a title, a close button top right, tabs where there are two views, and a scrolling body. On a phone a screen fills the window.'],
@@ -943,6 +943,8 @@
           'Click or tap near a castle to select it; the nearest castle to your pointer wins, so you do not need to hit the sprite exactly. A marching or besieging army on top of a castle is selected before the castle, except while you are choosing a march destination or measuring with the ruler, when the castle always wins; commanders resting inside a castle are reached from the castle panel.',
           'The selected castle is drawn above its neighbours with a moving gilt ring. A castle that changes hands flashes a ring once. A castle under threat pulses its red ring three times and then keeps it.',
           'Troop badges show only counts you know: a number, a tilde for the count you last saw, or nothing when you have never seen inside.',
+          'Armies stand where the last tick left them. When a tick lands they slide to their new position over about a second, so a march advances in steps, one per tick, exactly as the rules move it. Sight and interception are still worked out by the server from the army\'s position within the tick.',
+          'Castle markers and army badges scale with the zoom: about half size when the whole realm is in view, full size at four times closer, and a little larger again when you zoom right in. The sprites and terrain are the art itself and do not change.',
           'Switching between the 2D and 3D map crossfades. Under reduced motion none of this animates.',
         ]],
 
@@ -1740,7 +1742,16 @@
         if (m < 60) return `${m} min`;
         return `${Math.floor(m / 60)} h ${m % 60} min`;
       };
-      const fillLive = () => campGrid.querySelectorAll('[data-at]').forEach((el) => { el.textContent = `Next tick in ${fmtLeft(Number(el.dataset.at) - Date.now())}`; });
+      const productionAt = (g) => {
+        const at = nextTickAt(g);
+        if (!at || g.tick_speed === 'turn_based' || !g.production_cycle_ticks) return null;
+        const left = g.production_cycle_ticks - (g.current_tick % g.production_cycle_ticks);
+        return at + (left - 1) * TICK_MS[g.tick_speed];
+      };
+      const fillLive = () => {
+        campGrid.querySelectorAll('[data-at]').forEach((el) => { el.textContent = `Next tick in ${fmtLeft(Number(el.dataset.at) - Date.now())}`; });
+        campGrid.querySelectorAll('[data-prod]').forEach((el) => { el.textContent = `Production in ${fmtLeft(Number(el.dataset.prod) - Date.now())}`; });
+      };
       const stateOf = (g) => {
         if (g.status === 'finished') return ['good', 'Finished'];
         if (g.status === 'lobby') return ['info', 'In the lobby'];
@@ -1759,6 +1770,8 @@
         const cta = { lobby: 'Open the lobby', picking: 'Choose your start', active: 'Resume', finished: 'Read the story' }[g.status] || 'Open';
         const lines = [];
         if (g.status === 'active') lines.push(at ? h('span', { class: 'cl', 'data-at': String(at) }) : h('span', { class: 'cl' }, g.paused_at ? 'Paused by the host' : SPEEDS[g.tick_speed] || ''));
+        const prodAt = g.status === 'active' ? productionAt(g) : null;
+        if (prodAt) lines.push(h('span', { class: 'cl', 'data-prod': String(prodAt) }));
         if (since) lines.push(h('span', { class: 'cl hot' }, `${pluralN(since, 'tick')} since your last visit`));
         if (g.status === 'finished') lines.push(h('span', { class: 'cl' }, g.winner_player_id ? 'The war is over' : 'No winner recorded'));
         if (g.status === 'lobby') lines.push(h('span', { class: 'cl' }, `${g.max_players} seats at the table`));
@@ -1813,7 +1826,7 @@
         const rows = (mine.data || []).filter((r) => r.games);
         const ids = rows.map((r) => r.games.id);
         if (ids.length) {
-          const d = await sb.from('games').select('id,name,status,current_tick,tick_speed,last_tick_processed_at,paused_at,winner_player_id,max_players,current_turn_ends_at').in('id', ids);
+          const d = await sb.from('games').select('id,name,status,current_tick,tick_speed,last_tick_processed_at,paused_at,winner_player_id,max_players,current_turn_ends_at,production_cycle_ticks').in('id', ids);
           if (state.view !== 'home') return;
           if (!d.error) details = new Map(d.data.map((g) => [g.id, g]));
         }
@@ -3591,6 +3604,15 @@
         if (!interval || !g.last_tick_processed_at || g.status !== 'active' || g.paused_at) return g.current_tick;
         return g.current_tick + Math.min(1, Math.max(0, (Date.now() - Date.parse(g.last_tick_processed_at)) / interval));
       };
+      const SLIDE_MS = 700;
+      const sliding = () => !!(ms.slide && Date.now() - ms.slide.at < SLIDE_MS);
+      const viewTick = () => {
+        const g = ms.game;
+        if (!ms.slide || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return g.current_tick;
+        const f = Math.min(1, (Date.now() - ms.slide.at) / SLIDE_MS);
+        const e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        return ms.slide.from + (g.current_tick - ms.slide.from) * e;
+      };
 
       const edgePath = (a, b) => {
         if (ms.edgeMapFor !== ms.edges) { ms.edgeMap = new Map(ms.edges.map((e) => [e.from_territory_id + '-' + e.to_territory_id, e])); ms.edgeMapFor = ms.edges; }
@@ -3877,7 +3899,7 @@
           ms.fogSig = null;
           L.fog.replaceChildren();
         }
-        const tf = tickF();
+        const tf = viewTick();
         ms.t.forEach((t) => {
           if (ms.vis.has(t.id)) ms.mem[t.id] = { o: t.owner_player_id, tr: t.troops, tk: ms.game.current_tick };
         });
@@ -4092,8 +4114,8 @@
 
       const renderDyn = () => {
         if (ms.replay) { L.dyn.replaceChildren(); return; }
-        const tf = tickF();
-        trackSieges(tf);
+        trackSieges(tickF());
+        const tf = viewTick();
         if (ms.view3d) { sync3dArmies(tf); return; }
         const out = [];
         ms.cmd.forEach((c) => {
@@ -4141,8 +4163,19 @@
       };
 
       const nextEl = h('span');
+      const productionLeft = () => {
+        const g = ms.game;
+        const interval = TICK_MS[g.tick_speed];
+        if (!interval || !g.last_tick_processed_at || g.status !== 'active' || g.paused_at) return null;
+        const cyc = g.production_cycle_ticks;
+        const left = cyc - (g.current_tick % cyc);
+        return Math.max(0, Date.parse(g.last_tick_processed_at) + left * interval - Date.now());
+      };
+      const productionText = () => { const left = productionLeft(); return left === null ? '' : ` · ${fmtDuration(left)}`; };
       const updateCountdown = () => {
         const g = ms.game;
+        const prod = hud.querySelector('.kpi.treasury .prod');
+        if (prod) prod.textContent = productionText();
         if (g.status !== 'active') { nextEl.textContent = ''; return; }
         if (g.paused_at) { nextEl.textContent = 'paused by the host'; return; }
         const interval = TICK_MS[g.tick_speed];
@@ -4274,7 +4307,7 @@
         try { localStorage.setItem('ss-view3d', '1'); } catch {}
         ms.m3.resize();
         sync3d();
-        sync3dArmies(tickF());
+        sync3dArmies(viewTick());
         if (!wasBuilt && ms.goHome) ms.goHome();
       };
       state.cleanup.push(() => { if (ms.m3) ms.m3.dispose(); });
@@ -4583,7 +4616,7 @@
         const place = (host, nodes) => { const cur = [...host.children]; if (cur.length === nodes.length && cur.every((n, i) => n === nodes[i])) return; host.replaceChildren(...nodes); };
         place(hud, [ms.hudL, keep('c', h('div', { class: 'hud-c' },
             g.status === 'finished' ? null : kpi('victory', ['Road to victory', 'Victory'], h('span', { class: 'v' }, `${mineN} of ${winAt}`, h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))), `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game.`),
-            kpi('treasury', 'Treasury', h('span', { class: 'v' }, String(ms.me.gold), h('small', {}, `+${inc} in ${left}t`)), `Production pays every ${cyc} ticks. About +${inc} gold at the next one, in ${left} tick${left === 1 ? '' : 's'}.`),
+            kpi('treasury', 'Treasury', h('span', { class: 'v' }, String(ms.me.gold), h('small', {}, `+${inc} in ${left}t`, h('span', { class: 'prod' }, productionText()))), `Production pays every ${cyc} ticks. About +${inc} gold at the next one, in ${left} tick${left === 1 ? '' : 's'}${productionLeft() === null ? '' : ` (${fmtDuration(productionLeft())})`}.`),
             props ? kpi('proposals', 'Proposals', h('span', { class: 'v' }, h('span', { class: 'pill' }, String(props)), h('small', {}, 'to answer')), 'Open the proposals', () => { goRoot(); setTimeout(() => flashSection(sideEl.querySelector('[data-sec="offers"]') ? 'offers' : 'standings'), 50); }) : null,
             g.status === 'active' && ms.threats && ms.threats.length ? kpi('threat', 'Under threat', h('span', { class: 'v' }, `${ms.threats.length} castle${ms.threats.length === 1 ? '' : 's'}`), 'Hostile armies are heading for your castles. Click to look at the first one.', () => { const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); }) : null,
             g.paused_at && g.status === 'active' ? h('span', { class: 'tag gold' }, 'Paused') : null,
@@ -6318,7 +6351,9 @@
       const applyView = () => {
         svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
         const pxu = Math.min(svg.clientWidth / ms.view.w, svg.clientHeight / ms.view.h) || 1;
-        svg.style.setProperty('--mk', String(1 / pxu));
+        const fit = ms.full ? Math.min(svg.clientWidth / ms.full.w, svg.clientHeight / ms.full.h) || pxu : pxu;
+        ms.mkScale = Math.min(1.3, Math.max(0.5, 0.5 * Math.sqrt(pxu / fit)));
+        svg.style.setProperty('--mk', String(ms.mkScale / pxu));
         const plateW = 72 * (ms.terr ? M() * 1.3 : 1) * pxu;
         svg.classList.toggle('mk-on', plateW < 60);
         svg.classList.toggle('mk-far', plateW < 14);
@@ -6389,24 +6424,25 @@
         const ctm = svg.getScreenCTM();
         if (!ctm) return;
         const scr = (x, y) => new DOMPoint(x, y).matrixTransform(ctm);
-        const tf = tickF();
+        const tf = viewTick();
         const touch = e.pointerType === 'touch' || TOUCH_DEVICE;
         let hit = null;
-        let best = touch ? 30 : 22;
+        const mk = ms.mkScale || 1;
+        let best = Math.max(touch ? 24 : 14, (touch ? 30 : 22) * mk);
         if (!ms.marching && !ms.ruler) ms.cmd.forEach((c) => {
           if (!commanderSeen(c, tf) || c.status === 'idle') return;
           const pos = cmdPos(c, tf);
           if (!pos) return;
           const s = scr(pos.x, pos.y);
-          const d = Math.hypot(s.x - e.clientX, s.y - (e.clientY + 10));
+          const d = Math.hypot(s.x - e.clientX, s.y - (e.clientY + 10 * mk));
           if (d < best) { best = d; hit = { type: 'c', id: c.id }; }
         });
         if (!hit) {
-          best = touch ? 48 : 40;
+          best = Math.max(touch ? 36 : 24, (touch ? 48 : 40) * mk);
           ms.t.forEach((t) => {
             if (t.is_junction) return;
             const s = scr(t.x, t.y);
-            const d = Math.hypot(s.x - e.clientX, s.y - (e.clientY + 12));
+            const d = Math.hypot(s.x - e.clientX, s.y - (e.clientY + 12 * mk));
             if (d < best) { best = d; hit = { type: 't', id: t.id }; }
           });
         }
@@ -6468,6 +6504,8 @@
         const prevTick = ms.game ? ms.game.current_tick : null;
         const prevBattle = ms.battles && ms.battles.length ? Math.max(...ms.battles.map((b) => b.id)) : null;
         ms.game = view.game;
+        if (prevTick !== null && view.game.current_tick > prevTick && view.game.current_tick - prevTick <= 3) ms.slide = { from: prevTick, at: Date.now() };
+        else if (prevTick === null || view.game.current_tick !== prevTick) ms.slide = null;
         ms.players = new Map(view.players.map((p) => [p.id, p]));
         ms.me = ms.players.get(view.me);
         if (ms.me) setHouse(factionOf(ms.me.faction_slug));
@@ -6681,7 +6719,7 @@
         if (ms.mov.size || animStep === 0) renderDyn();
         if (animStep === 0) updateCountdown();
       }, 250);
-      const fxTimer = setInterval(() => { if (ms.fx && ms.fx.length && !ms.view3d) renderDyn(); }, 90);
+      const fxTimer = setInterval(() => { if ((ms.fx && ms.fx.length && !ms.view3d) || sliding()) renderDyn(); }, 40);
       const loadTimer = setInterval(load, 20000);
       try { if (!TOUCH_DEVICE && localStorage.getItem('ss-view3d') === '1' && ms.art) toggle3D(); } catch {}
       const onKey = (e) => {
