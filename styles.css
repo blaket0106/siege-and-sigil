@@ -1645,3 +1645,7 @@ button.pending::after { content: ''; position: absolute; inset: 0; margin: auto;
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 #toasts .toast .small { flex: none; height: 30px; padding: 0 10px; }
 @media (prefers-reduced-motion: reduce) { .skel i { animation: none; background: var(--ink-3); } .maploading i { animation: none; } }
+
+/* Realm tab: inline area ETA and spend preview */
+.side .line .eta { display: block; font-weight: 400; font-size: .74rem; color: var(--dim); font-style: italic; text-align: right; }
+.side .spend-plan { margin-top: 6px; }

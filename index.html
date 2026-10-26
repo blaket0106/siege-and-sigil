@@ -880,7 +880,7 @@
           ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
-          ['8', 'The side panel. Realm is your home view: Next move first, then offers and events, Upgrade everywhere, realm areas and the standings. A castle opens with its state as chips (yours, king\'s seat, under threat, besieged, crossing), its troops and levels, then Build with the three upgrade prices, the commanders standing there with a March shortcut, and everything else folded: defence and production, trails, threats, supply lines, your note and its history. A commander opens with the portrait, troops, rank and what they are doing now, then Orders, with abilities and the chronicle folded. Folds remember whether you left them open. Selecting a castle or commander opens it on top with a back arrow and a close button; the browser back button and Escape also step back. News lists events, Inbox holds messages and reports, Chat is the game channel.'],
+          ['8', 'The side panel. Realm is your home view: Next move first, then offers and events, Upgrade everywhere with its preview, realm areas with the cycles to the next level under each, and the standings. A castle opens with its state as chips (yours, king\'s seat, under threat, besieged, crossing), its troops and levels, then Build with the three upgrade prices, the commanders standing there with a March shortcut, and everything else folded: defence and production, trails, threats, supply lines, your note and its history. A commander opens with the portrait, troops, rank and what they are doing now, then Orders, with abilities and the chronicle folded. Folds remember whether you left them open. Selecting a castle or commander opens it on top with a back arrow and a close button; the browser back button and Escape also step back. News lists events, Inbox holds messages and reports, Chat is the game channel.'],
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers. The map controls beside it recentre the map on your castles, switch between the 2D and 3D map, show scan rings and toggle sound.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions. The address bar follows your selection, so a link to a castle or commander can be shared or bookmarked.'],
@@ -984,7 +984,7 @@
           'Prestige arrives every tick and goes to the [[areas|realm area]] you are currently building.',
         ]],
         ['h', 'Upgrade costs'],
-        ['p', 'An upgrade costs base times (current level plus one), divided by the castle\'s resources. [[map#natural-wealth|Natural resources]] and your [[areas|Guildhall]] make upgrades cheaper, so the same gold goes further at a rich castle. Bulk upgrade spends a budget on the cheapest castles first.'],
+        ['p', 'An upgrade costs base times (current level plus one), divided by the castle\'s resources. [[map#natural-wealth|Natural resources]] and your [[areas|Guildhall]] make upgrades cheaper, so the same gold goes further at a rich castle. Upgrade everywhere on the Realm tab spends a budget (your whole treasury by default) on the cheapest castles first, and shows what it would buy, castle by castle, before you press Spend.'],
         ['h', 'Roads'],
         ['p', 'Build a road at two castles and [[marching|marches]] between them are faster by a factor of the square root of (3 + your Stables level): about 1.7 times at Stables 0, 2 times at 1 and 3 times at 6. A road costs 6 gold per natural resource of the castle, so richer castles cost more.'],
         ['h', 'Capturing castles'],
@@ -1073,7 +1073,7 @@
         ]],
         ['p', 'Turn on Loop and the commander repeats the route forever. That is how you keep a front line supplied without checking in every hour.'],
         ['h', 'Changing your mind'],
-        ['p', 'When you build a route, each stop must be within range of the stop before it. Stops that are out of range cannot be added, and the server refuses a route with one. If a later stop becomes unreachable (for example a castle changes hands) the army stops at the last castle it reached and you get a message naming the army and the stop.'],
+        ['p', 'When you build a route, each stop must be within range of the stop before it. While you are adding stops the map dims every castle the next leg cannot reach and keeps the ones in range bright, with the range measured from the last stop you added. Stops that are out of range cannot be added (the message names both castles), and the server refuses a route with one. If a later stop becomes unreachable (for example a castle changes hands) the army stops at the last castle it reached and you get a message naming the army and the stop.'],
         ['p', 'Orders lock at the first tick. From the moment you send an army until the next tick arrives you can press Cancel march and it stays where it was. After that the army is committed to its destination and cannot turn back.'],
         ['p', 'On a route with several stops you can still press Halt at next stop, or Drop remaining stops while it waits. The army finishes its current stretch, stops at that castle and does not go on.'],
       ] },
@@ -3787,14 +3787,14 @@
         const stop = { id, type: 'assault', action: PREFS.action, amount: 0, delay: 0 };
         if (trailsOn()) {
           const leg = trailReach(last).get(id);
-          if (!leg) { toast('Out of range from the previous stop'); return; }
+          if (!leg) { toast(`${ms.t.get(id).name} is out of range from ${ms.t.get(last).name}. Add a closer stop first; castles in range are the bright ones.`); return; }
           stop.path = leg.path;
           stop.cost = leg.cost;
         } else if (ms.game.free_travel) {
           const a = ms.t.get(last);
           const b = ms.t.get(id);
           const dd = a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
-          if (dd > rangeOf(myStables())) { toast('Out of range from the previous stop'); return; }
+          if (dd > rangeOf(myStables())) { toast(`${b.name} is out of range from ${a.name}. Add a closer stop first; castles in range are the bright ones.`); return; }
           stop.cost = dd;
         }
         ms.stops.push(stop);
@@ -3887,13 +3887,16 @@
         ms.reachFrom = null;
         if ((ms.game.free_travel || trailsOn()) && ms.marching && ms.sel && ms.sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
-          if (trailsOn()) {
-            const from = ms.stops.length ? ms.stops[ms.stops.length - 1].id : c && c.current_territory_id;
-            if (from) {
-              ms.reachFrom = from;
-              ms.reachable = new Set(trailReach(from).keys());
+          const from = ms.stops.length ? ms.stops[ms.stops.length - 1].id : c && c.current_territory_id;
+          if (from) {
+            ms.reachFrom = from;
+            if (trailsOn()) ms.reachable = new Set(trailReach(from).keys());
+            else {
+              const o = ms.t.get(from);
+              const range = rangeOf(myStables());
+              ms.reachable = new Set([...ms.t.values()].filter((t) => !t.is_junction && t.id !== from && Math.hypot(t.x - o.x, t.y - o.y) <= range).map((t) => t.id));
             }
-          } else if (c && c.current_territory_id) ms.reachable = new Set(reachableFrom(c.current_territory_id).keys());
+          }
         }
 
         const cells = [];
@@ -3957,7 +3960,7 @@
           const MW = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
           const ms2 = tier >= 3 ? 1.0 : tier === 2 ? 1.15 : 1.35;
           const cw = count.length * 9 + 14 + (owner ? 16 : 0);
-          marks.push(sv('g', { class: 'mk', transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${seen ? 1 : 0.7}`, onclick: pick },
+          marks.push(sv('g', { class: 'mk', transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${(seen ? 1 : 0.7) * (reach ? 1 : 0.45)}`, onclick: pick },
             sv('g', { class: 'mk-i' },
               sv('circle', { cy: -8, r: 34, fill: 'transparent' }),
               owner ? sv('ellipse', { cy: 4, rx: 40, ry: 17, fill: oc, opacity: 0.35, style: 'pointer-events:none' }) : null,
@@ -4030,7 +4033,8 @@
           const pos = c && cmdPos(c, tf);
           const stables = (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
           if (pos && trailsOn() && ms.reachable) ms.reachable.forEach((id) => { const q = ms.t.get(id); pv.push(sv('circle', { cx: q.x, cy: q.y, r: 75 * M(), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2.5, 'vector-effect': 'non-scaling-stroke', 'stroke-dasharray': '4 6', style: 'pointer-events:none' })); });
-          if (pos && !trailsOn()) pv.push(sv('circle', { cx: pos.x, cy: pos.y, r: rangeOf(stables), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${2 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
+          const origin = ms.stops.length ? ms.t.get(ms.stops[ms.stops.length - 1].id) : pos;
+          if (origin && !trailsOn()) pv.push(sv('circle', { cx: origin.x, cy: origin.y, r: rangeOf(stables), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 2 * M(), 'stroke-dasharray': `${2 * M()} ${6 * M()}`, style: 'pointer-events:none' }));
         }
         if (ms.marching && ms.stops.length && ms.sel && ms.sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === ms.sel.id);
@@ -4683,11 +4687,19 @@
         const g = ms.game;
         const live = canAct();
         const order_ = Object.keys(AREA_NAMES);
+        const per = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id && !t.is_junction).reduce((n, t) => n + (t.prestige_level || 0), 0);
+        const cyc = g.production_cycle_ticks;
+        const etaOf = (a, need) => {
+          if (per <= 0) return 'no prestige income';
+          const cycles = Math.max(1, Math.ceil(Math.max(0, need - a.prestige_accumulated) / per));
+          const ticks = cyc - (g.current_tick % cyc) + (cycles - 1) * cyc;
+          return `${a.is_active ? 'next level in' : 'if active,'} ${pluralN(cycles, 'cycle')} (${ticks}t)`;
+        };
         const rows = [...ms.areas].sort((x, y) => order_.indexOf(x.area) - order_.indexOf(y.area)).map((a) => {
-          const need = Math.ceil(144 * a.level * g.area_cost_mult);
+          const need = Math.ceil(144 * a.level * g.area_cost_mult * ((g.area_cost_mults || {})[a.area] ?? 1));
           return h('div', { class: 'line' },
             h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[a.area] || a.area}${a.is_active ? ' (active)' : ''}`),
-            h('span', {}, `Lv ${a.level} · ${a.prestige_accumulated}/${need}`),
+            h('span', { title: etaOf(a, need) }, `Lv ${a.level} · ${a.prestige_accumulated}/${need}`, h('small', { class: 'eta' }, etaOf(a, need))),
             live && !a.is_active ? h('button', { style: 'padding:2px 8px;font-size:.78rem', onclick: order('set_active_area', { p_area: a.area }, `${AREA_NAMES[a.area]} is now the active area`, () => {
               const prev = ms.areas.map((x) => x.is_active);
               ms.areas.forEach((x) => { x.is_active = x.area === a.area; });
@@ -4696,14 +4708,51 @@
         });
         const type = h('select', {}, INFRA.map((i) => h('option', { value: i.type }, i.name)));
         type.value = 'recruitment';
-        const budget = h('input', { type: 'number', min: '1', value: Math.min(100, ms.me.gold) || 1, style: 'width:90px' });
+        const budget = h('input', { type: 'number', min: '1', value: Math.max(1, ms.me.gold), style: 'width:90px' });
+        const plan = h('div', { class: 'tip spend-plan' });
+        const spend = h('button', { class: 'primary' }, 'Spend');
+        const simulate = () => {
+          const i = INFRA.find((x) => x.type === type.value);
+          const mult = g.infra_cost_mult * g[i.mult];
+          const lv = new Map();
+          const mine = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id && !t.is_junction);
+          mine.forEach((t) => lv.set(t.id, t[i.col]));
+          let left = Math.min(Number(budget.value) || 0, ms.me.gold);
+          const bought = new Map();
+          let spent = 0;
+          for (let n = 0; n < 1000; n++) {
+            let best = null;
+            mine.forEach((t) => {
+              const cost = Math.max(1, Math.floor(i.base * (lv.get(t.id) + 1) / t.resources * mult));
+              if (!best || cost < best.cost || (cost === best.cost && t.id < best.t.id)) best = { t, cost };
+            });
+            if (!best || best.cost > left) break;
+            left -= best.cost; spent += best.cost;
+            lv.set(best.t.id, lv.get(best.t.id) + 1);
+            bought.set(best.t.name, (bought.get(best.t.name) || 0) + 1);
+          }
+          return { n: [...bought.values()].reduce((a, b) => a + b, 0), spent, bought, cheapest: mine.length ? Math.min(...mine.map((t) => Math.max(1, Math.floor(i.base * (lv.get(t.id) + 1) / t.resources * mult)))) : 0 };
+        };
+        const paintPlan = () => {
+          const r = simulate();
+          spend.disabled = r.n === 0;
+          spend.textContent = r.n ? `Spend ${r.spent} gold` : 'Spend';
+          const list = [...r.bought].map(([name, k]) => (k > 1 ? `${name} ×${k}` : name)).join(', ');
+          plan.textContent = r.n ? `Buys ${pluralN(r.n, `${type.value} upgrade`)} for ${r.spent} gold: ${list}. ${ms.me.gold - r.spent} gold left.` : `Nothing to buy: the cheapest ${type.value} upgrade costs ${r.cheapest} gold and your budget is ${Math.min(Number(budget.value) || 0, ms.me.gold)}.`;
+        };
+        type.oninput = paintPlan;
+        budget.oninput = paintPlan;
+        spend.onclick = (e) => order('bulk_upgrade_infrastructure', { p_infra_type: type.value, p_budget: Number(budget.value) || 1 }, (d) => (d.upgraded ? `${pluralN(d.upgraded, 'upgrade')} for ${d.spent} gold` : 'Nothing bought: prices changed before the order landed.'), () => {
+          const r = simulate();
+          const prev = ms.me.gold;
+          ms.me.gold -= r.spent;
+          return () => { ms.me.gold = prev; };
+        })(e);
+        if (live) paintPlan();
         return [
           h('div', { class: 'sec' }, h('b', {}, 'Realm areas (level, prestige to next)'), rows),
           live ? h('div', { class: 'sec' }, h('b', {}, 'Upgrade everywhere, cheapest first'),
-            h('div', { class: 'row wrap2' }, type, budget,
-              h('button', {
-                onclick: (e) => order('bulk_upgrade_infrastructure', { p_infra_type: type.value, p_budget: Number(budget.value) || 1 }, (d) => (d.upgraded ? `${pluralN(d.upgraded, 'upgrade')} for ${d.spent} gold` : `Nothing bought. Every ${type.value} upgrade costs more than your budget of ${budget.value || 1} gold, or each castle is at its limit. Try a bigger budget or another track.`))(e),
-              }, 'Spend')),
+            h('div', { class: 'row wrap2' }, type, budget, spend), plan,
             h('div', { class: 'tip' }, 'Recruitment adds troops each cycle, Treasury adds gold, Prestige speeds your realm areas. Early on, Recruitment wins the most castles.')) : null,
           live ? h('div', { class: 'sec' }, h('b', {}, 'Surrender'),
             h('button', {
