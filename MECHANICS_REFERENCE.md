@@ -1832,3 +1832,33 @@ Built from the NP observation study (research/np-observation, three all-AI games
 - **Unchanged:** leader hunt at 60 percent of the win line; expansion and early-war logic (already at or ahead of NP's pace).
 - **Shared database warning:** AI functions are global, so a change applies at once to every running game, including other sessions' sims.
 
+---
+
+## 20. Client Shell (map screen)
+
+The map screen is one top bar, the map, and one side panel. The data layer (RPCs in section 14, realtime in section 15) is unchanged; this section describes how the client renders and sequences it.
+
+### 20a. Top bar
+
+Three groups: left (back to games, crest, game name, tick and countdown), centre (Road to victory meter, Treasury with next-cycle income, Proposals count, Under threat count, paused and season tags, turn control), right (Castles, Ruler, Menu, Help). Map controls (recentre, 2D/3D, scan rings, sound) sit bottom-left of the map. Each group is rebuilt only when its rendered HTML changes, so buttons keep their DOM identity across refreshes. Under 760 px the bar is one 52 px row with shortened labels and only the Menu button on the right.
+
+### 20b. Panel stack and routing
+
+The side panel has one root view (Realm) and a stack of pushed views: castle (`t`) and commander (`c`). `select(type, id)` pushes the current selection onto `ms.stack` (max 20) and writes `#g<gameId>/<t|c><id>` to the URL with `pushState`. The header on a pushed view has Back (pops the stack) and Close (clears it). `popstate` applies the hash, so the browser back button works; Escape ends an active mode first, then steps back. Leaving the game clears the hash. Opening the page with a hash for a castle or commander that exists selects it after the first load.
+
+### 20c. Keyed panel rendering
+
+`drawSide()` builds the panel's top-level sections and passes them to `patchSide()`. If the view key (selection, tab, mode) changed, the panel is replaced and scrolled to the top. Otherwise each new section is compared with the existing one by `outerHTML`; equal sections are left untouched, so controls keep their identity and typed input values. A section that contains focus or is hovered is not replaced; the panel is marked dirty and redrawn when the pointer leaves the panel or moves to another section. The section that owns a control the player just activated is exempt from the hover guard until the follow-up load completes. The Next move box is a single persistent element, so its asynchronous content never flashes.
+
+### 20d. Order pipeline
+
+`act(button, fn, apply)` marks the button pending (spinner, no pointer events), runs `apply()` if given, which mutates local state and returns an undo function, re-renders, then awaits the RPC. On error the undo runs, the panel re-renders, and the error is shown as a toast. On success the button clears and a lite `load()` refreshes state. Optimistic `apply` functions exist for troop transfer (Take, Leave, the Next move Take button), infrastructure upgrades (level and gold), and setting the active realm area. Everything else gets the pending state only.
+
+### 20e. Load sequencing
+
+`load()` is called every 20 s, on every realtime event (debounced 300 ms) and after each order. Each call takes a sequence number; after each await inside `load()` the call aborts if a newer call has already applied its result, so a slow poll can never overwrite fresher state from a later order.
+
+### 20f. Confirmations and toasts
+
+Native `confirm()` is not used. `confirmDialog(message, label)` opens a modal with the consequence as body text and the action named on the primary button, and resolves to true or false. Toasts carry a dismiss button and stack to three.
+
