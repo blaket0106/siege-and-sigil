@@ -988,6 +988,13 @@
         ['note', 'A commander whose army is destroyed in a [[battles#fighting-at-a-castle|battle]] dies. So does every commander in a castle that falls.'],
       ] },
       { id: 'marching', group: 'Your forces', title: 'Marching and routes', blocks: [
+        ['h', 'Giving a march order'],
+        ['list', [
+          'Open a commander and press March, or press the March shortcut beside a commander in a castle panel. A bar across the top of the map says what to click; Escape or Cancel ends it.',
+          'Click the destination. The panel shows whether it is in range of one order, the route, the arrival tick and the predicted result of an assault.',
+          'If the castle is out of range in one order but a path runs through castles you or an ally hold, the panel offers March in N legs, which sends the army stop by stop, and Edit route, which opens the same stops in the route editor so you can change them. If no such path exists, the panel says so: raise Stables or take a closer castle first.',
+          'Next move makes the same offer when nothing is in reach of a single order: it names the nearest castle you can take in several legs and the castles the army passes through.',
+        ]],
         ['p', 'Select a [[commanders|commander]] and choose March, then click a destination. The map shows the path, the time to arrive and the cost.'],
         ['h', 'Range'],
         ['p', 'One order can cover only so much distance. Your [[areas|Stables]] level sets that distance. A single hop to a neighbouring castle is always allowed. Castles you can reach glow on the map.'],
@@ -3940,6 +3947,7 @@
           const pos = c && cmdPos(c, tf);
           if (pos) {
             const pts = trailsOn() && c.current_territory_id ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [pos, ...ms.stops.map((st) => ms.t.get(st.id))];
+            pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#1a140c', 'stroke-width': 7, 'stroke-opacity': 0.75, 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }));
             pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', 'stroke-dasharray': '9 6', style: 'pointer-events:none' }));
             ms.stops.forEach((st, i) => {
               const q = ms.t.get(st.id);
@@ -4764,13 +4772,17 @@
           const dest = ms.t.get(pv.to);
           const interval = TICK_MS[ms.game.tick_speed];
           const eta = interval ? ` (about ${fmtDuration((plan.arrival_tick - tickF()) * interval)})` : '';
+          const legs = plan.in_range ? null : legsTo(c.current_territory_id, pv.to);
+          const legT = legs ? legsTicks(legs) : null;
+          out.push(h('div', { class: 'chips', style: 'margin-bottom:8px' },
+            plan.in_range ? h('span', { class: 'chip good' }, `In range · ${plan.travel_ticks} ticks`) : h('span', { class: 'chip warn' }, `Out of range in one order · ${leagueText(plan.raw_length)} of ${leagueText(plan.range)} leagues`),
+            !plan.in_range && legs ? h('span', { class: 'chip info' }, `${legs.length} legs via ${legs.slice(0, -1).map((l) => ms.t.get(l.id).name).join(', ')}`) : null));
           out.push(h('div', {},
             line('Destination', dest.name),
             line('Route', plan.path.filter((id) => !ms.t.get(id).is_junction).map((id) => ms.t.get(id).name).join(' > ')),
-            line('Travel', `${plan.travel_ticks} ticks`),
-            line('Arrives', `tick ${plan.arrival_tick}${eta}`),
-            line('Distance / range', `${leagueText(plan.raw_length)} / ${leagueText(plan.range)} leagues`),
-            line('In range', plan.in_range ? (plan.raw_length > plan.range ? 'Yes (single hop)' : 'Yes') : 'No')));
+            line('Arrives', plan.in_range ? `tick ${plan.arrival_tick}${eta}` : legT != null ? `tick ${Math.ceil(tickF()) + legT} in ${legs.length} legs` : 'needs more than one order'),
+            line('Distance / range', `${leagueText(plan.raw_length)} / ${leagueText(plan.range)} leagues`)));
+          if (!plan.in_range && !legs) out.push(h('div', { class: 'tip', style: 'color:var(--warn)' }, 'No path through castles you hold reaches it in one order each. Raise Stables, or take a closer castle first.'));
           const friendly = dest.owner_player_id && isFriend(dest.owner_player_id);
           if (!friendly) {
             const type = h('select', { onchange: (e) => { pv.type = e.target.value; } },
@@ -4781,9 +4793,12 @@
           }
           if (ms.collectAt === pv.to) out.push(h('div', { class: 'tip', style: 'color:var(--gold2)' }, 'On arrival this army will collect all the troops in the castle.'));
           out.push(h('div', { class: 'row wrap2', style: 'margin-top:10px' },
-            h('button', {
+            !plan.in_range && legs ? h('button', { class: 'primary', onclick: sendLegs(c, legs, pv.type) }, `March in ${legs.length} legs`) : null,
+            !plan.in_range && legs ? h('button', { onclick: () => { ms.stops = legs.map((l, i) => ({ id: l.id, type: i === legs.length - 1 ? pv.type : 'assault', action: PREFS.action, amount: 0, delay: 0, path: l.path, cost: l.cost })); ms.loop = false; ms.preview = null; render(); drawSide(); } }, 'Edit route') : null,
+            plan.in_range || !legs ? h('button', {
               class: 'primary',
               disabled: !plan.in_range,
+              title: plan.in_range ? null : 'Out of range in one order',
               onclick: (e) => act(e.currentTarget, async () => {
                 const collecting = ms.collectAt === pv.to;
                 const { data, error } = collecting
@@ -4796,11 +4811,10 @@
                 ms.stops = []; ms.loop = false;
                 toast(`Marching. Arrives at tick ${data.arrival_tick}`, true);
               }),
-            }, 'March'),
-            h('button', {
-              disabled: !plan.in_range,
+            }, 'March') : null,
+            plan.in_range ? h('button', {
               onclick: () => { ms.stops = [{ id: pv.to, type: pv.type, action: PREFS.action, amount: 0, delay: 0, path: plan.path, cost: plan.raw_length }]; ms.loop = false; ms.preview = null; render(); drawSide(); },
-            }, 'Start a route here')));
+            }, 'Start a route here') : null));
         }
         if (ms.stops.length) {
           const when = stopTicks();
@@ -4813,12 +4827,11 @@
               const type = friendly ? null : h('select', { style: 'width:auto;padding:3px 6px', onchange: (e) => { st.type = e.target.value; } },
                 h('option', { value: 'assault' }, 'Assault'), h('option', { value: 'siege' }, 'Siege'));
               if (type) type.value = st.type;
-              return h('div', {},
-                h('div', { class: 'line', style: 'align-items:center' },
-                  h('span', { style: 'color:var(--text)' }, `${i + 1}. ${dest.name}`),
-                  h('span', { class: 'row' }, ms.speed && st.cost ? h('span', { style: 'color:var(--dim);font-size:.8rem' }, `+${when[i]} ticks`) : null, type,
-                    h('button', { style: 'padding:2px 8px', onclick: () => { if (trailsOn()) ms.stops.splice(i); else ms.stops.splice(i, 1); render(); drawSide(); } }, 'x'))),
-                dest.owner_player_id === ms.me.id ? orderControls(st, drawSide) : null);
+              return h('div', { class: 'stop' },
+                h('span', { class: 'num' }, String(i + 1)),
+                h('div', { class: 'stop-main' }, h('b', {}, dest.name), h('div', { class: 'stop-sub' }, type, dest.owner_player_id === ms.me.id ? orderControls(st, drawSide) : null)),
+                h('span', { class: 'eta' }, ms.speed && st.cost ? `+${when[i]}` : ''),
+                h('button', { type: 'button', class: 'ib', 'aria-label': 'Remove this stop', title: trailsOn() ? 'Remove this stop and those after it' : 'Remove this stop', onclick: () => { if (trailsOn()) ms.stops.splice(i); else ms.stops.splice(i, 1); render(); drawSide(); } }, icon('close')));
             }),
             ms.speed ? line('Reaches the last stop in', tickText(when[when.length - 1])) : null,
             h('label', { class: 'check', style: 'margin:8px 0' }, h('input', { type: 'checkbox', checked: ms.loop, onchange: (e) => { ms.loop = e.target.checked; drawSide(); } }), `Loop: return to ${origin.name} and repeat`),
@@ -4977,6 +4990,47 @@
         return ok;
       };
 
+      const legsTo = (fromId, destId, maxLegs = 6) => {
+        if (!trailsOn()) return null;
+        const dest = ms.t.get(destId);
+        if (!dest) return null;
+        const legs = [];
+        let cur = fromId;
+        const seen = new Set([fromId]);
+        for (let i = 0; i < maxLegs; i++) {
+          const reach = trailReach(cur);
+          if (reach.has(destId)) { legs.push({ id: destId, ...reach.get(destId) }); return legs; }
+          const curT = ms.t.get(cur);
+          const here = Math.hypot(curT.x - dest.x, curT.y - dest.y);
+          let best = null;
+          let bd = here;
+          reach.forEach((leg, id) => {
+            const t = ms.t.get(id);
+            if (!t || seen.has(id) || !(t.owner_player_id === ms.me.id || isFriend(t.owner_player_id))) return;
+            const d = Math.hypot(t.x - dest.x, t.y - dest.y);
+            if (d < bd) { bd = d; best = { id, ...leg }; }
+          });
+          if (!best) return null;
+          legs.push(best);
+          seen.add(best.id);
+          cur = best.id;
+        }
+        return null;
+      };
+      const legsTicks = (legs) => (ms.speed ? legs.reduce((a, l) => a + Math.ceil(l.cost / ms.speed), 0) : null);
+      const sendLegs = (c, legs, type) => (e) => act(e.currentTarget, async () => {
+        const last = legs.length - 1;
+        const { data, error } = await sb.rpc('send_on_route', {
+          p_game_id: gameId, p_commander_id: c.id, p_march_type: type,
+          p_stops: legs.map((l, i) => ({ territory_id: l.id, march_type: i === last ? type : 'assault', action: 'nothing', amount: 0, delay: 0 })),
+          p_options: { loop: false, origin_order: { action: 'nothing', amount: 0, delay: 0 } },
+        });
+        if (error) throw error;
+        leaveMode();
+        ms.collectAt = null;
+        toast(`${c.name} marches in ${legs.length} legs. First stop at tick ${data.arrival_tick}`, true);
+      });
+
       const sendHere = (c, t, collect) => {
         select('c', c.id);
         ms.collectAt = collect ? t.id : null;
@@ -5078,7 +5132,35 @@
                 lines.push(h('div', { class: 'tip', style: 'margin-top:8px' }, `${o.a.name} (${o.a.troops} troops) could ${o.kind === 'retake' ? 'retake' : 'take'} ${o.t.name}, which needs ${o.need}. `, h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); sendHere(o.a, o.t); } }, 'Send')));
               });
             } else if (!pending.length) {
-              lines.push(h('div', {}, actors.length ? 'No castle you can see is within reach of any of your free armies. Raise Stables to march farther, or take a closer castle first.' : 'Your free armies are holding threatened castles.'));
+              let far = null;
+              for (const a of actors) {
+                const from = ms.t.get(a.current_territory_id);
+                const st = stats.get(a.id);
+                const garOf = (t) => {
+                  if (t.owner_player_id === null) { const seenT = ms.vis.has(t.id) && typeof t.troops === 'number'; return seenT ? t.troops : expectedNeutral(t); }
+                  return ms.vis.has(t.id) && typeof t.troops === 'number' ? t.troops : null;
+                };
+                const cands = [...ms.t.values()].filter((t) => !t.is_junction && t.id !== from.id && t.owner_player_id !== ms.me.id && !(t.owner_player_id && isFriend(t.owner_player_id)) && !targeted.has(t.id) && garOf(t) != null)
+                  .sort((x, y) => (x.owner_player_id === null ? 0 : 1) - (y.owner_player_id === null ? 0 : 1) || Math.hypot(x.x - from.x, x.y - from.y) - Math.hypot(y.x - from.x, y.y - from.y)).slice(0, 6);
+                for (const t of cands) {
+                  const legs = legsTo(from.id, t.id);
+                  if (!legs) continue;
+                  let need = Infinity;
+                  if (t.owner_player_id === null) need = troopsNeeded(garOf(t), (ms.game.neutral_armory ?? 1) + 1 + (t.terrain === 'mountain' ? 1 : 0), st.damage);
+                  else { const e2 = defenceEstimate(t, st.armory); if (e2) need = troopsNeeded(e2.troops, e2.dmg, st.damage); }
+                  if (a.troops >= need) { far = { a, t, legs, need, est: t.owner_player_id === null && !(ms.vis.has(t.id) && typeof t.troops === 'number') }; break; }
+                }
+                if (far) break;
+              }
+              if (far) {
+                const via = far.legs.slice(0, -1).map((l) => ms.t.get(l.id).name).join(', ');
+                lines.push(h('div', {}, `${far.a.name} has ${far.a.troops} troops. ${far.t.name} needs ${far.need}${far.est ? ' (expected, out of sight)' : ''} and is ${far.legs.length} legs away${via ? `, through ${via}` : ''}.`,
+                  h('div', { class: 'row wrap2', style: 'margin-top:6px' },
+                    h('button', { class: 'primary', onclick: sendLegs(far.a, far.legs, 'assault') }, `Send ${far.a.name} to ${far.t.name} in ${far.legs.length} legs`),
+                    h('button', { class: 'ghost', onclick: () => { select('t', far.t.id); ms.focusOn && ms.focusOn(far.t.id); } }, 'Look first'))));
+              } else {
+                lines.push(h('div', {}, actors.length ? 'No castle you can see is within reach of any of your free armies, even in several legs. Raise Stables to march farther, or scout for a closer castle.' : 'Your free armies are holding threatened castles.'));
+              }
             } else {
               const easiest = pending.slice().sort((x, y) => (x.need - x.a.troops) - (y.need - y.a.troops) || x.d - y.d)[0];
               const a = easiest.a;
@@ -5138,7 +5220,7 @@
         };
         const paint = async (stats) => {
           try { await paintInner(stats); } catch {
-            box.replaceChildren(h('div', { class: 'sec' }, h('b', {}, 'Next move'), h('div', { class: 'tip' }, 'Checking the roads. This updates at the next refresh.')));
+            if (!box.childElementCount) box.replaceChildren(h('div', { class: 'sec' }, h('b', {}, 'Next move'), h('div', { class: 'tip' }, 'Checking the roads.')));
           }
         };
         if (!best) { paint(new Map()); return box; }

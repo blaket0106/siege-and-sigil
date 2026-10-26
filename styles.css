@@ -1509,3 +1509,13 @@ button.pending::after { content: ''; position: absolute; inset: 0; margin: auto;
 .side .nmbox .sec { border-color: var(--gilt-lo); background: linear-gradient(180deg, #2a2013, var(--ink-2)); border: 1px solid var(--gilt-lo); border-radius: var(--radius); padding: 12px; margin-top: 8px; }
 .side .nmbox .sec > b { color: var(--gilt); }
 .side .nmbox .sec > div:not(.tip):not(.row) { font-family: var(--font-ui); font-size: 1.02rem; }
+
+/* Routes v2 */
+.side .stop { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 32px; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--rule-soft); }
+.side .stop .num { font-family: var(--font-sc); font-weight: 700; color: var(--gilt); text-align: center; padding-top: 3px; }
+.side .stop-main { min-width: 0; }
+.side .stop-main b { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; }
+.side .stop-sub { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.side .stop-sub > .row { margin: 0; }
+.side .stop .eta { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 0.85rem; padding-top: 4px; white-space: nowrap; }
+.side .stop .ib { width: 32px; height: 32px; }
