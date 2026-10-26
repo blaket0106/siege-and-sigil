@@ -1118,7 +1118,7 @@ svg.mk-on .castles-layer { display: none; }
 .mk text { paint-order: stroke; stroke: #000; stroke-width: 3px; stroke-linejoin: round; font-family: Cinzel, serif; font-weight: 700; text-anchor: middle; pointer-events: none; }
 .mk .mk-name { display: none; }
 svg.mk-names .mk .mk-name { display: inline; }
-.mk-threat { animation: mkPulse 1s ease-in-out infinite; }
+.mk-threat { animation: mkPulse 1s ease-in-out 3; }
 @keyframes mkPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .ak { display: none; }
 svg.mk-on .ak { display: inline; }
@@ -1230,6 +1230,7 @@ body.in-map input, body.in-map select { font-family: var(--font-sans); }
 .hud .kpi .k { color: var(--faint); font-size: 0.72rem; white-space: nowrap; }
 .hud .kpi .k .short { display: none; }
 @media (max-width: 760px) { .hud .kpi .k .long { display: none; } .hud .kpi .k .short { display: inline; } .hud .kpi { overflow: hidden; } }
+@media (max-width: 480px) { .hud .kpi .k { display: none; } .hud .hud-c { gap: 12px; } .hud .kpi .v { font-size: 1.05rem; } .hud .kpi .pill { margin: 0; } }
 .hud .kpi .v { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; line-height: 1; color: var(--gilt-hi); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hud .kpi .v small { font-family: var(--font-sans); font-weight: 400; font-size: 0.75rem; color: var(--dim); margin-left: 6px; }
 .hud .kpi .meter-track { width: 160px; height: 5px; margin-top: 4px; border-radius: 3px; box-shadow: none; border: 0; background: var(--ink-3); }
@@ -1590,3 +1591,15 @@ button.pending::after { content: ''; position: absolute; inset: 0; margin: auto;
   .grow { grid-template-columns: 1fr; gap: 4px; }
   .gtot { grid-template-columns: 1fr auto; }
 }
+
+
+/* Map layer v2 */
+.mk .mk-name { fill: #f3e9d2; font-size: 11px; letter-spacing: 0.04em; stroke: rgba(16, 11, 6, 0.95); stroke-width: 3.2px; }
+.mk .selring, .castle .selring { animation: selDash 1.2s linear infinite; }
+@keyframes selDash { to { stroke-dashoffset: -16; } }
+.mk-flash { animation: mkFlash 1.5s ease-out both; transform-origin: 0 0; }
+@keyframes mkFlash { 0% { opacity: 1; transform: scale(0.9); } 60% { opacity: 0.9; transform: scale(1.35); } 100% { opacity: 0; transform: scale(1.7); } }
+.mapwrap.xfade > svg, .mapwrap.xfade > .map3d-host { animation: mapFade 0.3s var(--ease) both; }
+@keyframes mapFade { from { opacity: 0; } to { opacity: 1; } }
+.mapwrap svg .mk, .mapwrap svg .castle { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .mk .selring, .castle .selring, .mk-flash, .mapwrap.xfade > svg, .mapwrap.xfade > .map3d-host { animation: none; } .mk-flash { opacity: 0; } }

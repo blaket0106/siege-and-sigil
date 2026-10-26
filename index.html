@@ -917,6 +917,14 @@
         ['houses'],
       ] },
       { id: 'map', group: 'The world', title: 'The map', blocks: [
+        ['h', 'Selecting things'],
+        ['list', [
+          'Click or tap near a castle to select it; the nearest castle to your pointer wins, so you do not need to hit the sprite exactly. A marching or besieging army on top of a castle is selected before the castle; commanders resting inside a castle are reached from the castle panel.',
+          'The selected castle is drawn above its neighbours with a moving gilt ring. A castle that changes hands flashes a ring once. A castle under threat pulses its red ring three times and then keeps it.',
+          'Troop badges show only counts you know: a number, a tilde for the count you last saw, or nothing when you have never seen inside.',
+          'Switching between the 2D and 3D map crossfades. Under reduced motion none of this animates.',
+        ]],
+
         ['p', 'The realm is a set of castles joined by routes. Everything that matters happens at castles or on the routes between them.'],
         ['diagram', 'map'],
         ['h', 'Trails and free travel'],
@@ -3182,7 +3190,7 @@
       const W = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
       const ownerCol = owner ? colors.c : '#8e8a82';
       const tagY = Math.round(W * 0.2) + 10;
-      const troop = showTroops ? String(t.troops) : (o.lastTr != null ? `~${o.lastTr}` : '?');
+      const troop = showTroops ? String(t.troops) : (o.lastTr != null ? `~${o.lastTr}` : '');
       const dotY = tagY + (showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? 54 : 31);
       const nameW = nameLabel.length * 8.4;
       const tw = 24 + nameW + (troop.length * 9 + 14);
@@ -3197,6 +3205,7 @@
         owner ? ring({ stroke: ownerCol, 'stroke-width': 4.2, 'stroke-opacity': 0.95 }) : o.unknown ? ring({ stroke: '#7f8cab', 'stroke-width': 2, 'stroke-opacity': 0.75, 'stroke-dasharray': '2 7' }) : ring({ stroke: '#b9b09a', 'stroke-width': 1.4, 'stroke-opacity': 0.4, 'stroke-dasharray': '5 6' }),
         mine ? ring({ stroke: '#f5dc94', 'stroke-width': 1.2, 'stroke-opacity': 0.9, rx: W * 1.06, ry: W * 0.38 }) : null,
         selected ? ring({ class: 'selring', stroke: '#f5dc94', 'stroke-width': 2.6, 'stroke-dasharray': '9 7', rx: W * 1.16, ry: W * 0.43 }) : null,
+        o.flash ? ring({ class: 'mk-flash', stroke: '#f5dc94', 'stroke-width': 3, rx: W * 1.2, ry: W * 0.45 }) : null,
         sieged ? ring({ class: 'selring', stroke: '#e0685c', 'stroke-width': 3, 'stroke-dasharray': '6 5', rx: W * 1.26, ry: W * 0.48 }) : null,
         sv('g', { style: 'cursor:pointer;pointer-events:none' }, castleSprite(tier, t.terrain, ownerCol, owner ? colors.c2 : '#5a574f')),
         sieged ? siegeCamp(W, siegeCol, siegeTier) : null,
@@ -3205,8 +3214,8 @@
           owner ? sv('rect', { x: x0, y: tagY, width: 5, height: 21, rx: 2, fill: ownerCol }) : null,
           sv('path', { d: `M${x0 + 5} ${tagY + 4}h12v9q0 5 -6 7q-6 -2 -6 -7Z`, fill: ownerCol, stroke: '#0e0905', 'stroke-width': 1 }),
           owner ? sv('path', { d: `M${x0 + 5} ${tagY + 8}h12v3h-12Z`, fill: colors.c2, opacity: 0.9 }) : null,
-          sv('text', { x: x0 + 23, y: tagY + 15, 'font-size': 12.5, style: 'fill:#efe3c4;font-family:Cinzel,serif;font-weight:600;letter-spacing:.03em' }, nameLabel),
-          sv('text', { x: x0 + tw - 8, y: tagY + 15.5, 'text-anchor': 'end', 'font-size': 13, style: `fill:${showTroops ? '#f5dc94' : '#9a8a64'};font-family:Cinzel,serif;font-weight:700` }, troop)),
+          sv('text', { x: x0 + 23, y: tagY + 15, 'font-size': 12.5, style: 'fill:#efe3c4;font-family:Cinzel,serif;font-weight:600;letter-spacing:.03em;paint-order:stroke;stroke:rgba(16,11,6,0.9);stroke-width:2px' }, nameLabel),
+          troop === '' ? null : sv('text', { x: x0 + tw - 8, y: tagY + 15.5, 'text-anchor': 'end', 'font-size': 13, style: `fill:${showTroops ? '#f5dc94' : '#9a8a64'};font-family:Cinzel,serif;font-weight:700` }, troop)),
         tag ? sv('g', { class: 'lbl-plate', style: 'pointer-events:none' },
           sv('rect', { x: -(tag[1].length * 6.4 + 10) / 2, y: -W * 1.3 - 14, width: tag[1].length * 6.4 + 10, height: 17, rx: 8, fill: 'rgba(16,11,6,0.82)', stroke: tag[2], 'stroke-width': 1.3 }),
           sv('text', { x: 0, y: -W * 1.3 - 2, 'text-anchor': 'middle', 'font-size': 10.5, style: `fill:${tag[2]};font-family:Cinzel,serif;font-weight:700` }, tag[1])) : null,
@@ -3887,17 +3896,18 @@
           const mine = owner === ms.me.id;
           const isCap = ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id;
           const nameLabel = `${isCap ? '♛ ' : ''}${t.name}`;
+          const flashing = !!(ms.flash && ms.flash.has(t.id) && Date.now() - ms.flash.get(t.id) < 1600);
           const selC = ms.sel && ms.sel.type === 'c' ? ms.sel.id : null;
-          const csig = JSON.stringify([owner, seen, mine, showTroops, t.troops, selected, threatened.has(t.id), sieged, siegers.map((c) => c.id), here.map((c) => [c.id, c.troops, c.status, c.id === selC]), reach, nameLabel, tagOf(t.id), k, tier, !!ms.replay, plate, ms.mem[t.id] ? ms.mem[t.id].tr : null, t.x, t.y, isCap, ms.game.fog_of_war]);
+          const csig = JSON.stringify([owner, seen, mine, showTroops, t.troops, selected, threatened.has(t.id), sieged, siegers.map((c) => c.id), here.map((c) => [c.id, c.troops, c.status, c.id === selC]), reach, nameLabel, tagOf(t.id), k, tier, !!ms.replay, plate, ms.mem[t.id] ? ms.mem[t.id].tr : null, t.x, t.y, isCap, ms.game.fog_of_war, flashing]);
           const hit = ms.castleCache.get(t.id);
           if (hit && hit.sig === csig) { castles.push(hit.g); marks.push(hit.mk); return; }
           const g = plate
-            ? plateCastle({ t, tier, owner, seen, mine, showTroops, unknown: ownerUnknown(t, seen), lastTr: !showTroops && ms.mem[t.id] && ms.mem[t.id].tr != null ? ms.mem[t.id].tr : null, selected, sieged, siegeCol: sieged ? color(siegers[0].owner_player_id) : null, siegeTier: sieged ? armyTier(siegers.reduce((a, c) => a + (typeof c.troops === 'number' ? c.troops : 30), 0)) : 0, here, reach, pick, nameLabel, tag: tagOf(t.id), colors: { c: color(owner), c2: color2(owner), cmd: color }, onCmd: (c) => select('c', c.id), cmdSel: (c) => !!ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id })
+            ? plateCastle({ t, tier, owner, seen, mine, showTroops, flash: flashing, unknown: ownerUnknown(t, seen), lastTr: !showTroops && ms.mem[t.id] && ms.mem[t.id].tr != null ? ms.mem[t.id].tr : null, selected, sieged, siegeCol: sieged ? color(siegers[0].owner_player_id) : null, siegeTier: sieged ? armyTier(siegers.reduce((a, c) => a + (typeof c.troops === 'number' ? c.troops : 30), 0)) : 0, here, reach, pick, nameLabel, tag: tagOf(t.id), colors: { c: color(owner), c2: color2(owner), cmd: color }, onCmd: (c) => select('c', c.id), cmdSel: (c) => !!ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id })
             : sv('g', {}, sv('circle', { cx: 0, cy: 0, r: 8 + 3 * tier, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }), sv('text', { x: 0, y: -8 - 3 * tier - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'));
           g.setAttribute('transform', `translate(${t.x},${t.y}) scale(${k},${k})`);
           castles.push(g);
           const oc = owner ? color(owner) : '#8a8478';
-          const count = showTroops ? String(t.troops) : (ms.mem[t.id] && ms.mem[t.id].tr != null ? `~${ms.mem[t.id].tr}` : '?');
+          const count = showTroops ? String(t.troops) : (ms.mem[t.id] && ms.mem[t.id].tr != null ? `~${ms.mem[t.id].tr}` : '');
           const MW = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
           const ms2 = tier >= 3 ? 1.0 : tier === 2 ? 1.15 : 1.35;
           const cw = count.length * 9 + 14 + (owner ? 16 : 0);
@@ -3909,16 +3919,24 @@
               mine ? sv('ellipse', { cy: 4, rx: 34, ry: 13.5, fill: 'none', stroke: '#f5dc94', 'stroke-width': 1.4, style: 'pointer-events:none' }) : null,
               threatened.has(t.id) ? sv('ellipse', { class: 'mk-threat', cy: 4, rx: 44, ry: 19, fill: 'rgba(255,60,40,0.18)', stroke: '#ff4a3a', 'stroke-width': 3.5 }) : null,
               sieged ? sv('ellipse', { cy: 4, rx: 38, ry: 16, fill: 'none', stroke: '#e0685c', 'stroke-width': 2.5, 'stroke-dasharray': '6 5' }) : null,
-              selected ? sv('ellipse', { cy: 4, rx: 36, ry: 15, fill: 'none', stroke: '#ffffff', 'stroke-width': 2.5, 'stroke-dasharray': '8 6' }) : null,
+              selected ? sv('ellipse', { class: 'selring', cy: 4, rx: 36, ry: 15, fill: 'none', stroke: '#f5dc94', 'stroke-width': 2.5, 'stroke-dasharray': '8 6' }) : null,
+              flashing ? sv('ellipse', { class: 'mk-flash', cy: 4, rx: 40, ry: 17, fill: 'none', stroke: '#f5dc94', 'stroke-width': 3 }) : null,
               sv('g', { transform: `scale(${(ms2 * 0.8).toFixed(3)})`, style: 'pointer-events:none' }, castleSprite(tier, t.terrain, oc, owner ? color2(owner) : '#5a574f')),
-              sv('rect', { class: owner ? 'mk-tp' : 'mk-tp mk-nt', x: -cw / 2, y: 14, width: cw, height: 20, rx: 4, fill: 'rgba(16,11,6,0.88)', stroke: owner ? oc : 'rgba(214,171,82,0.6)', 'stroke-width': owner ? 2.4 : 1.2 }),
-              owner ? sv('path', { d: `M${-cw / 2 + 4} 17h11v8q0 4 -5.5 6q-5.5 -2 -5.5 -6Z`, fill: oc, stroke: '#0e0905', 'stroke-width': 1, style: 'pointer-events:none' }) : null,
-              owner ? sv('path', { d: `M${-cw / 2 + 4} 20.5h11v2.5h-11Z`, fill: color2(owner), opacity: 0.9, style: 'pointer-events:none' }) : null,
-              sv('text', { class: owner ? 'mk-tp' : 'mk-tp mk-nt', x: owner ? 8 : 0, y: 29, 'font-size': 14, fill: showTroops ? '#f5dc94' : '#9a8a64', style: 'stroke:none;paint-order:normal' }, count),
+              count === '' ? null : sv('rect', { class: owner ? 'mk-tp' : 'mk-tp mk-nt', x: -cw / 2, y: 14, width: cw, height: 20, rx: 4, fill: 'rgba(16,11,6,0.88)', stroke: owner ? oc : 'rgba(214,171,82,0.6)', 'stroke-width': owner ? 2.4 : 1.2 }),
+              owner && count !== '' ? sv('path', { d: `M${-cw / 2 + 4} 17h11v8q0 4 -5.5 6q-5.5 -2 -5.5 -6Z`, fill: oc, stroke: '#0e0905', 'stroke-width': 1, style: 'pointer-events:none' }) : null,
+              owner && count !== '' ? sv('path', { d: `M${-cw / 2 + 4} 20.5h11v2.5h-11Z`, fill: color2(owner), opacity: 0.9, style: 'pointer-events:none' }) : null,
+              count === '' ? null : sv('text', { class: owner ? 'mk-tp' : 'mk-tp mk-nt', x: owner ? 8 : 0, y: 29, 'font-size': 14, fill: showTroops ? '#f5dc94' : '#9a8a64', style: 'stroke:none;paint-order:normal' }, count),
               isCap ? sv('text', { y: -MW * 0.9, 'font-size': 14, fill: '#f5dc94' }, '♛') : null,
-              sv('text', { class: 'mk-name', y: 48, 'font-size': 11, fill: '#efe3c4' }, t.name))));
+              sv('text', { class: 'mk-name', y: count === '' ? 30 : 48, 'font-size': 11, fill: '#efe3c4' }, t.name))));
           ms.castleCache.set(t.id, { sig: csig, g, mk: marks[marks.length - 1] });
         });
+        if (ms.sel && ms.sel.type === 't') {
+          const top = ms.castleCache.get(ms.sel.id);
+          if (top) {
+            const ci = castles.indexOf(top.g); if (ci >= 0) castles.push(castles.splice(ci, 1)[0]);
+            const mi = marks.indexOf(top.mk); if (mi >= 0) marks.push(marks.splice(mi, 1)[0]);
+          }
+        }
         L.cells.replaceChildren(...cells);
         L.castles.replaceChildren(...castles);
         L.marks.replaceChildren(...marks);
@@ -4182,6 +4200,10 @@
       };
 
       const toggle3D = async () => {
+        wrap.classList.remove('xfade');
+        void wrap.offsetWidth;
+        wrap.classList.add('xfade');
+        setTimeout(() => wrap.classList.remove('xfade'), 400);
         if (ms.view3d) {
           ms.view3d = false;
           stage3d.style.display = 'none';
@@ -6267,8 +6289,34 @@
       });
 
       svg.addEventListener('click', (e) => {
+        if (ms.dragged || ms.replay || !ms.game) return;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+        const scr = (x, y) => new DOMPoint(x, y).matrixTransform(ctm);
+        const tf = tickF();
+        const touch = e.pointerType === 'touch' || TOUCH_DEVICE;
+        let hit = null;
+        let best = touch ? 30 : 22;
+        ms.cmd.forEach((c) => {
+          if (!commanderSeen(c, tf) || c.status === 'idle') return;
+          const pos = cmdPos(c, tf);
+          if (!pos) return;
+          const s = scr(pos.x, pos.y);
+          const d = Math.hypot(s.x - e.clientX, s.y - (e.clientY + 10));
+          if (d < best) { best = d; hit = { type: 'c', id: c.id }; }
+        });
+        if (!hit) {
+          best = touch ? 48 : 40;
+          ms.t.forEach((t) => {
+            if (t.is_junction) return;
+            const s = scr(t.x, t.y);
+            const d = Math.hypot(s.x - e.clientX, s.y - (e.clientY + 12));
+            if (d < best) { best = d; hit = { type: 't', id: t.id }; }
+          });
+        }
+        if (hit) { e.stopPropagation(); select(hit.type, hit.id); return; }
         if (e.target === svg) select(null);
-      });
+      }, true);
 
       let firstLoad = true;
       const LITE_FETCH = new Set([0, 1, 2, 3, 8, 9]);
@@ -6329,14 +6377,17 @@
           let gained = 0;
           let lostN = 0;
           ms.lost = ms.lost || new Set();
+          ms.flash = ms.flash || new Map();
           ms.t.forEach((t, id) => {
             const was = prevOwn.get(id);
             if (t.owner_player_id === ms.me.id) ms.lost.delete(id);
             if (was === undefined || was === t.owner_player_id) return;
+            ms.flash.set(id, Date.now());
             if (t.owner_player_id === ms.me.id) gained++;
             else if (was === ms.me.id) { lostN++; ms.lost.add(id); }
           });
           if (lostN) Sfx.lost(); else if (gained) Sfx.fanfare();
+          if (ms.flash.size) setTimeout(() => { if (state.view === 'map' && state.roomId === gameId) render(); }, 1700);
         }
         ms.standings = view.standings;
         ms.serverSources = view.sources;
