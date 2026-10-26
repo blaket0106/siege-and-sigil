@@ -852,7 +852,7 @@
           ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
-          ['8', 'The side panel. Realm is your home view with Next move, areas, upgrades and standings. Selecting a castle or commander opens it on top with a back arrow and a close button; the browser back button and Escape also step back. News lists events, Inbox holds messages and reports, Chat is the game channel.'],
+          ['8', 'The side panel. Realm is your home view: Next move first, then offers and events, Upgrade everywhere, realm areas and the standings. A castle opens with its state as chips (yours, king\'s seat, under threat, besieged, crossing), its troops and levels, then Build with the three upgrade prices, the commanders standing there with a March shortcut, and everything else folded: defence and production, trails, threats, supply lines, your note and its history. A commander opens with the portrait, troops, rank and what they are doing now, then Orders, with abilities and the chronicle folded. Folds remember whether you left them open. Selecting a castle or commander opens it on top with a back arrow and a close button; the browser back button and Escape also step back. News lists events, Inbox holds messages and reports, Chat is the game channel.'],
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers. The map controls beside it recentre the map on your castles, switch between the 2D and 3D map, show scan rings and toggle sound.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions. The address bar follows your selection, so a link to a castle or commander can be shared or bookmarked.'],
@@ -4463,7 +4463,7 @@
         const inc = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id).reduce((a, t) => a + (t.treasury_level || 0) * (10 + 2 * mint), 0);
         const cyc = g.production_cycle_ticks;
         const left = cyc - (g.current_tick % cyc);
-        const kpi = (cls, k, v, title, onclick) => h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `kpi ${cls}${onclick ? ' link ghost' : ''}`, title, onclick }, h('span', { class: 'k' }, k), v);
+        const kpi = (cls, k, v, title, onclick) => h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `kpi ${cls}${onclick ? ' link ghost' : ''}`, title, onclick }, h('span', { class: 'k' }, Array.isArray(k) ? [h('span', { class: 'long' }, k[0]), h('span', { class: 'short' }, k[1])] : k), v);
         const props = pendingProposals();
         if (!ms.hudL) {
           ms.hudName = h('b', {});
@@ -4480,7 +4480,7 @@
         const keep = (key, node) => { const prev = ms.hudParts[key]; if (prev && prev.outerHTML === node.outerHTML) return prev; ms.hudParts[key] = node; return node; };
         const place = (host, nodes) => { const cur = [...host.children]; if (cur.length === nodes.length && cur.every((n, i) => n === nodes[i])) return; host.replaceChildren(...nodes); };
         place(hud, [ms.hudL, keep('c', h('div', { class: 'hud-c' },
-            g.status === 'finished' ? null : kpi('victory', TOUCH_DEVICE ? 'Victory' : 'Road to victory', h('span', { class: 'v' }, `${mineN} of ${winAt}`, h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))), `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game.`),
+            g.status === 'finished' ? null : kpi('victory', ['Road to victory', 'Victory'], h('span', { class: 'v' }, `${mineN} of ${winAt}`, h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))), `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game.`),
             kpi('treasury', 'Treasury', h('span', { class: 'v' }, String(ms.me.gold), h('small', {}, `+${inc} in ${left}t`)), `Production pays every ${cyc} ticks. About +${inc} gold at the next one, in ${left} tick${left === 1 ? '' : 's'}.`),
             props ? kpi('proposals', 'Proposals', h('span', { class: 'v' }, h('span', { class: 'pill' }, String(props)), h('small', {}, 'to answer')), 'Open the proposals', () => { goRoot(); setTimeout(() => flashSection(sideEl.querySelector('[data-sec="offers"]') ? 'offers' : 'standings'), 50); }) : null,
             g.status === 'active' && ms.threats && ms.threats.length ? kpi('threat', 'Under threat', h('span', { class: 'v' }, `${ms.threats.length} castle${ms.threats.length === 1 ? '' : 's'}`), 'Hostile armies are heading for your castles. Click to look at the first one.', () => { const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); }) : null,
@@ -4556,14 +4556,28 @@
             disabled: gold < hire,
             onclick: order('hire_commander', { p_territory_id: t.id, p_school: sc.slug }, (d) => `${d.name} joins${d.role === 'king' ? ' as king' : ''}`),
           }, sc.name))));
-        out.push(h('div', { class: 'row wrap2', style: 'margin-top:12px' }, h('button', {
-          class: 'danger',
-          title: 'Give the castle up. It becomes unclaimed and loses its troops.',
-          onclick: async (e) => {
-            if (await confirmDialog(`Abandon ${t.name}? It becomes unclaimed, its troops are lost, and anyone can take it. This cannot be undone.`, `Abandon ${t.name}`)) order('abandon_castle', { p_territory_id: t.id }, (d) => `${d.abandoned} abandoned`)(e);
-          },
-        }, 'Abandon castle')));
         return h('div', { class: 'sec' }, out);
+      };
+      const abandonButton = (t) => (t.owner_player_id !== ms.me.id || !canAct() ? null : h('div', { class: 'sec pfoot' }, h('button', {
+        class: 'danger',
+        title: 'Give the castle up. It becomes unclaimed and loses its troops.',
+        onclick: async (e) => {
+          if (await confirmDialog(`Abandon ${t.name}? It becomes unclaimed, its troops are lost, and anyone can take it. This cannot be undone.`, `Abandon ${t.name}`)) order('abandon_castle', { p_territory_id: t.id }, (d) => `${d.abandoned} abandoned`)(e);
+        },
+      }, 'Abandon castle')));
+      const pfold = (key, title, sub, ...kids) => {
+        ms.folds = ms.folds || new Set();
+        const body = kids.flat().filter(Boolean);
+        if (!body.length) return null;
+        return h('details', { class: 'pfold', open: ms.folds.has(key) || null, ontoggle: (e) => { if (e.target.open) ms.folds.add(key); else ms.folds.delete(key); } },
+          h('summary', {}, h('span', { class: 'ft' }, title), sub ? h('span', { class: 'fs' }, sub) : null), h('div', { class: 'fb' }, body));
+      };
+      const dipChip = (pid) => {
+        if (pid === ms.me.id) return h('span', { class: 'chip you' }, 'You');
+        const st = dipStatus(pid);
+        const map = { allied: ['good', 'Allied'], truce: ['info', 'Truce'], nap: ['info', 'Pact'], proposed: ['warn', 'Proposed'], peace_proposed: ['warn', 'Peace offered'], grace_period: ['warn', 'Alliance ending'], war: ['danger', 'At war'] };
+        const [tone, label] = map[st] || ['', ''];
+        return label ? h('span', { class: `chip ${tone}` }, label) : null;
       };
 
       const realmSection = () => {
@@ -5881,39 +5895,47 @@
           const t = ms.t.get(sel.id);
           const seen = ms.vis.has(t.id);
           const owner = (seen || t.owner_player_id !== undefined) ? t.owner_player_id : (ms.mem[t.id] ? ms.mem[t.id].o : null);
-          parts.push(panelHeader(t.name, `Tier ${t.tier} · ${t.natural_resources} resources${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + (TERRAIN_NAMES[t.terrain] || t.terrain) : ''}${t.terrain === 'mountain' ? ' (defenders strike harder)' : ''}`));
-          parts.push(h('div', { class: 'sec' },
-            line('Owner', owner ? pname(owner) + (seen || t.owner_player_id !== undefined ? '' : ' (last seen)') : ownerUnknown(t, seen) ? 'Unknown, out of sight' : 'Unclaimed'),
-            !seen ? line('Last scouted', ms.mem[t.id] ? `tick ${ms.mem[t.id].tk != null ? ms.mem[t.id].tk : 'unknown'}, ${ms.mem[t.id].o ? pname(ms.mem[t.id].o) : 'unclaimed'}, ${ms.mem[t.id].tr != null ? ms.mem[t.id].tr : '?'} troops` : 'Never') : null,
-            line('Troops', seen ? t.troops : 'Unknown'),
-            seen && t.resources !== undefined && t.resources !== null && t.resources !== t.natural_resources ? line('Resources (with terraforming)', t.resources) : null,
-            seen ? line('Treasury / Recruitment / Prestige', `${t.treasury_level} / ${t.industry_level} / ${t.prestige_level}`) : null,
-            seen ? line('Road', t.has_road ? 'Yes' : 'No') : null,
-            t.garrison_commander_id && seen ? line('Garrison leader', (ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || '') : null));
-          parts.push(castleNotes(t));
-          const crb = castleReportBox(t);
-          if (crb) parts.push(crb);
+          const mine = owner === ms.me.id;
+          const lastSeenTxt = !seen && ms.mem[t.id] ? `Last seen tick ${ms.mem[t.id].tk != null ? ms.mem[t.id].tk : '?'}: ${ms.mem[t.id].o ? pname(ms.mem[t.id].o) : 'unclaimed'}, ${ms.mem[t.id].tr != null ? ms.mem[t.id].tr : '?'} troops` : null;
+          parts.push(panelHeader(t.name, `Tier ${t.tier} · ${t.natural_resources} resources${t.region ? ' · ' + t.region : ''}${t.terrain ? ' · ' + (TERRAIN_NAMES[t.terrain] || t.terrain) : ''}`));
+          const chips = [
+            owner ? (mine ? h('span', { class: 'chip you' }, 'Yours') : h('span', { class: 'chip', style: `color:${color(owner)};background:var(--ink-3)` }, `House ${houseOf(owner) || pname(owner)}`, dipChip(owner))) : h('span', { class: 'chip' }, ownerUnknown(t, seen) ? 'Unknown, out of sight' : 'Unclaimed'),
+            ms.players.get(owner) && ms.players.get(owner).capital_territory_id === t.id ? h('span', { class: 'chip you' }, 'King\'s seat') : null,
+            (ms.threats || []).includes(t.id) ? h('span', { class: 'chip danger' }, 'Under threat') : null,
+            ms.cmd.some((c) => c.status === 'sieging' && c.current_territory_id === t.id && commanderSeen(c, tf)) ? h('span', { class: 'chip danger' }, 'Besieged') : null,
+            t.crossing_kind ? h('span', { class: 'chip info', title: t.crossing_kind === 'pass' ? 'Mountain pass: armies cross the range only here, and a march stops here unless you or an ally hold it.' : 'River crossing: armies cross the river only here, and a march stops here unless you or an ally hold it.' }, t.crossing_kind === 'pass' ? 'Mountain pass' : 'River crossing') : null,
+            (t.choke || 0) >= 2 ? h('span', { class: 'chip info', title: 'Many routes across the realm run through this castle.' }, t.choke >= 3 ? 'Major chokepoint' : 'Chokepoint') : null,
+            !seen ? h('span', { class: 'chip warn' }, 'Out of sight') : null,
+          ];
+          parts.push(h('div', { class: 'sec hero' },
+            h('div', { class: 'chips' }, chips),
+            h('div', { class: 'hero-nums' },
+              h('div', { class: 'hn' }, h('b', {}, seen ? String(t.troops) : (ms.mem[t.id] && ms.mem[t.id].tr != null ? `~${ms.mem[t.id].tr}` : '?')), h('span', {}, 'troops')),
+              seen ? h('div', { class: 'hn' }, h('b', {}, `${t.treasury_level} · ${t.industry_level} · ${t.prestige_level}`), h('span', {}, 'treasury · recruitment · prestige')) : null,
+              seen && t.has_road ? h('div', { class: 'hn' }, h('b', {}, 'Road'), h('span', {}, 'built')) : null),
+            lastSeenTxt ? h('div', { class: 'tip' }, lastSeenTxt) : null,
+            t.garrison_commander_id && seen ? h('div', { class: 'tip' }, `Garrison led by ${(ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || 'a commander'}`) : null));
+          parts.push(siegeSection(t));
           parts.push(assaultSection(t));
-          parts.push(castleThreat(t), castleSupply(t));
+          if (mine) parts.push(buildSection(t));
           const here = ms.cmd.filter((c) => c.current_territory_id === t.id && commanderSeen(c, tf));
-          if (here.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Commanders here'), here.map(cmdRow)));
+          if (here.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Commanders here'), here.map((c) => {
+            const own = c.owner_player_id === ms.me.id && canAct() && c.status === 'idle' && t.garrison_commander_id !== c.id;
+            return h('div', { class: 'cmdline' }, cmdRow(c), own ? h('button', { type: 'button', class: 'small', title: c.troops ? 'Give a march order' : 'Give this commander troops', onclick: () => { select('c', c.id); if (c.troops) { ms.marching = true; ms.preview = null; render(); drawSide(); } } }, c.troops ? 'March' : 'Troops') : null);
+          })));
+          const threatBox = castleThreat(t);
+          if (threatBox && (ms.threats || []).includes(t.id)) parts.push(threatBox);
           const fought = ms.battles.filter((b) => b.territory_id === t.id);
-          if (fought.length) parts.push(h('div', { class: 'sec' }, h('b', {}, 'Battles here'), fought.map(battleRow)));
-          parts.push(siegeSection(t), buildSection(t));
-          if (t.crossing_kind) {
-            parts.push(h('div', { class: 'sec', style: 'color:var(--gold2)' }, t.crossing_kind === 'pass'
-              ? 'Mountain pass. Armies cross the range only through this castle, and a march stops here unless you or an ally hold it.'
-              : 'River crossing. Armies cross the river only through this castle, and a march stops here unless you or an ally hold it.'));
-          }
-          if ((t.choke || 0) >= 2) {
-            parts.push(h('div', { class: 'sec', style: 'color:var(--gold2)' }, t.choke >= 3
-              ? 'Major chokepoint. A great many of the shortest routes across the realm run through this castle. Whoever holds it controls how armies move.'
-              : 'Chokepoint. Many routes across the realm run through this castle, so holding it makes it harder for rivals to move.'));
-          }
           const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
           const links = castleLinks(t.id).filter((l) => l.len <= reachRange).sort((a, b) => a.len - b.len);
-          parts.push(h('div', { class: 'sec' }, h('b', {}, ms.game.free_travel ? 'Within your range' : trailsOn() ? 'Trails to' : 'Roads to'), links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${l.mult > 1.05 ? 'slow ×' + l.mult.toFixed(1) + ' · ' : ''}${Math.round(l.len)}`)))));
-          parts.push(castleHistory(t));
+          parts.push(pfold('report', mine ? 'Defence and production' : 'Defence', null, castleReportBox(t)));
+          parts.push(pfold('trails', ms.game.free_travel ? 'Within your range' : trailsOn() ? 'Trails' : 'Roads', links.length ? `${links.length} · nearest ${links[0].t.name}` : 'none', links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${l.mult > 1.05 ? 'slow ×' + l.mult.toFixed(1) + ' · ' : ''}${Math.round(l.len)}`)))));
+          if (threatBox && !(ms.threats || []).includes(t.id)) parts.push(pfold('threats', 'Threats', 'none seen', threatBox));
+          parts.push(pfold('supply', 'Supply lines', null, castleSupply(t)));
+          if (fought.length) parts.push(pfold('battles', 'Battles here', String(fought.length), fought.map(battleRow)));
+          parts.push(pfold('note', 'Your note', tagOf(t.id) ? (NOTE_TAGS.find(([k]) => k === tagOf(t.id)) || [0, ''])[1] : null, castleNotes(t)));
+          parts.push(pfold('history', `History of ${t.name}`, null, castleHistory(t)));
+          parts.push(abandonButton(t));
         } else if (sel && sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === sel.id);
           if (!c || !commanderSeen(c, tf)) {
@@ -5922,20 +5944,21 @@
             return;
           }
           const ab = ms.abil.get(c.id) || {};
-          const m = ms.mov.get(c.id);
           const pr = c.profile;
-          parts.push(panelHeader(`${c.role === 'king' ? '♛ ' : ''}${c.name}`, `${pname(c.owner_player_id)} · ${c.troops} troops · ${nowText(c)}`));
+          const own = c.owner_player_id === ms.me.id;
+          parts.push(panelHeader(`${c.role === 'king' ? '♛ ' : ''}${c.name}`, `${pname(c.owner_player_id)} · ${c.school}${pr && pr.age ? ` · age ${pr.age}` : ''}`));
           parts.push(h('div', { class: 'cprofile' },
             cmdCard(c, { size: 'l', faction: slugOf(c.owner_player_id), rank: rankOf(c), troops: c.troops }),
             h('div', { class: 'cinfo' },
-              h('h3', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`, c.owner_player_id === ms.me.id ? h('button', { type: 'button', class: 'link renamebtn', title: 'Rename this commander', onclick: () => renameDialog(c) }, 'Rename') : null),
               pr && pr.epithet ? h('div', { class: 'cepi' }, pr.epithet) : null,
-              h('div', { style: 'color:var(--dim)' }, `${pname(c.owner_player_id)} · ${c.school}${pr && pr.age ? ` · age ${pr.age}` : ''}${c.council_area ? ` · Councillor of the ${AREA_NAMES[c.council_area] || c.council_area}` : ''}${c.promoted ? ' · Veteran' : ''}`))));
+              h('div', { class: 'chips' }, dipChip(c.owner_player_id), c.role === 'king' ? h('span', { class: 'chip you' }, 'King') : null, c.promoted ? h('span', { class: 'chip info' }, 'Veteran') : null, c.council_area ? h('span', { class: 'chip info' }, `Councillor of the ${AREA_NAMES[c.council_area] || c.council_area}`) : null, c.status === 'moving' ? h('span', { class: 'chip info' }, 'Marching') : c.status === 'sieging' ? h('span', { class: 'chip danger' }, 'Besieging') : null),
+              h('div', { class: 'hero-nums' }, h('div', { class: 'hn' }, h('b', {}, String(c.troops)), h('span', {}, 'troops')), h('div', { class: 'hn' }, h('b', {}, `R${rankOf(c)}`), h('span', {}, 'rank'))),
+              h('div', { class: 'tip now' }, nowText(c)),
+              own ? h('button', { type: 'button', class: 'link renamebtn', title: 'Rename this commander', onclick: () => renameDialog(c) }, 'Rename') : null)));
           parts.push(commanderActions(c));
-          if (pr && pr.bio) parts.push(h('p', { class: 'cbio' }, pr.bio));
-          if (c.owner_player_id === ms.me.id) {
-            const box = h('div', { class: 'chron' }, h('h4', {}, 'Chronicle'), h('div', { class: 'chron-body' }, 'Reading the chronicle...'));
-            parts.push(box);
+          if (c.current_territory_id) parts.push(h('div', { class: 'sec' }, h('button', { class: 'cmdrow', onclick: () => select('t', c.current_territory_id) }, `At ${(ms.t.get(c.current_territory_id) || {}).name || 'a castle'}`, h('span', { style: 'color:var(--dim);margin-left:auto' }, 'Open castle'))));
+          if (own) {
+            const box = h('div', { class: 'chron' }, h('div', { class: 'chron-body' }, 'Reading the chronicle...'));
             ms.chron = ms.chron || new Map();
             const paint = (data) => {
               const body = box.querySelector('.chron-body');
@@ -5952,36 +5975,39 @@
             const hit = ms.chron.get(c.id);
             if (hit) paint(hit.data);
             if (!hit || Date.now() - hit.at > 12000) sb.rpc('commander_chronicle', { p_commander_id: c.id }).then(({ data }) => { if (data) { ms.chron.set(c.id, { at: Date.now(), data }); paint(data); } });
+            parts.push(pfold('abil', 'Abilities', Object.entries(ab).filter(([, v]) => v > 0).map(([k, v]) => `${ABILITY_NAMES[k] || k} ${v}`).join(' · ') || 'none yet', growthSection(c)));
+            parts.push(pfold('chron', 'Chronicle', hit ? `${hit.data.wins + hit.data.losses} battles · ${hit.data.castles} castles` : null, box));
+          } else {
+            const known = Object.entries(ab).filter(([, v]) => v > 0);
+            parts.push(pfold('abil', 'Abilities', known.map(([k, v]) => `${ABILITY_NAMES[k] || k} ${v}`).join(' · ') || 'none known', known.length ? known.map(([k, v]) => line(ABILITY_NAMES[k] || k, v)) : h('div', { class: 'empty' }, 'None yet')));
           }
-          parts.push(h('div', { class: 'sec' },
-            line('Rank', rankOf(c)),
-            line('Troops', c.troops),
-            line('Now', nowText(c))));
-          const known = Object.entries(ab).filter(([, v]) => v > 0);
-          parts.push(c.owner_player_id === ms.me.id ? growthSection(c) : h('div', { class: 'sec' }, h('b', {}, 'Abilities'),
-            known.length ? known.map(([k, v]) => line(ABILITY_NAMES[k] || k, v)) : h('div', { class: 'empty' }, 'None yet')));
-          if (c.current_territory_id) parts.push(h('div', { class: 'sec' }, h('button', { onclick: () => select('t', c.current_territory_id) }, 'Show territory')));
+          if (pr && pr.bio) parts.push(pfold('bio', 'About', null, h('p', { class: 'cbio' }, pr.bio)));
         } else {
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
-          parts.push(h('h3', {}, 'Realm'), nextMoveSection(), ...realmSection());
+          const [areas, upgrade, surrender] = realmSection();
+          parts.push(nextMoveSection());
           const offers = offersSection();
           if (offers) offers.dataset.sec = 'offers';
           parts.push(offers);
           parts.push(eventsSection());
           parts.push(prisonersSection());
-          parts.push(h('div', { class: 'sec' }, h('button', { onclick: fallenHall }, 'Hall of the Fallen')));
+          parts.push(upgrade);
+          parts.push(areas);
           parts.push(h('div', { class: 'sec', 'data-sec': 'standings' }, h('b', {}, 'Standings'), pl.map(({ p, n }) => {
-            const st = p.id === ms.me.id ? 'you' : dipStatus(p.id);
             const ctl = diplomacyControls(p);
-            return h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
-              h('div', { class: 'line', style: 'border:none' },
-                h('span', { class: 'row', style: 'gap:8px;color:var(--text)' }, sigil(p.faction_slug, 22), p.display_name, p.is_ai && p.ai_style ? h('span', { class: 'tag', title: (AI_STYLES.find(([k]) => k === p.ai_style) || [0, 0, ''])[2] }, (AI_STYLES.find(([k]) => k === p.ai_style) || [0, p.ai_style])[1]) : null, p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? h('span', { class: 'tag' }, 'out') : null),
-                h('span', {}, `${n} · ${st === 'neutral' ? '' : st.replace('_', ' ')}`)),
+            const self = p.id === ms.me.id;
+            const out = p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined;
+            const styleTag = p.is_ai && p.ai_style ? (AI_STYLES.find(([k]) => k === p.ai_style) || [0, p.ai_style, ''])[1] : null;
+            return h('div', { class: 'strow' + (self ? ' me' : '') },
+              h('div', { class: 'strow-top' },
+                sigil(p.faction_slug, 28),
+                h('div', { class: 'strow-id' }, h('b', {}, p.display_name), h('span', {}, [p.is_ai ? `AI${styleTag ? ' · ' + styleTag : ''}` : 'Player', out ? ' · eliminated' : ''].join(''))),
+                h('div', { class: 'strow-right' }, out ? h('span', { class: 'chip' }, 'Out') : dipChip(p.id), h('b', { class: 'strow-n' }, String(n)))),
               profileLine(p),
-              p.id !== ms.me.id || ctl ? h('div', { class: 'row wrap2', style: 'margin-top:4px' }, ctl, p.id !== ms.me.id ? h('button', { onclick: () => openDm(p.id) }, 'Message') : null, p.id !== ms.me.id && !p.is_ai && canAct() && !(p.eliminated_at_tick != null) ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null) : null);
+              !self && !out && (ctl || !p.is_ai) ? pfold(`dip${p.id}`, 'Actions', null, h('div', { class: 'dipbox' }, ctl, h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { onclick: () => openDm(p.id) }, 'Message'), !p.is_ai && canAct() ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null))) : null);
           })));
-          if (canAct() && ms.players.size > 2) parts.push(h('div', { class: 'sec' }, h('button', { onclick: mediationDialog }, 'Offer mediation')));
-          parts.push(h('div', { class: 'sec', style: 'color:var(--dim);font-size:.8rem' }, 'Click a castle or commander for details. Drag to pan, scroll to zoom. A gold ring marks a king.'));
+          parts.push(h('div', { class: 'sec row wrap2' }, canAct() && ms.players.size > 2 ? h('button', { onclick: mediationDialog }, 'Offer mediation') : null, h('button', { onclick: fallenHall }, 'Hall of the Fallen')));
+          parts.push(surrender ? pfold('surrender', 'Surrender', null, surrender) : null);
         }
         if (ms.ruler) parts.unshift(rulerPanel());
         patchSide([sideTabs(), ...parts]);
