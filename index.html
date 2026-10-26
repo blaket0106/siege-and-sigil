@@ -324,6 +324,26 @@
       return close;
     }
 
+    function screen(title, body, opts = {}) {
+      let closeFn = () => {};
+      const bodyEl = h('div', { class: 'scr-body' });
+      const tabsEl = opts.tabs ? h('div', { class: 'scr-tabs', role: 'tablist' }) : null;
+      const show = (k) => {
+        opts.tab = k;
+        if (tabsEl) tabsEl.replaceChildren(...opts.tabs.map(([key, label]) => h('button', { type: 'button', role: 'tab', 'aria-selected': opts.tab === key ? 'true' : 'false', class: opts.tab === key ? 'on' : '', onclick: () => show(key) }, label)));
+        bodyEl.replaceChildren(...[opts.render ? opts.render(k) : body].flat().filter(Boolean));
+      };
+      show(opts.tab || (opts.tabs ? opts.tabs[0][0] : null));
+      closeFn = modal(title, h('div', { class: 'scr' }, opts.sub ? h('p', { class: 'scr-sub' }, opts.sub) : null, tabsEl, opts.toolbar || null, bodyEl), () => []);
+      const dlg = document.querySelector('.overlay:last-of-type .modal');
+      if (dlg) {
+        dlg.classList.add('screen');
+        if (opts.wide) dlg.classList.add('wide');
+        dlg.querySelector('h2').after(h('button', { type: 'button', class: 'ib scr-close', 'aria-label': 'Close', title: 'Close', onclick: () => closeFn() }, icon('close')));
+      }
+      return { close: () => closeFn(), show, body: bodyEl };
+    }
+
     const FACTION_FALLBACK = {
       brannoch: ['#B8742A', '#6B3A1A', 'Brannoch'], dravos: ['#26262B', '#E8662A', 'Dravos'], halcyr: ['#E8EEF2', '#4A8FC4', 'Halcyr'],
       kaldran: ['#B3202A', '#E0A526', 'Kaldran'], mereth: ['#6A3FA0', '#E58AA8', 'Mereth'], ostrand: ['#1E8A8F', '#E3C98A', 'Ostrand'],
@@ -848,7 +868,7 @@
           ['1', 'The back arrow to your games, your crest, the game name and the time to the next tick.'],
           ['2', 'Road to victory: how close the leader is to the castle share that wins ([[basics#what-wins-the-game|how you win]]). Proposals waiting for your answer and castles under threat appear beside it; click either to jump to them.'],
           ['3', 'Your gold and what the next production cycle adds ([[economy#how-production-works|production]]).'],
-          ['4', 'Castles (every castle in one table), Ruler, Menu (Empires, Intel, Research, Ledger, Recorder, Battle calculator, Game rules, Host tools, Options and this manual) and Help.'],
+          ['4', 'Castles (every castle in one table), Ruler, Menu and Help. The menu is in three groups: Your realm (Research, Castles, Ledger), The war (Intel, Recorder, Battle calculator, and Replay once a game ends) and This game (Game rules, Host tools, Options, How to play). Every one of these opens the same kind of screen: a title, a close button top right, tabs where there are two views, and a scrolling body. On a phone a screen fills the window.'],
           ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
@@ -856,6 +876,12 @@
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers. The map controls beside it recentre the map on your castles, switch between the 2D and 3D map, show scan rings and toggle sound.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions. The address bar follows your selection, so a link to a castle or commander can be shared or bookmarked.'],
+        ['h', 'The secondary screens'],
+        ['list', [
+          'Research lists every realm area with its level, progress bar, prestige collected and an estimate: the time to the next level for the active area, and the time it would take if you made another area active. Make active switches at once.',
+          'Intel has two tabs. Charts plots one measure per house or per group, one point per production cycle. Groups is where you put houses into private colour groups to compare alliances; the group strength shows castles toward the win and troops seen. Standings and diplomacy stay in the Realm panel.',
+          'Ledger has By house (gold given and received, with the net) and Entries (every line, newest first). Recorder lists public events and your battles, filtered by house and kind. Castles is the sortable table.',
+        ]],
         ['h', 'How orders respond'],
         ['list', [
           'An order shows in the panel the moment you give it: troops move, gold is spent, the button shows a spinner until the server confirms. If the server refuses, the panel reverts and a message explains why.',
@@ -3273,11 +3299,11 @@
       };
       [mode, first, aT, aD, dT, dD].forEach((el) => { el.addEventListener('input', calc); el.addEventListener('change', calc); });
       calc();
-      modal('Battle calculator', h('div', {},
+      screen('Battle calculator', h('div', {},
         h('div', { class: 'tip', style: 'margin-bottom:8px' }, 'Damage per round is Armory plus the leader\'s Valor, at least 1. Enter your best guess for each side.'),
         h('label', {}, 'Kind of battle'), mode,
         h('div', { class: 'grid2' }, h('div', {}, h('label', {}, 'Attacker troops'), aT), h('div', {}, h('label', {}, 'Attacker damage per round'), aD), h('div', {}, h('label', {}, 'Defender troops'), dT), h('div', {}, h('label', {}, 'Defender damage per round'), dD)),
-        firstRow, result), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+        firstRow, result), { sub: 'Predict a fight before you commit to it.' });
     }
 
     function optionsDialog() {
@@ -4181,14 +4207,13 @@
       };
       state.cleanup.push(() => { if (ms.m3) ms.m3.dispose(); });
 
-      const DIP_NAMES = { allied: 'Allied', truce: 'Truce', proposed: 'Alliance offered', peace_proposed: 'Peace offered', neutral: 'At war' };
 
       const GROUPS = [['', 'No group', null], ['a', 'Crimson', '#d94a4a'], ['b', 'Azure', '#4a8fd9'], ['c', 'Emerald', '#58b86a'], ['d', 'Amber', '#e8c14a'], ['e', 'Violet', '#b06ad9']];
       const groupKey = `ss-groups-${gameId}-${uid}`;
       const loadGroups = () => { try { return JSON.parse(localStorage.getItem(groupKey)) || {}; } catch { return {}; } };
       const saveGroups = (g) => { try { localStorage.setItem(groupKey, JSON.stringify(g)); } catch {} };
 
-      const empiresDialog = () => {
+      const groupsPanel = (redraw) => {
         const g = ms.game;
         const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
         const groups = loadGroups();
@@ -4196,48 +4221,32 @@
           const seen = [...ms.t.values()].filter((t) => t.owner_player_id === p.id && ms.vis.has(t.id)).reduce((sum, t) => sum + (t.troops || 0), 0);
           return { p, n: castlesOf(p.id), troops: seen, group: groups[p.id] || '' };
         }).sort((x, y) => y.n - x.n);
-        let close = () => {};
-        const redo = () => { close(); empiresDialog(); };
-        const cols = 'display:grid;grid-template-columns:1.6fr .45fr 1.1fr .8fr .7fr .9fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(214,171,82,0.15)';
-        const head = h('div', { style: `${cols};color:var(--dim);font-size:.8rem` }, h('span', {}, 'House'), h('span', {}, 'Castles'), h('span', {}, `Toward ${winAt}`), h('span', {}, 'Relation'), h('span', {}, 'Troops seen'), h('span', {}, 'Group'));
         const list = rows.map(({ p, n, troops, group }) => {
-          const sel = h('select', { style: 'padding:3px 6px', 'aria-label': `Group for ${p.display_name}`, onchange: (e) => { const next = loadGroups(); if (e.target.value) next[p.id] = e.target.value; else delete next[p.id]; saveGroups(next); redo(); } }, GROUPS.map(([k, name]) => h('option', { value: k }, name)));
+          const sel = h('select', { 'aria-label': `Group for ${p.display_name}`, onchange: (e) => { const next = loadGroups(); if (e.target.value) next[p.id] = e.target.value; else delete next[p.id]; saveGroups(next); redraw(); } }, GROUPS.map(([k, name]) => h('option', { value: k }, name)));
           sel.value = group;
           const gcol = (GROUPS.find((x) => x[0] === group) || [])[2];
-          return h('div', { style: cols },
-            h('span', { style: 'display:flex;align-items:center;gap:8px' }, h('button', { type: 'button', class: 'crestbtn', title: `House ${factionOf(p.faction_slug).name}: history and leaders`, 'aria-label': `House ${factionOf(p.faction_slug).name} history and leaders`, onclick: () => houseCard(p.faction_slug) }, sigil(p.faction_slug, 26)), p.display_name, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'tag', style: 'color:var(--gules-hi)' }, 'out') : null),
-            h('b', {}, String(n)),
-            h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: p.id === ms.me.id ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
-            h('span', {}, p.id === ms.me.id ? 'You' : DIP_NAMES[dipStatus(p.id)] || dipStatus(p.id)),
-            h('span', { style: 'color:var(--dim)' }, p.id === ms.me.id || isFriend(p.id) || troops ? String(troops) : '?'),
-            h('span', { style: 'display:flex;align-items:center;gap:6px' }, gcol ? h('i', { style: `width:10px;height:10px;border-radius:50%;background:${gcol};display:inline-block` }) : null, sel));
+          return h('div', { class: 'grow' },
+            h('span', { class: 'grow-id' }, sigil(p.faction_slug, 22), h('b', {}, p.display_name), dipChip(p.id)),
+            h('span', { class: 'grow-n' }, `${n} castles`, h('small', {}, p.id === ms.me.id || isFriend(p.id) || troops ? ` · ${troops} troops seen` : '')),
+            h('span', { class: 'grow-sel' }, gcol ? h('i', { style: `background:${gcol}` }) : null, sel));
         });
         const totals = GROUPS.filter((x) => x[0]).map(([k, name, col]) => {
           const members = rows.filter((r) => r.group === k);
           if (!members.length) return null;
           const castles = members.reduce((sum, r) => sum + r.n, 0);
           const troops = members.reduce((sum, r) => sum + r.troops, 0);
-          return h('div', { style: cols.replace('1.6fr .45fr 1.1fr .8fr .7fr .9fr', '1.4fr .5fr 1.2fr 2.4fr') },
-            h('span', { style: 'display:flex;align-items:center;gap:8px' }, h('i', { style: `width:12px;height:12px;border-radius:50%;background:${col};display:inline-block` }), `${name} (${members.length})`),
-            h('b', {}, String(castles)),
-            h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: 'rival', style: `width:${Math.min(100, (castles / Math.max(1, winAt)) * 100)}%;background:${col}` })),
-            h('span', { style: 'color:var(--dim)' }, `${troops} troops seen, ${Math.round((castles / Math.max(1, ms.t.size)) * 100)}% of all castles`));
+          return h('div', { class: 'gtot' }, h('span', {}, h('i', { style: `background:${col}` }), `${name} (${members.length})`),
+            h('div', { class: 'meter-track', style: 'height:6px' }, h('i', { class: 'rival', style: `width:${Math.min(100, (castles / Math.max(1, winAt)) * 100)}%;background:${col}` })),
+            h('b', {}, `${castles} of ${winAt}`), h('small', {}, `${troops} troops seen`));
         }).filter(Boolean);
         const allies = rows.filter((r) => r.p.id !== ms.me.id && dipStatus(r.p.id) === 'allied');
-        close = modal('Empires', h('div', {}, head, list,
-          totals.length ? h('div', { style: 'margin-top:14px' }, h('b', {}, 'Group strength'), totals) : null,
-          h('div', { class: 'row wrap2', style: 'margin-top:10px' },
-            h('button', { disabled: !allies.length, onclick: () => { const next = {}; next[ms.me.id] = 'b'; allies.forEach((r) => { next[r.p.id] = 'b'; }); saveGroups({ ...loadGroups(), ...next }); redo(); } }, 'Group my alliance'),
-            h('button', { disabled: !Object.keys(groups).length, onclick: () => { saveGroups({}); redo(); } }, 'Clear groups')),
-          h('div', { class: 'tip', style: 'margin-top:8px' }, `${winAt} of ${ms.t.size} castles wins the game${g.victory_decay ? `, and from tick ${g.victory_decay_start} the target drops by ${g.victory_decay} each production` : ''}. Groups are private notes for comparing rivals and allies. Troop counts cover only castles you can see.`),
-          canAct() ? h('div', { style: 'margin-top:12px' }, h('button', {
-            class: 'danger',
-            onclick: async (e) => {
-              if (await confirmDialog('Concede defeat? You are eliminated at once, your commanders die and your castles become unowned. This cannot be undone.')) {
-                run(e.currentTarget, async () => { const { error } = await sb.rpc('concede_defeat', { p_game_id: gameId }); if (error) throw error; toast('You have conceded', true); await load(); });
-              }
-            },
-          }, 'Concede defeat')) : null), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
+        return h('div', {},
+          h('p', { class: 'tip', style: 'margin:0 0 10px' }, 'Groups are private notes for comparing rivals and allies in the charts. Troop counts cover only castles you can see.'),
+          list,
+          totals.length ? h('div', { style: 'margin-top:14px' }, h('b', { class: 'scr-h' }, 'Group strength'), totals) : null,
+          h('div', { class: 'row wrap2', style: 'margin-top:12px' },
+            h('button', { disabled: !allies.length, onclick: () => { const next = {}; next[ms.me.id] = 'b'; allies.forEach((r) => { next[r.p.id] = 'b'; }); saveGroups({ ...loadGroups(), ...next }); redraw(); } }, 'Group my alliance'),
+            h('button', { disabled: !Object.keys(groups).length, onclick: () => { saveGroups({}); redraw(); } }, 'Clear groups')));
       };
 
       const INTEL_METRICS = {
@@ -4252,7 +4261,7 @@
         const { data, error } = await sb.rpc('intel_live', { p_game_id: gameId });
         if (error) return toast(error.message);
         const metric = selectOf(Object.fromEntries(Object.entries(INTEL_METRICS).map(([k, v]) => [k, v[0]])), 'castles');
-        const mode = selectOf({ player: 'Each house', group: 'My groups (set in Empires)' }, 'player');
+        const mode = selectOf({ player: 'Each house', group: 'My groups' }, 'player');
         const chart = h('div');
         const draw = () => {
           const fn = INTEL_METRICS[metric.value][1];
@@ -4275,14 +4284,20 @@
             })).filter((sr) => sr.points.length);
           }
           chart.replaceChildren(
-            series.length ? lineChart(series, INTEL_METRICS[metric.value][0]) : h('div', { class: 'empty' }, mode.value === 'group' ? 'No groups yet. Put houses in groups from Menu, Empires.' : 'No data yet.'),
+            series.length ? lineChart(series, INTEL_METRICS[metric.value][0]) : h('div', { class: 'empty' }, mode.value === 'group' ? 'No groups yet. Put houses in groups on the Groups tab.' : 'No data yet.'),
             h('div', { class: 'row wrap2', style: 'margin-top:6px' }, series.map((sr) => h('span', { style: 'display:inline-flex;align-items:center;gap:6px;color:var(--dim)' }, h('i', { style: `width:14px;height:4px;border-radius:2px;background:${sr.color};display:inline-block` }), sr.name))));
         };
         metric.addEventListener('change', draw);
         mode.addEventListener('change', draw);
         draw();
-        modal('Intel', data.length ? h('div', {}, h('label', {}, 'Measure'), metric, h('label', {}, 'Compare'), mode, chart, h('div', { class: 'tip' }, 'One point per production cycle. Totals only: where an army or castle stands is still hidden by the fog. Rival gold is never shown.'))
-          : h('div', { class: 'empty' }, 'Intel charts start after the first production cycle.'), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+        let scr = null;
+        scr = screen('Intel', null, {
+          wide: true,
+          tabs: [['charts', 'Charts'], ['groups', 'Groups']],
+          render: (k) => (k === 'charts'
+            ? (data.length ? [h('div', { class: 'scr-toolbar' }, h('label', {}, 'Measure', metric), h('label', {}, 'Compare', mode)), chart, h('p', { class: 'tip' }, 'One point per production cycle. Totals only: where an army or castle stands is still hidden by the fog.')] : h('div', { class: 'empty' }, 'Intel charts start after the first production cycle. Until then, the standings in the Realm panel show castles held.'))
+            : groupsPanel(() => scr.show('groups'))),
+        });
       };
 
       const researchDialog = async () => {
@@ -4290,24 +4305,26 @@
         if (error) return toast(error.message);
         const per = data.income;
         const live = canAct();
-        let closeR = () => {};
+        let scr = null;
         const etaOf = (a) => {
           const left = Math.max(0, a.need - a.accumulated);
-          if (!a.active) return 'Not the active area';
-          if (per <= 0) return 'No prestige income';
+          if (per <= 0) return 'no prestige income';
           const cycles = Math.max(1, Math.ceil(left / per));
           const ticks = data.ticks_to_cycle + (cycles - 1) * data.cycle_ticks;
-          return `${cycles} cycle${cycles === 1 ? '' : 's'}, about ${ticks} ticks`;
+          return `${pluralN(cycles, 'cycle')}, about ${ticks} ticks`;
         };
-        const rows = data.areas.filter((a) => !a.disabled).map((a) => h('div', { class: 'sec', style: 'padding:8px 0' },
-          h('div', { class: 'line', style: 'border:none' }, h('b', {}, `${AREA_NAMES[a.area] || a.area}${a.active ? ' (active)' : ''}`), h('span', {}, `Level ${a.level}`)),
-          h('div', { class: 'meter-track', style: 'height:8px' }, h('i', { class: 'mine', style: `width:${Math.min(100, (a.accumulated / Math.max(1, a.need)) * 100)}%` })),
-          h('div', { class: 'line', style: 'border:none;color:var(--dim)' }, h('span', {}, `${a.accumulated} of ${a.need} prestige`), h('span', {}, etaOf(a))),
-          live && !a.active ? h('button', { class: 'small', onclick: (e) => act(e.currentTarget, async () => { const r = await sb.rpc('set_active_area', { p_game_id: gameId, p_area: a.area }); if (r.error) throw r.error; closeR(); researchDialog(); }) }, 'Make active') : null));
-        closeR = modal('Research', h('div', {},
-          h('div', { class: 'tip' }, `Your castles earn ${per} prestige each production (every ${data.cycle_ticks} ticks, next in ${data.ticks_to_cycle}). It all goes to the active area${data.library_bonus ? `, and your Library adds about ${data.library_bonus} to a random area` : ''}.`),
-          ...rows,
-          h('div', { class: 'tip' }, 'The next level costs 144 x the current level x the game\'s research cost. More Prestige upgrades on your castles speed it up.')), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
+        const rows = data.areas.filter((a) => !a.disabled).map((a) => h('div', { class: 'rrow' + (a.active ? ' on' : '') },
+          h('div', { class: 'rrow-top' }, h('b', {}, AREA_NAMES[a.area] || a.area), a.active ? h('span', { class: 'chip you' }, 'Active') : null, h('span', { class: 'rrow-lv' }, `Level ${a.level}`)),
+          h('div', { class: 'rrow-fx' }, AREA_EFFECT[a.area] || ''),
+          h('div', { class: 'meter-track', style: 'height:6px' }, h('i', { class: 'mine', style: `width:${Math.min(100, (a.accumulated / Math.max(1, a.need)) * 100)}%` })),
+          h('div', { class: 'rrow-foot' }, h('span', {}, `${a.accumulated} of ${a.need} prestige`), h('span', {}, a.active ? `Next level in ${etaOf(a)}` : `If active: ${etaOf(a)}`),
+            live && !a.active ? h('button', { class: 'small', onclick: (e) => act(e.currentTarget, async () => { const r = await sb.rpc('set_active_area', { p_game_id: gameId, p_area: a.area }); if (r.error) throw r.error; scr.close(); researchDialog(); }, () => {
+              const prev = ms.areas.map((x) => x.is_active);
+              ms.areas.forEach((x) => { x.is_active = x.area === a.area; });
+              return () => ms.areas.forEach((x, k) => { x.is_active = prev[k]; });
+            }) }, 'Make active') : null)));
+        scr = screen('Research', h('div', {}, ...rows, h('p', { class: 'tip' }, 'The next level costs 144 times the current level, times the game\'s research cost. More Prestige upgrades on your castles speed it up.')),
+          { sub: `Your castles earn ${per} prestige each production (every ${data.cycle_ticks} ticks, next in ${data.ticks_to_cycle}). It all goes to the active area${data.library_bonus ? `, and your Library adds about ${data.library_bonus} to a random area` : ''}.` });
       };
 
       const ledgerDialog = async () => {
@@ -4323,12 +4340,13 @@
           if (r.amount < 0) e.sent -= r.amount; else e.got += r.amount;
           by.set(r.counterparty_player_id, e);
         });
-        const sums = [...by.entries()].map(([pid, e]) => h('div', { class: 'line' }, h('span', { style: 'color:var(--text)' }, pname(pid)), h('span', {}, `gave ${e.sent}, received ${e.got}, net ${e.got - e.sent >= 0 ? '+' : ''}${e.got - e.sent}`)));
-        modal('Ledger', data.length ? h('div', {},
-          h('b', {}, 'By house'), ...sums,
-          fees ? h('div', { class: 'line' }, h('span', {}, 'Technology fees paid'), h('span', {}, String(-fees))) : null,
-          h('b', { style: 'display:block;margin-top:10px' }, 'Latest entries'),
-          h('div', { style: 'max-height:40vh;overflow-y:auto' }, data.slice(0, 60).map((r) => h('div', { class: 'line' }, h('span', {}, `Tick ${r.tick}: ${LAB[r.type] || r.type}${r.counterparty_player_id ? ` (${pname(r.counterparty_player_id)})` : ''}`), h('span', {}, `${r.amount > 0 ? '+' : ''}${r.amount}`))))) : h('div', { class: 'empty' }, 'No gold has passed between you and another house yet. Gifts of gold raise a house\'s regard for you.'), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
+        const sums = [...by.entries()].map(([pid, e]) => h('div', { class: 'feed' }, h('span', { class: 'feed-k' }, pname(pid)), h('span', {}, `gave ${e.sent}, received ${e.got}`), h('b', { class: e.got - e.sent >= 0 ? 'pos' : 'neg' }, `${e.got - e.sent >= 0 ? '+' : ''}${e.got - e.sent}`)));
+        screen('Ledger', null, {
+          tabs: [['houses', 'By house'], ['entries', 'Entries']],
+          render: (k) => (k === 'houses'
+            ? (sums.length || fees ? [sums, fees ? h('div', { class: 'feed' }, h('span', { class: 'feed-k' }, 'Technology fees'), h('span', {}, 'paid'), h('b', { class: 'neg' }, String(-fees))) : null] : h('div', { class: 'empty' }, 'No gold has changed hands with another house yet.'))
+            : (data.length ? data.slice(0, 120).map((r) => h('div', { class: 'feed' }, h('span', { class: 'feed-k' }, `Tick ${r.tick}`), h('span', {}, `${LAB[r.type] || r.type}${r.counterparty_player_id ? ` · ${pname(r.counterparty_player_id)}` : ''}`), h('b', { class: r.amount >= 0 ? 'pos' : 'neg' }, `${r.amount >= 0 ? '+' : ''}${r.amount}`))) : h('div', { class: 'empty' }, 'No entries yet.'))),
+        });
       };
 
       const recorderDialog = async () => {
@@ -4347,16 +4365,16 @@
         const who = selectOf({ all: 'Every house', ...Object.fromEntries([...ms.players.values()].map((p) => [String(p.id), p.display_name])) }, 'all');
         const what = selectOf(KIND, 'all');
         let shown = 80;
-        const list = h('div', { style: 'max-height:52vh;overflow-y:auto' });
+        const list = h('div', {});
         const draw = () => {
           const f = entries.filter((e) => (who.value === 'all' || e.pids.includes(Number(who.value))) && (what.value === 'all' || kindOf(e.type) === what.value));
-          list.replaceChildren(...(f.length ? f.slice(0, shown).map((e) => h('div', { class: 'line' }, h('span', { style: 'color:var(--dim);min-width:64px' }, `Tick ${e.tick}`), h('span', { style: 'text-align:right' }, e.text))) : [h('div', { class: 'empty' }, 'Nothing recorded for this filter.')]),
+          list.replaceChildren(...(f.length ? f.slice(0, shown).map((e) => h('div', { class: 'feed' }, h('span', { class: 'feed-k' }, `Tick ${e.tick}`), h('span', {}, e.text))) : [h('div', { class: 'empty' }, 'Nothing recorded for this filter.')]),
             ...(f.length > shown ? [h('button', { class: 'small', onclick: () => { shown += 80; draw(); } }, `Show more (${f.length - shown} left)`)] : []));
         };
         who.addEventListener('change', () => { shown = 80; draw(); });
         what.addEventListener('change', () => { shown = 80; draw(); });
         draw();
-        modal('Recorder', h('div', {}, h('div', { class: 'row wrap2' }, who, what), list, h('div', { class: 'tip' }, 'Public events plus the battles you were in, newest first.')), (c) => [h('button', { class: 'primary', onclick: c }, 'Close')]);
+        screen('Recorder', h('div', {}, list, h('p', { class: 'tip' }, 'Public events plus the battles you were in, newest first.')), { toolbar: h('div', { class: 'scr-toolbar' }, h('label', {}, 'House', who), h('label', {}, 'Kind', what)), wide: true });
       };
 
       const hostDialog = () => {
@@ -4390,14 +4408,14 @@
             });
           }
         };
-        modal('Host tools', h('div', {},
+        screen('Host tools', h('div', {},
           h('div', { class: 'sec' }, h('b', {}, paused ? 'The game is paused' : 'Pause the game'),
             h('div', { class: 'tip' }, 'Ticks stop for everyone. When you resume, the countdown carries on from where it stopped.'),
             h('button', { onclick: (e) => act(e.currentTarget, async () => { const { error } = await sb.rpc('admin_set_paused', { p_game_id: gameId, p_paused: !paused }); if (error) throw error; toast(paused ? 'Game resumed' : 'Game paused', true); }) }, paused ? 'Resume' : 'Pause')),
           h('div', { class: 'sec' }, h('b', {}, 'Jump ahead'),
             h('div', { class: 'tip' }, solo ? 'Run ticks now to test movement, production and battles. This cannot be undone.' : 'Only available while you are the only human in the game.'),
             h('div', { class: 'row wrap2' }, h('button', { disabled: !solo, onclick: jump(1) }, 'Jump 1 tick'), h('button', { disabled: !solo, onclick: jump(5) }, 'Jump 5 ticks'), h('button', { disabled: !solo, onclick: jump(6) }, 'Jump 6 ticks'), h('button', { disabled: !solo, onclick: jump(24) }, 'Jump 24 ticks')))),
-          (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+          { sub: 'Only the host sees this.' });
       };
 
       const setReplayTick = (tick) => {
@@ -4443,21 +4461,25 @@
       state.cleanup.push(() => window.removeEventListener('ss-replay', onReplay));
 
       const menuDialog = () => {
-        let closeMenu = () => {};
-        const item = (title, note, fn) => h('button', { class: 'cmdrow', onclick: () => { closeMenu(); fn(); } }, title, h('span', { style: 'color:var(--dim);margin-left:auto' }, note));
+        let scr = null;
+        const item = (title, note, fn) => h('button', { type: 'button', class: 'menu-item', onclick: () => { scr.close(); fn(); } }, h('b', {}, title), h('span', {}, note));
+        const group = (title, ...items) => (items.filter(Boolean).length ? h('div', { class: 'menu-group' }, h('h3', {}, title), h('div', { class: 'menu-items' }, items)) : null);
         const g = ms.game;
-        closeMenu = modal('Menu', h('div', {},
-          item('Empires', 'standings and relations', empiresDialog),
-          item('Intel', 'charts and group analysis', intelDialog),
-          item('Research', 'areas, progress and ETAs', researchDialog),
-          item('Ledger', 'gold given and received', ledgerDialog),
-          item('Recorder', 'history of the war', recorderDialog),
-          item('Battle calculator', 'predict a fight', battleCalcDialog),
-          item('Game rules', 'the articles of war', () => modal(`${g.name}: rules`, articlesOfWar(g, ms.players.size), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')])),
-          g.status === 'finished' ? item('Replay', 'watch the castles change hands', startReplay) : null,
-          g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', 'pause or jump ticks', hostDialog) : null,
-          item('Options', 'default order, panel side, sound', optionsDialog),
-          item('How to play', 'help', helpDialog)), (close) => [h('button', { class: 'primary', onclick: close }, 'Close')]);
+        scr = screen('Menu', h('div', {},
+          group('Your realm',
+            item('Research', 'areas, progress and ETAs', researchDialog),
+            item('Castles', 'every castle in one table', castlesDialog),
+            item('Ledger', 'gold given and received', ledgerDialog)),
+          group('The war',
+            item('Intel', 'charts and groups', intelDialog),
+            item('Recorder', 'history of the war', recorderDialog),
+            item('Battle calculator', 'predict a fight', battleCalcDialog),
+            g.status === 'finished' ? item('Replay', 'watch the castles change hands', startReplay) : null),
+          group('This game',
+            item('Game rules', 'the articles of war', () => screen(`${g.name}: rules`, articlesOfWar(g, ms.players.size), { wide: true })),
+            g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', 'pause or jump ticks', hostDialog) : null,
+            item('Options', 'default order, panel side, map text, sound', optionsDialog),
+            item('How to play', 'the field manual', () => helpDialog()))));
       };
 
       const drawHud = () => {
@@ -5716,11 +5738,11 @@
               h('td', { class: 'num' }, String(r.t.tier || 1)),
               h('td', { class: 'num' }, r.seen && r.t.treasury_level != null ? `${r.t.treasury_level} / ${r.t.industry_level} / ${r.t.prestige_level}` : '?'),
               h('td', { class: 'num' }, r.near ? `${r.near}` : '-')))))),
-            h('div', { class: 'tip' }, 'Click a column to sort and a row to look at the castle. "From you" is the distance from your nearest castle in leagues.'));
+            h('p', { class: 'tip' }, 'Click a column to sort and a row to look at the castle. "From you" is the distance from your nearest castle in leagues.'));
         };
         filterSel.addEventListener('change', () => { state2.filter = filterSel.value; draw(); });
         draw();
-        modal('All castles', wrap, (close) => { closeCastles = close; return [h('button', { onclick: close }, 'Close')]; });
+        closeCastles = screen('All castles', wrap, { wide: true }).close;
       };
 
       const sendGoldDialog = (p) => {
@@ -5958,9 +5980,9 @@
           return;
         }
         if (ms.tab === 'inbox') {
-          const sub = (k, label) => h('button', { class: ms.inboxTab === k ? 'primary' : '', onclick: () => { ms.inboxTab = k; ms.report = null; drawSide(); drawHud(); } }, label);
+          const sub = (k, label) => h('button', { type: 'button', class: ms.inboxTab === k ? 'on' : '', 'aria-pressed': ms.inboxTab === k ? 'true' : 'false', onclick: () => { ms.inboxTab = k; ms.report = null; drawSide(); drawHud(); } }, label);
           if (ms.inboxTab === 'battles') markBattlesSeen();
-          const bar = h('div', { class: 'row', style: 'margin:12px 0' }, sub('reports', 'Reports'), sub('battles', `Battles${ms.battles.length ? ` (${ms.battles.length})` : ''}`));
+          const bar = h('div', { class: 'seg side-seg' }, sub('reports', 'Reports'), sub('battles', `Battles${ms.battles.length ? ` · ${ms.battles.length}` : ''}`));
           const open = ms.report ? ms.battles.find((x) => x.id === ms.report) : null;
           let body;
           if (ms.inboxTab === 'battles') {
@@ -6080,11 +6102,14 @@
             const self = p.id === ms.me.id;
             const out = p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined;
             const styleTag = p.is_ai && p.ai_style ? (AI_STYLES.find(([k]) => k === p.ai_style) || [0, p.ai_style, ''])[1] : null;
+            const winAt = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
+            const seenTroops = [...ms.t.values()].filter((t) => t.owner_player_id === p.id && ms.vis.has(t.id)).reduce((sum, t) => sum + (t.troops || 0), 0);
             return h('div', { class: 'strow' + (self ? ' me' : '') },
               h('div', { class: 'strow-top' },
                 sigil(p.faction_slug, 28),
-                h('div', { class: 'strow-id' }, h('b', {}, p.display_name), h('span', {}, [p.is_ai ? `AI${styleTag ? ' · ' + styleTag : ''}` : 'Player', out ? ' · eliminated' : ''].join(''))),
-                h('div', { class: 'strow-right' }, out ? h('span', { class: 'chip' }, 'Out') : dipChip(p.id), h('b', { class: 'strow-n' }, String(n)))),
+                h('div', { class: 'strow-id' }, h('b', {}, p.display_name), h('span', {}, [p.is_ai ? `AI${styleTag ? ' · ' + styleTag : ''}` : 'Player', out ? ' · eliminated' : '', self || isFriend(p.id) || seenTroops ? ` · ${seenTroops} troops seen` : ''].join(''))),
+                h('div', { class: 'strow-right' }, out ? h('span', { class: 'chip' }, 'Out') : dipChip(p.id), h('b', { class: 'strow-n', title: `${n} of ${winAt} castles to win` }, String(n)))),
+              h('div', { class: 'meter-track strow-meter' }, h('i', { class: self ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
               profileLine(p),
               !self && !out && (ctl || !p.is_ai) ? pfold(`dip${p.id}`, 'Actions', null, h('div', { class: 'dipbox' }, ctl, h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { onclick: () => openDm(p.id) }, 'Message'), !p.is_ai && canAct() ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null))) : null);
           })));
