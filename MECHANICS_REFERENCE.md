@@ -1819,3 +1819,16 @@ Findings from the Neptune's Pride live game: hourly tick vs 20-tick production c
 - **Already covered, no change:** map label thresholds (Options has per-label rules for castle text, army counts and upgrade levels), default march action (Options), warp gates (roads).
 - **Jump stops, tuned (migration 20261024610000).** A castle halts a jump at most once per stage (near, final, siege) in any 12 ticks, not once per army. `games.jump_halt_on_threat` (default true) lets a sim turn the halts off.
 - **Commander hire price is 25 gold by default** (migration 20261024620000; was 100). The wizard stepper defaults to 25 in steps of 5. Games already created keep their price, so sims 270 and 271 still pay 100. Cheaper hires will let the AI (which hires toward a castle-based ratio) and the player field more armies earlier; re-check expansion and the leader's pace in the next sims.
+
+## 50. AI Drive To Win, Victory Decay (migration 20261024630000)
+
+Built from the NP observation study (research/np-observation, three all-AI games): NP's AI has a fast local opening and neighbour-first wars but never finishes a game, so ours keeps those two and adds a closing drive.
+
+- **Victory decay on by default.** `games.victory_decay` defaults to 1 castle per production and `games.victory_decay_start` to 250. `game_standing` lowers the castles needed by `victory_decay x floor((tick - start) / production cycle)` (floor of 15 percent of all castles unchanged). Existing games keep their old decay (0). The wizard stepper defaults to 1.
+- **Campaign focus (`ai_focus`).** Each AI picks one enemy at a time: not an ally, with a castle within 6 castle spacings of its own, preferring houses no bigger than 1.3 times its size and then the smallest. Kept for 72 ticks, dropped if it is eliminated or becomes an ally. In `ai_commanders` the focus house's castles get +6 priority, +4 more when it holds 4 castles or fewer (finish it), and castles taken from the AI in the last 36 ticks get +4 (retake). Balanced and Aggressive strike commanders may strike the focus from tick 40.
+- **Final push.** A house within 10 castles of the win line uses a margin of 1.0 on every target, may always strike, and scores targets higher the fewer troops they need (`+ max(0, 8 - need / 12)`).
+- **Land into army.** When 8 percent or fewer castles are unclaimed, `ai_spend` weighs Treasury at 3.0 against Recruitment 1.0 (was 1.2) and keeps a gold reserve of at most 60 (was 150), so gold turns into troops.
+- **Backstabbing.** The chance per tick that an AI betrays an ally once neutral land is nearly gone is tripled: 0.012, 0.03, 0.06, 0.12 by difficulty 2 to 5 (was 0.004 to 0.04). The target is picked by size, troops and distance, as before.
+- **Unchanged:** leader hunt at 60 percent of the win line; expansion and early-war logic (already at or ahead of NP's pace).
+- **Shared database warning:** AI functions are global, so a change applies at once to every running game, including other sessions' sims.
+

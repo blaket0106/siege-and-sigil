@@ -42,7 +42,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, neutral_armory, unit_scale, league, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
+    const GAME_COLS = 'id, name, status, neutral_armory, unit_scale, league, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, victory_decay_start, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
 
     function watchGame(gameId, onRefresh) {
       const channel = sb.channel('game:' + gameId, { config: { private: true } })
@@ -2018,7 +2018,7 @@
       const victory = h('input', { type: 'range', min: '10', max: '100', step: '5', value: '50', 'aria-label': 'Castles needed to win' });
       const victoryOut = h('output', {});
       victory.addEventListener('input', changed);
-      const decay = stepper({ min: 0, max: 16, value: 0, unit: 'castles', onChange: changed });
+      const decay = stepper({ min: 0, max: 16, value: 1, unit: 'castles', onChange: changed });
       const alliances = cards([['none', 'No alliances', 'Every house plays alone.', 'alliance_none'], ['0', 'No warning', 'Alliances can end instantly.', 'alliance_open'], ['24', '24 tick warning', 'Ending an alliance gives allies 24 ticks notice.', 'alliance_warn'], ['48', '48 tick warning', 'Ending an alliance gives allies 48 ticks notice.', 'alliance_warn']], '24', changed, { compact: true, min: 150 });
       const anon = cards([['normal', 'Names shown', 'Everyone sees real display names.', 'names_shown'], ['extra', 'Names hidden', 'Players appear under their house name until the game ends.', 'names_hidden']], 'normal', changed, { compact: true, min: 220 });
 
@@ -2152,7 +2152,7 @@
             preview.el))],
         ['Rules', sec('', heading('Write the rules', 'How the war is won, what each house can see, and how alliances and names work.'),
           sxGroup('Fog of war', 'What a house can see of its rivals.', fog.el),
-          sxGroup('Victory', 'The first house to hold this share of all castles wins.', sxField('Castles needed to win', h('div', { class: 'sx-range' }, victory, victoryOut)), sxField('Victory decay', decay.el, 'Each production, the share needed drops by this many castles, so stalled games end. 0 turns it off.')),
+          sxGroup('Victory', 'The first house to hold this share of all castles wins.', sxField('Castles needed to win', h('div', { class: 'sx-range' }, victory, victoryOut)), sxField('Victory decay', decay.el, 'After tick 250, each production the castles needed to win drop by this many, so stalled games end. 0 turns it off.')),
           sxGroup('Alliances', 'Houses can ally, share victory conditions and fight together.', alliances.el),
           sxGroup('Player names', null, anon.el),
           )],
@@ -3121,7 +3121,7 @@
             game.mirrored ? ['Layout', 'Mirrored stars'] : game.star_scatter === 'twin_rings' ? ['Layout', 'Twin rings'] : null),
           art('Victory and sight',
             ['Victory', `${Math.round(game.victory_pct * 100)}% of castles`],
-            game.victory_decay ? ['Decay', `${game.victory_decay} castles per production`] : null,
+            game.victory_decay ? ['Decay', `${game.victory_decay} castles per production after tick ${game.victory_decay_start}`] : null,
             ['Fog', game.fog_dark ? 'Dark' : game.fog_of_war ? 'Fog' : 'Off'],
             game.anonymity === 'extra' ? ['Names', 'Hidden until the game ends'] : null,
             game.start_selection === 'choose' ? ['Starts', `Houses choose (${game.pick_minutes} min)`] : null,
@@ -4049,7 +4049,7 @@
           h('div', { class: 'row wrap2', style: 'margin-top:10px' },
             h('button', { disabled: !allies.length, onclick: () => { const next = {}; next[ms.me.id] = 'b'; allies.forEach((r) => { next[r.p.id] = 'b'; }); saveGroups({ ...loadGroups(), ...next }); redo(); } }, 'Group my alliance'),
             h('button', { disabled: !Object.keys(groups).length, onclick: () => { saveGroups({}); redo(); } }, 'Clear groups')),
-          h('div', { class: 'tip', style: 'margin-top:8px' }, `${winAt} of ${ms.t.size} castles wins the game${g.victory_decay ? `, and the target drops by ${g.victory_decay} each production` : ''}. Groups are private notes for comparing rivals and allies. Troop counts cover only castles you can see.`),
+          h('div', { class: 'tip', style: 'margin-top:8px' }, `${winAt} of ${ms.t.size} castles wins the game${g.victory_decay ? `, and from tick ${g.victory_decay_start} the target drops by ${g.victory_decay} each production` : ''}. Groups are private notes for comparing rivals and allies. Troop counts cover only castles you can see.`),
           canAct() ? h('div', { style: 'margin-top:12px' }, h('button', {
             class: 'danger',
             onclick: (e) => {
