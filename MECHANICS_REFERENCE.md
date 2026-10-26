@@ -1868,3 +1868,7 @@ The home screen (`showHome`) and the lobby room (`showRoom`) use `patchKeyed(hos
 
 Castle counts, threats and turn state are not shown on campaign cards because `my_games` does not return them and `game_territories` and `game_players` are not readable by the client. Adding `castles_held`, `castles_to_win` and `under_threat` to `my_games` would allow a Road to victory meter on each card.
 
+### 20h. Setup wizard
+
+`createDialog()` is one screen: name, seat count, seats, land shape, castles per house and pace are always visible; Rules, Realm detail, Houses, Time and Who can join are `<details>` folds whose summary line is recomputed from the controls on every change. The realm preview and a settings summary sit in a sticky aside with the Raise campaign button; the same button repeats at the end of the form. Seats default to one human host plus AI opponents (Baron, balanced), and extra seats added with the stepper are AI. The settings object passed to `create_game` and the `add_ai_seat` calls are unchanged from the five-step wizard.
+

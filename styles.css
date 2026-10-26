@@ -1409,3 +1409,55 @@ button.pending::after { content: ''; position: absolute; inset: 0; margin: auto;
 .schools .sx-field label { font-family: var(--font-sc); font-size: 0.8rem; letter-spacing: 0.1em; color: var(--faint); font-weight: 700; }
 @media (max-width: 900px) { .room-cols { grid-template-columns: 1fr; } .room-side { order: -1; } }
 @media (max-width: 560px) { .room-head2-in { grid-template-columns: 40px auto 1fr; } .room-head2-in .chip { grid-column: 2 / -1; justify-self: start; } .seats { grid-template-columns: 1fr; } }
+
+
+/* Wizard v2: one screen with folds */
+.wz2 { display: grid; gap: 18px; }
+.wz-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.wz-head h2 { font-size: 1.6rem; }
+.wz-head p { color: var(--dim); margin: 6px 0 0; max-width: 60ch; font-family: var(--font-ui); font-style: italic; }
+.wz-cols { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; align-items: start; }
+.wz-main { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.wz-main > * { min-width: 0; }
+.wz2 .sx-range output { white-space: normal; }
+@media (max-width: 640px) { .wz2 .sx-range { grid-template-columns: 1fr; height: auto; gap: 6px; } }
+.wz-main .sx-group { margin: 0 0 22px; }
+.wz-aside { position: sticky; top: 16px; display: grid; gap: 14px; }
+.wz-aside .sx-preview { position: static; }
+.wz-aside .mapstage { width: 100%; max-width: none; }
+.wz-sum { padding: 14px 16px; border: 1px solid var(--rule-soft); border-radius: var(--radius); background: var(--surface-b); font-family: var(--font-sans); }
+.wz-sum h3 { font-family: var(--font-display); font-size: 1.05rem; margin: 0 0 8px; color: var(--gilt-hi); letter-spacing: 0.03em; }
+.wz-sum > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--rule-soft); font-size: 0.92rem; }
+.wz-sum > div span { color: var(--dim); }
+.wz-sum > div b { font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+.wz-cta .primary.wide { width: 100%; height: 48px; }
+.wz-fold { border: 1px solid var(--rule-soft); border-radius: var(--radius); background: var(--surface-b); margin-bottom: 10px; }
+.wz-fold summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr) 14px; align-items: baseline; gap: 12px; padding: 14px 16px; }
+.wz-fold summary::-webkit-details-marker { display: none; }
+.wz-fold summary::after { content: ''; width: 8px; height: 8px; border-right: 1.5px solid var(--dim); border-bottom: 1.5px solid var(--dim); transform: rotate(-45deg); align-self: center; transition: transform var(--t-ui, 0.2s) var(--ease); }
+.wz-fold[open] summary::after { transform: rotate(45deg); }
+.wz-fold summary:hover { background: var(--edge-glow); }
+.fold-title { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; letter-spacing: 0.08em; color: var(--gilt-hi); }
+.wz-fold .fold-sub { color: var(--dim); font-family: var(--font-sans); font-size: 0.9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wz-fold[open] .fold-sub { white-space: normal; }
+.fold-body { padding: 4px 16px 10px; border-top: 1px solid var(--rule-soft); }
+.fold-body .sx-group { margin-top: 18px; }
+.wz-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--rule-soft); }
+.wz2 .sx-seats { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.wz2 .sx-seat { min-height: 0; }
+.wz2 .sx-group > h3 { color: var(--gilt); }
+@media (max-width: 1100px) {
+  .wz-cols { grid-template-columns: minmax(0, 1fr); }
+  .wz-aside { position: static; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .wz-aside .mapstage { max-width: 320px; }
+  .wz-cta { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .wz-aside { grid-template-columns: 1fr; }
+  .wz-aside .mapstage { max-width: 240px; }
+  .wz-head { flex-direction: column; }
+  .wz-fold summary { grid-template-columns: minmax(0, 1fr) 14px; }
+  .wz-fold .fold-sub { grid-column: 1; }
+  .wz-foot { flex-direction: column-reverse; }
+  .wz-foot button { width: 100%; }
+}

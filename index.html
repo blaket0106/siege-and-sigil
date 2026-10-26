@@ -1092,7 +1092,8 @@
         ['note', 'You can remove a friend at any time from their profile. Removing a friend stops them seeing your stats.'],
       ] },
       { id: 'hosting', group: 'Other players', title: 'Hosting a game', blocks: [
-        ['p', 'Anyone can raise a campaign. The setup has four steps: Realm, Rules, Players and Review. The Realm page shows a live preview of the land that the same settings will create.'],
+        ['p', 'Anyone can raise a campaign. The setup is one screen. The choices that change the game most sit at the top: the name, who sits at the table, the land, its size and the pace. Everything else has a sensible default and folds open below: Rules, Realm detail, Houses, Time and Who can join. Each fold shows its current settings in one line, and the summary on the right updates as you go. The realm preview draws the land the same settings will create; New map rolls another.'],
+        ['note', 'With the defaults, seats 2 to 4 are AI opponents, so Raise campaign gives you a game you can start alone from the lobby. Make a seat a player to leave it open for someone to join.'],
         ['h', 'Realm'],
         ['list', [
           'Land shape and size, and how many castles each house starts with.',
@@ -2061,11 +2062,11 @@
       const name = h('input', { type: 'text', maxlength: '60', value: `${state.profile ? state.profile.display_name : 'My'}'s campaign`, 'aria-label': 'Campaign name' });
       name.addEventListener('input', () => updateSummary());
       const password = h('input', { type: 'text', maxlength: '40', placeholder: 'No password', 'aria-label': 'Password' });
-      const seats = [{ kind: 'human', faction: null }, { kind: 'human', faction: null }, { kind: 'ai', faction: null, level: 3, style: 'balanced' }, { kind: 'ai', faction: null, level: 3, style: 'balanced' }];
+      const seats = [{ kind: 'human', faction: null }, { kind: 'ai', faction: null, level: 3, style: 'balanced' }, { kind: 'ai', faction: null, level: 3, style: 'balanced' }, { kind: 'ai', faction: null, level: 3, style: 'balanced' }];
       const seatsEl = h('div', { class: 'sx-seats' });
       const seatCount = stepper({ min: 2, max: 8, value: seats.length, onChange: () => {
         const n = Math.min(8, Math.max(2, seatCount.number || 2));
-        while (seats.length < n) seats.push({ kind: 'human', faction: null });
+        while (seats.length < n) seats.push({ kind: 'ai', faction: null, level: 3, style: 'balanced' });
         while (seats.length > n) seats.pop();
         paintSeats(); changed();
       } });
@@ -2165,13 +2166,23 @@
       const turnBlock = h('div', { class: 'sx-sub', hidden: true }, sxGroup('Turn-based settings', 'These only apply to turn-based games.',
         sxRow(sxField('Ticks per turn', perTurn, 'How many ticks pass each time a turn resolves.'), sxField('Turn deadline', turnDuration, 'How long houses have to take their turn.')), fixedTurns.el));
 
-      const summaryEl = h('div', { class: 'sx-summary' });
+      const summaryEl = h('div', { class: 'wz-sum' });
+      const folds = [];
+      const labelOf = (ctl, map) => map[ctl.value] || ctl.value;
       const updateSummary = () => {
         const castles = SIZE_COUNT[size.value] * seats.length;
         const ai = seats.filter((s) => s.kind === 'ai').length;
-        const chips = [`${seats.length} houses${ai ? ` (${ai} AI)` : ''}`, `${castles} castles`, SHAPE_INFO[shape.value][0], SPEED_CARDS.find((c) => c[0] === speed.value)[1], { open: 'Open game', friends: 'Friends only', invite: 'Invite only' }[visibility.value]];
-        summaryEl.replaceChildren(h('b', {}, name.value.trim() || 'New campaign'), ...chips.map((c) => h('span', { class: 'chip' }, c)));
-        victoryOut.textContent = `${victory.value}% of all castles (about ${Math.ceil((castles * Number(victory.value)) / 100)} of ${castles}; river crossings add 10 to 15 castles, so the exact target is set when the map is built)`;
+        const humans = seats.length - ai;
+        const row = (k, v) => h('div', {}, h('span', {}, k), h('b', {}, v));
+        summaryEl.replaceChildren(
+          h('h3', {}, name.value.trim() || 'New campaign'),
+          row('Houses', `${seats.length}${ai ? `, ${ai} AI` : ''}${humans > 1 ? `, ${humans - 1} to invite` : ''}`),
+          row('Castles', `${castles} on ${SHAPE_INFO[shape.value][0].toLowerCase()}`),
+          row('Victory', `${Math.ceil((castles * Number(victory.value)) / 100)} castles${Number(decay.value) ? ', decays from tick 250' : ''}`),
+          row('A tick', SPEED_CARDS.find((c) => c[0] === speed.value)[1].replace(/^Normal$/, 'every hour')),
+          row('Visible to', { open: 'everyone', friends: 'friends', invite: 'invited only' }[visibility.value]));
+        victoryOut.textContent = `${victory.value}% · about ${Math.ceil((castles * Number(victory.value)) / 100)} of ${castles} castles`;
+        folds.forEach(([sub, fn]) => { sub.textContent = fn(); });
       };
       const syncRules = () => {
         starting.input.max = String(MAX_START[size.value]);
@@ -2238,62 +2249,16 @@
         return api;
       })();
 
-      const sec = (cls, ...kids) => h('section', { class: cls || '' }, ...kids);
-      const heading = (title, sub) => h('div', { class: 'sheet-head' }, h('h2', {}, title), sub ? h('p', {}, sub) : null);
-      const sections = [
-        ['Table', sec('', heading('Gather your table', 'Name the campaign and decide who sits at it: players, or AI opponents.'),
-          sxGroup('Campaign', null, sxRow(sxField('Name', name, 'Shown in the lobby list and to everyone you invite.'), sxField('Seats at the table', seatCount.el, 'One seat per house, 2 to 8. You can change any seat between player and AI later, from the lobby.'))),
-          sxGroup('Seats', 'Seat 1 is yours. Make each other seat a player (you will invite or wait for someone) or an AI opponent with its own strength.', seatsEl),
-          sxGroup('Who can join', 'You can always share the game code or link, or invite friends, whichever you choose.', visibility.el, sxRow(sxField('Password', password, 'Optional. Players must enter it to take a seat.'), h('div', { class: 'sx-field' }, h('label', {}, 'Start'), autoStart.el))))],
-        ['Realm', sec('realm-sec', heading('Shape the realm', 'Everything about the land: its shape, how many castles it holds, and what lies between them.'),
-          h('div', { class: 'sx-realm' },
-            h('div', { class: 'sx-realm-main' },
-              sxGroup('Land shape', 'The outline of the land. Seas shape how armies move.', shape.el),
-              sxGroup('Castles per house', 'The total number of castles on the map is this number times the number of houses.', size.el),
-              sxGroup('Map scale', 'How far apart the castles sit. Larger maps mean longer marches and slower games.', scale.el),
-              sxGroup('Terrain', 'The mix of rivers, ranges and forests.', mapPreset.el),
-              sxGroup('Castle layout', 'How the castles are placed on the land.', style.el, pattern.el, mirror.el),
-              sxGroup('Travel', 'How armies move between castles.', travel.el),
-              sxGroup('Roads', null, roads.el, sxField('Roads already built', randomRoads.el, 'Some neutral castles can start with a road.')),
-              sxGroup('Natural wealth', 'How rich the castles are. Wealthier castles make every upgrade cheaper.', richness.el),
-              sxGroup('Starting distance', 'Where the houses begin. Applies to round, continent, ring and mirrored lands.', home.el)),
-            preview.el))],
-        ['Rules', sec('', heading('Write the rules', 'How the war is won, what each house can see, and how alliances and names work.'),
-          sxGroup('Fog of war', 'What a house can see of its rivals.', fog.el),
-          sxGroup('Victory', 'The first house to hold this share of all castles wins.', sxField('Castles needed to win', h('div', { class: 'sx-range' }, victory, victoryOut)), sxField('Victory decay', decay.el, 'After tick 250, each production the castles needed to win drop by this many, so stalled games end. 0 turns it off.')),
-          sxGroup('Alliances', 'Houses can ally, share victory conditions and fight together.', alliances.el),
-          sxGroup('Player names', null, anon.el),
-          )],
-        ['Houses', sec('', heading('Equip the houses', 'What every house begins with, what upgrades cost, and which realm areas start ahead.'),
-          sxGroup('Starting estate', null, sxRow(sxField('Starting castles', starting, null), sxField('Starting gold', gold, 'Gold each house begins with.')), startHint,
-            sxRow(sxField('Troops per castle', garrison, 'Troops in every starting castle. Neutral castles hold none.'), sxField('Starting commanders', cmdStart, 'Besides the king, each house starts with this many commanders.')),
-            sxField('Commander hire price', cmdCost, 'What it costs to hire another commander later.')),
-          sxGroup('Upgrade prices', 'How much each kind of upgrade costs.', sxField('Treasury upgrades', devTreasury.el), sxField('Recruitment upgrades', devRecruit.el), sxField('Prestige upgrades', devPrestige.el)),
-          sxGroup('Teaching other houses', 'Houses can teach each other realm area levels for gold.', tradeCost.el, tradeScan.el),
-          sxGroup('Realm areas', 'Seven areas improve the whole realm. Set the level each house starts with and how costly each is to research.',
-            h('div', { class: 'sx-areas' }, techRows.map((r) => (r.el = h('div', { class: 'sx-area' }, h('div', { class: 'nm' }, h('b', {}, TECH_NAMES[r.area]), h('small', {}, AREA_EFFECT[r.area]), r.opt ? r.opt.el : null), h('div', { class: 'lv' }, h('small', {}, 'Start level'), r.level.el), h('div', { class: 'cs' }, h('small', {}, 'Research'), r.cost)))))))],
-        ['Time', sec('', heading('Set the pace', 'How quickly the world turns, and how long a campaign can last.'),
-          sxGroup('Tick speed', 'A tick is one beat of the world. Everything happens in ticks: marches, battles and production.', speed.el),
-          sxGroup('Production', null, sxField('Production cycle', cycle.el), cycleHelp),
-          sxGroup('Truces and limits', null, sxRow(sxField('Truce length', truce, 'After peace is made, attacks are blocked for this many ticks.'), sxField('Time limit', limit, 'Optional. Leave empty for no limit. At the limit, the leader wins.'))),
-          turnBlock)],
-      ];
-
-      const body = h('div', { class: 'stepbody' }, sections.map(([, el]) => el));
-      const rail = h('nav', { class: 'rail', 'aria-label': 'Setup steps' });
-      const foot = h('div', { class: 'sheet-foot' });
-      const draw = () => {
-        sections.forEach(([, el], i) => el.classList.toggle('on', i === stepIndex));
-        preview.show(sections[stepIndex][0] === 'Realm');
-        rail.replaceChildren(...sections.map(([title], i) => h('button', { type: 'button', class: i === stepIndex ? 'on' : '', 'aria-current': i === stepIndex ? 'step' : null, onclick: () => { stepIndex = i; draw(); } },
-          h('span', { class: 'ico' }, String(i + 1)), title)));
-        const last = stepIndex === sections.length - 1;
-        foot.replaceChildren(
-          stepIndex > 0 ? h('button', { type: 'button', class: 'ghost', onclick: () => { stepIndex -= 1; draw(); window.scrollTo(0, 0); } }, 'Back') : h('button', { type: 'button', class: 'ghost', onclick: showHome }, 'Cancel'),
-          last
-            ? h('button', { type: 'button', class: 'primary', onclick: (e) => submit(e.currentTarget) }, 'Raise campaign')
-            : h('button', { type: 'button', class: 'primary', onclick: () => { stepIndex += 1; draw(); window.scrollTo(0, 0); } }, 'Continue'));
+      const fold = (id, title, subFn, ...kids) => {
+        const sub = h('span', { class: 'fold-sub' });
+        folds.push([sub, subFn]);
+        return h('details', { class: 'wz-fold', id: `wz-${id}` }, h('summary', {}, h('span', { class: 'fold-title' }, title), sub), h('div', { class: 'fold-body' }, ...kids));
       };
+      const FOG_L = { off: 'Clear', fog: 'Fog', dark: 'Dark' };
+      const ALL_L = { none: 'no alliances', '0': 'alliances end instantly', '24': 'alliances with 24 tick warning', '48': 'alliances with 48 tick warning' };
+      const VIS_L = { open: 'Open', friends: 'Friends only', invite: 'Invite only' };
+      const SCALE_L = { '6': 'Classic', '12': 'Wide', '20': 'Standard scale', '24': 'Immense', '30': 'Colossal', '36': 'Titanic' };
+      const COST_L = { '0.5': 'cheap', '1': 'standard', '2': 'costly' };
 
       const submit = (btn) => run(btn, async () => {
         const startLevels = {};
@@ -2369,12 +2334,52 @@
         await showRoom(data);
       });
 
+
+      const raiseBtn = (cls) => h('button', { type: 'button', class: 'primary ' + (cls || ''), onclick: (e) => submit(e.currentTarget) }, 'Raise campaign');
+      const main = h('div', { class: 'wz-main' },
+        sxGroup('Campaign', null, sxRow(sxField('Name', name, 'Shown in the lobby and to everyone you invite.'), sxField('Seats at the table', seatCount.el, 'One seat per house, 2 to 8.'))),
+        sxGroup('Seats', 'Seat 1 is yours. Make each other seat an AI opponent with its own strength and style, or a player you will invite.', seatsEl),
+        sxGroup('Land', 'The outline of the land. Seas shape how armies move.', shape.el),
+        sxGroup('Size', 'Castles per house. The map holds this many times the number of houses.', size.el),
+        sxGroup('Pace', 'A tick is one beat of the world: marches, battles and production all happen in ticks.', speed.el, turnBlock),
+        fold('rules', 'Rules', () => `${FOG_L[fog.value]} · ${victory.value}% to win · decay ${decay.value || 0} · ${ALL_L[alliances.value]} · names ${anon.value === 'extra' ? 'hidden' : 'shown'}`,
+          sxGroup('Fog of war', 'What a house can see of its rivals.', fog.el),
+          sxGroup('Victory', 'The first house to hold this share of all castles wins.', sxField('Castles needed to win', h('div', { class: 'sx-range' }, victory, victoryOut), 'River crossings add 10 to 15 castles, so the exact target is set when the map is built.'), sxField('Victory decay', decay.el, 'After tick 250, each production the castles needed to win drop by this many, so stalled games end. 0 turns it off.')),
+          sxGroup('Alliances', 'Houses can ally, share victory conditions and fight together.', alliances.el),
+          sxGroup('Player names', null, anon.el)),
+        fold('realm', 'Realm detail', () => `${SCALE_L[scale.value]} · ${PRESET_INFO[mapPreset.value].split(':')[0]} · ${style.value === 'scatter' ? 'scattered' : 'clustered'}${pattern.value === 'twin_rings' ? ', twin rings' : ''}${mirror.checked ? ', mirrored' : ''} · ${travel.value === 'trails' ? 'trails' : 'free travel'} · ${roads.value === 'disabled' ? 'no roads' : roads.value + ' roads'} · ${richness.value} wealth · ${home.value} start`,
+          sxGroup('Map scale', 'How far apart the castles sit. Larger maps mean longer marches and slower games.', scale.el),
+          sxGroup('Terrain', 'The mix of rivers, ranges and forests.', mapPreset.el),
+          sxGroup('Castle layout', 'How the castles are placed on the land.', style.el, pattern.el, mirror.el),
+          sxGroup('Travel', 'How armies move between castles.', travel.el),
+          sxGroup('Roads', null, roads.el, sxField('Roads already built', randomRoads.el, 'Some neutral castles can start with a road.')),
+          sxGroup('Natural wealth', 'How rich the castles are. Wealthier castles make every upgrade cheaper.', richness.el),
+          sxGroup('Starting distance', 'Where the houses begin. Applies to round, continent, ring and mirrored lands.', home.el)),
+        fold('houses', 'Houses', () => `${starting.value || 1} castles · ${gold.value || 0} gold · ${garrison.value || 0} troops a castle · ${cmdStart.value || 0} commanders · hire ${cmdCost.value || 0} · ${COST_L[devTreasury.value]} treasury, ${COST_L[devRecruit.value]} recruitment, ${COST_L[devPrestige.value]} prestige`,
+          sxGroup('Starting estate', null, sxRow(sxField('Starting castles', starting, null), sxField('Starting gold', gold, 'Gold each house begins with.')), startHint,
+            sxRow(sxField('Troops per castle', garrison, 'Troops in every starting castle. Neutral castles hold none.'), sxField('Starting commanders', cmdStart, 'Besides the king, each house starts with this many commanders.')),
+            sxField('Commander hire price', cmdCost, 'What it costs to hire another commander later.')),
+          sxGroup('Upgrade prices', 'How much each kind of upgrade costs.', sxField('Treasury upgrades', devTreasury.el), sxField('Recruitment upgrades', devRecruit.el), sxField('Prestige upgrades', devPrestige.el)),
+          sxGroup('Teaching other houses', 'Houses can teach each other realm area levels for gold.', tradeCost.el, tradeScan.el),
+          sxGroup('Realm areas', 'Seven areas improve the whole realm. Set the level each house starts with and how costly each is to research.',
+            h('div', { class: 'sx-areas' }, techRows.map((r) => (r.el = h('div', { class: 'sx-area' }, h('div', { class: 'nm' }, h('b', {}, TECH_NAMES[r.area]), h('small', {}, AREA_EFFECT[r.area]), r.opt ? r.opt.el : null), h('div', { class: 'lv' }, h('small', {}, 'Start level'), r.level.el), h('div', { class: 'cs' }, h('small', {}, 'Research'), r.cost))))))),
+        fold('time', 'Time', () => `gold every ${cycle.value || 24} ticks · truce ${truce.value || 48} ticks · ${limit.value ? `ends at tick ${limit.value}` : 'no time limit'}${speed.value === 'turn_based' ? ` · ${perTurn.value || 6} ticks a turn` : ''}`,
+          sxGroup('Production', null, sxField('Production cycle', cycle.el), cycleHelp),
+          sxGroup('Truces and limits', null, sxRow(sxField('Truce length', truce, 'After peace is made, attacks are blocked for this many ticks.'), sxField('Time limit', limit, 'Optional. Leave empty for no limit. At the limit, the leader wins.')))),
+        fold('join', 'Who can join', () => `${VIS_L[visibility.value]} · ${password.value.trim() ? 'password' : 'no password'} · ${autoStart.checked ? 'starts when every seat is taken' : 'you start it from the lobby'}`,
+          sxGroup('Listing', 'You can always share the game code or link, or invite friends, whichever you choose.', visibility.el, sxRow(sxField('Password', password, 'Optional. Players must enter it to take a seat.'), h('div', { class: 'sx-field' }, h('label', {}, 'Start'), autoStart.el)))),
+        h('div', { class: 'wz-foot' }, h('button', { type: 'button', class: 'ghost', onclick: showHome }, 'Cancel'), raiseBtn()));
+      password.addEventListener('input', updateSummary);
+      const aside = h('aside', { class: 'wz-aside' }, preview.el, summaryEl, h('div', { class: 'wz-cta' }, raiseBtn('wide')));
+
       paintSeats();
       syncRules();
       updateSummary();
-      draw();
       mount(h('div', { class: 'wrap' }, topbar(),
-        h('div', { class: 'sheet' }, rail, h('div', { class: 'sx-main' }, summaryEl, h('div', { class: 'panel' }, body, foot)))));
+        h('div', { class: 'wz2' },
+          h('div', { class: 'wz-head' }, h('div', {}, h('h2', {}, 'Raise a campaign'), h('p', {}, 'Name it, seat the houses, pick the land and the pace. Everything else has a sensible default you can open below.')), h('button', { type: 'button', class: 'ghost', onclick: showHome }, 'Cancel')),
+          h('div', { class: 'wz-cols' }, main, aside))));
+      preview.show(true);
     }
 
     async function quickStart(e) {
