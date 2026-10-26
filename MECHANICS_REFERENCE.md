@@ -1862,3 +1862,9 @@ The side panel has one root view (Realm) and a stack of pushed views: castle (`t
 
 Native `confirm()` is not used. `confirmDialog(message, label)` opens a modal with the consequence as body text and the action named on the primary button, and resolves to true or false. Toasts carry a dismiss button and stack to three.
 
+### 20g. Home and lobby rendering
+
+The home screen (`showHome`) and the lobby room (`showRoom`) use `patchKeyed(host, items)`: each item has a `key`, a `sig` (a JSON string of the data it renders) and a `build()` function. An item whose key and sig match the element already in the host is left untouched and `build()` is not called; otherwise the element is rebuilt. The home refreshes every 8 s (`list_open_games`, `my_games`, `my_game_invites`, `my_unread`, plus one `games` select for tick, speed, pause and winner of the player's games) and the leaderboard every eighth refresh. Card countdowns are filled from a `data-at` timestamp by a 30 s clock so they never change the signature. The room refreshes every 20 s and on realtime events and patches five sections: header, table, articles, chat and the Begin, Invite and Starting schools panels. The chat input is one persistent element, so focus and a half-typed message survive a refresh.
+
+Castle counts, threats and turn state are not shown on campaign cards because `my_games` does not return them and `game_territories` and `game_players` are not readable by the client. Adding `castles_held`, `castles_to_win` and `under_threat` to `my_games` would allow a Road to victory meter on each card.
+

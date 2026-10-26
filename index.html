@@ -90,6 +90,21 @@
       return el;
     }
 
+    function patchKeyed(host, items) {
+      const cur = new Map([...host.children].map((el) => [el.dataset.k, el]));
+      const next = items.filter(Boolean).map((it) => {
+        const old = cur.get(it.key);
+        if (old && old.dataset.sig === it.sig) return old;
+        const el = it.build();
+        el.dataset.k = it.key;
+        el.dataset.sig = it.sig;
+        return el;
+      });
+      const kids = [...host.children];
+      if (next.length === kids.length && next.every((n, i) => n === kids[i])) return;
+      host.replaceChildren(...next);
+    }
+
     function toast(message, ok) {
       const host = document.getElementById('toasts');
       const t = h('div', { class: 'toast' + (ok ? ' ok' : ''), role: 'status' }, h('span', {}, message),
@@ -815,6 +830,17 @@
           'Open Standings and meet your neighbours ([[diplomacy|Diplomacy]]). A quiet border is worth more than one more army.',
         ]],
       ] },
+      { id: 'home', group: 'Start here', title: 'The home screen', blocks: [
+        ['p', 'The home screen is where you pick up your campaigns and start new ones.'],
+        ['list', [
+          'The strip at the top is you: your crest, your name (click it to rename), and your record of campaigns, victories and [[diplomacy#honor|honor]]. Quick start raises a four-house game against three AI rivals in one click. Raise a campaign opens the full setup.',
+          'Your campaigns are cards. Each shows the house you play, a state (the current tick, In the lobby, Choose your start, Paused or Finished), when the next tick lands, how many ticks have passed since your last visit, and a count of unread reports and messages. Campaigns that need you sort first.',
+          'Invitations from friends appear above your campaigns with Join and Decline.',
+          'Open lobbies lists games waiting for players, with the seats already taken shown as sigils. Join by code takes the short code a host shares with you.',
+          'The roll of honor ranks players by honor across finished campaigns.',
+        ]],
+        ['note', 'The screen refreshes itself every few seconds, but only the parts that changed are redrawn, so nothing moves under your pointer.'],
+      ] },
       { id: 'screen', group: 'Start here', title: 'Reading the screen', blocks: [
         ['p', 'This is the map screen, where you spend nearly all of a game. The numbers in the picture match the list below it.'],
         ['diagram', 'screen'],
@@ -1087,6 +1113,13 @@
           'Players enter the code in Join by code on the home screen, or open the link after signing in.',
           'Invite friends lists your [[friends|friends]]. They see "invited you" at the top of their home screen and can join or decline.',
           'In an Invite only game, only people with the code, the link or an invitation can join. A password, if you set one, still applies.',
+        ]],
+        ['h', 'The lobby'],
+        ['list', [
+          'The table shows every seat: players, AI houses with their strength and style, and open seats. The host can seat an AI in any open seat, change an AI, or remove a player.',
+          'Begin holds the start button and tells you what is still needed. A game needs at least two houses; seat an AI to play alone. Cancel game and Leave sit below it.',
+          'Invite players shows the game code and link with copy buttons, and Invite friends. Starting schools lets each player choose where their king and commanders trained before the game begins.',
+          'The articles of war fold open to show every rule of the game. Chat is the lobby channel.',
         ]],
         ['h', 'Host tools'],
         ['p', 'The host can pause and resume a game. In a game with one human player the host can also jump ahead a number of ticks. A jump stops early when a hostile army you can see comes within 4 ticks of one of your castles, again on its last tick, and when one lays siege to a castle, so a warning is never lost inside a long jump. Armies in the fog never stop a jump. A castle stops a jump at most once per stage in any 12 ticks, so a war on several fronts does not stop every tick. Finished games can be replayed from the Replay bar.'],
@@ -1616,120 +1649,163 @@
       state.view = 'home';
       state.roomId = null;
       await Promise.all([loadFactions(), state.profile ? null : loadProfile()]);
+      const profile = state.profile || {};
 
-      const openList = h('div', { class: 'list' });
+      const campGrid = h('div', { class: 'camps' });
       const inviteStrip = h('div', { class: 'invites' });
-      const codeInput = h('input', { type: 'text', placeholder: 'Game code, such as K7M2-9QX4', maxlength: '12', 'aria-label': 'Game code', autocomplete: 'off' });
+      const openList = h('div', { class: 'lobbies' });
+      const boardList = h('div', { class: 'honor-list' }, h('div', { class: 'empty' }, 'Loading'));
+      const codeInput = h('input', { type: 'text', id: 'joincode', placeholder: 'Code, such as K7M2-9QX4', maxlength: '12', 'aria-label': 'Game code', autocomplete: 'off' });
       codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = codeInput.value.trim(); if (v) joinByCode(v); } });
-      const bannerGrid = h('div', { class: 'banners' });
-      const boardList = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Loading'));
-      const crestHolder = h('div', { class: 'crest' });
+      const campaignsB = h('b', {}, String(profile.total_games ?? 0));
 
-      const statusText = (g) => ({ lobby: 'In the lobby', picking: 'Choose your start', active: `Tick ${g.current_tick}`, finished: 'Finished' }[g.status] || g.status);
+      let details = new Map();
+      let unread = new Map();
+      let openData = [];
+      let refreshes = 0;
 
-      const unread = new Map();
-      const banner = (r) => {
-        const g = r.games;
-        const f = factionOf(r.faction_slug);
-        return h('button', { class: 'banner', style: `--tint:${f.color}`, onclick: () => openGame(g.id) },
-          h('div', { class: 'sig' }, sigil(r.faction_slug, 44)),
-          h('div', { class: 'bname' }, g.name),
-          h('div', { class: 'bmeta' }, `House ${f.name}`),
-          h('div', { class: 'bstate' }, statusText(g)),
-          unread.get(g.id) ? h('span', { class: 'bunread', title: 'Unread inbox reports and messages (not chat)' }, String(unread.get(g.id))) : null);
+      const lastSeen = (id) => { try { return Number(localStorage.getItem(`ss-lastseen-${id}`)) || 0; } catch { return 0; } };
+      const nextTickAt = (g) => {
+        if (g.status !== 'active' || g.paused_at) return null;
+        if (g.tick_speed === 'turn_based') return g.current_turn_ends_at ? Date.parse(g.current_turn_ends_at) : null;
+        const ms = TICK_MS[g.tick_speed];
+        return ms && g.last_tick_processed_at ? Date.parse(g.last_tick_processed_at) + ms : null;
       };
+      const fmtLeft = (ms) => {
+        if (ms <= 0) return 'any moment now';
+        const m = Math.round(ms / 60000);
+        if (m < 60) return `${m} min`;
+        return `${Math.floor(m / 60)} h ${m % 60} min`;
+      };
+      const fillLive = () => campGrid.querySelectorAll('[data-at]').forEach((el) => { el.textContent = `Next tick in ${fmtLeft(Number(el.dataset.at) - Date.now())}`; });
+      const stateOf = (g) => {
+        if (g.status === 'finished') return ['good', 'Finished'];
+        if (g.status === 'lobby') return ['info', 'In the lobby'];
+        if (g.status === 'picking') return ['warn', 'Choose your start'];
+        if (g.paused_at) return ['warn', 'Paused'];
+        return ['you', `Tick ${g.current_tick}`];
+      };
+      const cardSig = (r, g) => JSON.stringify([g.status, g.current_tick, g.paused_at, g.last_tick_processed_at, g.winner_player_id, g.max_players, g.current_turn_ends_at, g.name, r.faction_slug, unread.get(g.id) || 0, lastSeen(g.id)]);
+      const card = (r, g) => {
+        const f = factionOf(r.faction_slug);
+        const [tone, label] = stateOf(g);
+        const seen = lastSeen(g.id);
+        const since = g.status === 'active' && seen && g.current_tick > seen ? g.current_tick - seen : 0;
+        const n = unread.get(g.id) || 0;
+        const at = nextTickAt(g);
+        const cta = { lobby: 'Open the lobby', picking: 'Choose your start', active: 'Resume', finished: 'Read the story' }[g.status] || 'Open';
+        const lines = [];
+        if (g.status === 'active') lines.push(at ? h('span', { class: 'cl', 'data-at': String(at) }) : h('span', { class: 'cl' }, g.paused_at ? 'Paused by the host' : SPEEDS[g.tick_speed] || ''));
+        if (since) lines.push(h('span', { class: 'cl hot' }, `${pluralN(since, 'tick')} since your last visit`));
+        if (g.status === 'finished') lines.push(h('span', { class: 'cl' }, g.winner_player_id ? 'The war is over' : 'No winner recorded'));
+        if (g.status === 'lobby') lines.push(h('span', { class: 'cl' }, `${g.max_players} seats at the table`));
+        if (g.status === 'picking') lines.push(h('span', { class: 'cl hot' }, 'Your start is waiting to be chosen'));
+        return h('button', { type: 'button', class: `camp s-${g.status}`, style: `--tint:${f.color};--tint2:${f.color2}`, onclick: () => openGame(g.id) },
+          h('div', { class: 'camp-top' }, h('span', { class: 'camp-sig' }, sigil(r.faction_slug, 44)), h('div', { class: 'camp-id' }, h('b', {}, g.name), h('span', {}, `House ${f.name}`)), h('span', { class: `chip ${tone}` }, label)),
+          h('div', { class: 'camp-body' }, lines),
+          h('div', { class: 'camp-foot' }, h('span', { class: 'camp-cta' }, cta), n ? h('span', { class: 'pill', title: 'Unread reports and messages' }, `${n} new`) : null));
+      };
+      const newCard = (any) => h('button', { type: 'button', class: 'camp new', onclick: createDialog },
+        h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), h('span', {}, any ? 'Raise another campaign' : 'Raise your first campaign'),
+        h('span', { class: 'cl' }, 'Pick the land, the houses and the pace'));
 
       const openRow = (g) => {
         const taken = g.taken_factions || [];
+        const full = g.player_count >= g.max_players;
         const pips = h('div', { class: 'pips', 'aria-label': `${g.player_count} of ${g.max_players} seats taken` },
           taken.map((sl) => sigil(sl, 20)),
           Array.from({ length: Math.max(0, g.max_players - taken.length) }, () => openShield(20)));
-        return h('div', { class: 'lobby-strip' },
-          h('div', {},
-            h('div', { class: 'name game' }, g.name, g.joined ? h('span', { class: 'tag green' }, 'joined') : null, g.has_password ? h('span', { class: 'tag' }, 'password') : null),
-            h('div', { class: 'meta game', style: 'margin-top:0' }, `Hosted by ${g.host_name}`),
+        return h('div', { class: 'lobby' },
+          h('div', { class: 'lobby-main' },
+            h('div', { class: 'lobby-name' }, g.name, g.joined ? h('span', { class: 'chip good' }, 'Joined') : null, g.has_password ? h('span', { class: 'chip info' }, 'Password') : null),
+            h('div', { class: 'lobby-host' }, `Hosted by ${g.host_name} · ${g.player_count} of ${g.max_players} seats`),
             pips,
             h('div', { class: 'facts' }, gameFacts(g).map((t) => h('span', { class: 'fact' }, t)))),
           g.joined
-            ? h('button', { class: 'primary small', onclick: () => showRoom(g.id) }, 'Open')
-            : h('button', { class: 'primary small', disabled: g.player_count >= g.max_players, onclick: () => joinDialog(g) }, g.player_count >= g.max_players ? 'Full' : 'Join'));
+            ? h('button', { type: 'button', class: 'primary', onclick: () => showRoom(g.id) }, 'Open')
+            : h('button', { type: 'button', class: 'primary', disabled: full, onclick: () => joinDialog(g) }, full ? 'Full' : 'Join'));
+      };
+      const inviteRow = (i) => h('div', { class: 'invite' },
+        h('div', {}, h('b', {}, i.host_name), ' invited you to ', h('b', {}, i.game_name)),
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'primary', onclick: () => { const g = openData.find((x) => x.id === i.game_id); if (g) joinDialog(g); else toast('That game is no longer open'); } }, 'Join'),
+          h('button', { type: 'button', class: 'ghost', onclick: (e) => run(e.currentTarget, async () => { const r = await sb.rpc('decline_game_invite', { p_id: i.id }); if (r.error) throw r.error; await refresh(); }) }, 'Decline')));
+
+      const loadBoard = async () => {
+        const { data, error } = await sb.rpc('get_leaderboard', { p_limit: 15 });
+        if (state.view !== 'home') return;
+        if (error) return toast(error.message);
+        patchKeyed(boardList, data.length
+          ? data.map((r, i) => ({ key: `r${i}`, sig: JSON.stringify(r), build: () => h('div', { class: 'honor' },
+            h('span', { class: 'rank' }, String(i + 1)),
+            h('div', {}, h('div', { class: 'hname' }, r.display_name), h('div', { class: 'hmeta' }, `${pluralN(r.total_wins, 'win')} in ${pluralN(r.total_games, 'campaign')}`)),
+            h('span', { class: 'chip you' }, `${r.honor} honor${r.infamy ? ` · ${r.infamy} infamy` : ''}`)) }))
+          : [{ key: 'empty', sig: '0', build: () => h('div', { class: 'empty' }, 'No finished campaigns yet. The first victory will be recorded here.') }]);
       };
 
       const refresh = async () => {
         if (state.view !== 'home' || document.hidden) return;
-        const [open, mine, inv] = await Promise.all([
-          sb.rpc('list_open_games'),
-          sb.rpc('my_games'),
-          sb.rpc('my_game_invites'),
-        ]);
+        const [open, mine, inv, ur] = await Promise.all([sb.rpc('list_open_games'), sb.rpc('my_games'), sb.rpc('my_game_invites'), sb.rpc('my_unread')]);
         if (state.view !== 'home') return;
-
+        const rows = (mine.data || []).filter((r) => r.games);
+        const ids = rows.map((r) => r.games.id);
+        if (ids.length) {
+          const d = await sb.from('games').select('id,name,status,current_tick,tick_speed,last_tick_processed_at,paused_at,winner_player_id,max_players,current_turn_ends_at').in('id', ids);
+          if (state.view !== 'home') return;
+          if (!d.error) details = new Map(d.data.map((g) => [g.id, g]));
+        }
+        unread = new Map((ur.data || []).filter((u) => u.unread).map((u) => [u.game_id, u.unread]));
         if (open.error) toast(open.error.message);
         else {
-          openList.replaceChildren(...(open.data.length ? open.data.map(openRow) : [h('div', { class: 'empty' }, 'No open lobbies right now. Raise a campaign and others can join it.')]));
+          openData = open.data || [];
+          patchKeyed(openList, openData.length
+            ? openData.map((g) => ({ key: `o${g.id}`, sig: JSON.stringify(g), build: () => openRow(g) }))
+            : [{ key: 'empty', sig: '0', build: () => h('div', { class: 'empty' }, 'No open lobbies right now. Raise a campaign and others can join it.') }]);
         }
-
-        const invites = inv.data || [];
-        inviteStrip.replaceChildren(...invites.map((i) => h('div', { class: 'panel invite' },
-          h('div', {}, h('b', {}, i.host_name), ' invited you to ', h('b', {}, i.game_name)),
-          h('div', { class: 'row', style: 'display:flex;gap:8px' },
-            h('button', { class: 'primary small', onclick: () => { const g = (open.data || []).find((x) => x.id === i.game_id); if (g) joinDialog(g); else toast('That game is no longer open'); } }, 'Join'),
-            h('button', { class: 'small', onclick: (e) => run(e.currentTarget, async () => { const r = await sb.rpc('decline_game_invite', { p_id: i.id }); if (r.error) throw r.error; await refresh(); }) }, 'Decline')))));
+        patchKeyed(inviteStrip, (inv.data || []).map((i) => ({ key: `i${i.id}`, sig: JSON.stringify(i), build: () => inviteRow(i) })));
         if (mine.error) toast(mine.error.message);
         else {
-          const rows = (mine.data || []).filter((r) => r.games).sort((a, b) => b.games.id - a.games.id);
-          campaignsB.textContent = String(((state.profile && state.profile.total_games) || 0) + rows.filter((r) => r.games.status !== 'finished').length);
-          const ur = await sb.rpc('my_unread');
-          unread.clear();
-          (ur.data || []).forEach((u) => { if (u.unread) unread.set(u.game_id, u.unread); });
-          bannerGrid.replaceChildren(...rows.map(banner), h('button', { class: 'banner new', onclick: createDialog },
-            h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), h('span', {}, rows.length ? 'Raise another campaign' : 'Raise your first campaign')));
+          const order = { active: 0, picking: 1, lobby: 2, finished: 3 };
+          const full = rows.map((r) => ({ r, g: { ...r.games, ...(details.get(r.games.id) || {}) } }))
+            .sort((a, b) => (order[a.g.status] ?? 9) - (order[b.g.status] ?? 9) || (unread.get(b.g.id) || 0) - (unread.get(a.g.id) || 0) || b.g.id - a.g.id);
+          campaignsB.textContent = String(((profile.total_games) || 0) + rows.filter((x) => x.games.status !== 'finished').length);
+          patchKeyed(campGrid, [...full.map(({ r, g }) => ({ key: `g${g.id}`, sig: cardSig(r, g), build: () => card(r, g) })), { key: 'new', sig: String(rows.length > 0), build: () => newCard(rows.length > 0) }]);
+          fillLive();
         }
+        if (refreshes++ % 8 === 0) loadBoard();
       };
 
-      const profile = state.profile || {};
-      const campaignsB = h('b', {}, profile.total_games ?? 0);
-      crestHolder.replaceChildren(emblem(150, { draw: !state.homeDrawn }));
+      const ruler = h('header', { class: 'ruler' },
+        h('div', { class: 'ruler-crest' }, emblem(84, { draw: !state.homeDrawn })),
+        h('div', { class: 'ruler-id' },
+          h('button', { type: 'button', class: 'ruler-name', onclick: renameDialog, title: 'Change your name' }, profile.display_name || 'Lord'),
+          h('div', { class: 'ruler-stats' },
+            h('span', {}, campaignsB, ' campaigns'), h('span', {}, h('b', {}, String(profile.total_wins ?? 0)), ' victories'), h('span', {}, h('b', {}, String(profile.honor ?? 0)), ' honor'))),
+        h('div', { class: 'ruler-actions' },
+          h('button', { type: 'button', class: 'primary', onclick: quickStart, title: 'Four houses with three AI rivals and default rules, ready to play' }, 'Quick start'),
+          h('button', { type: 'button', onclick: createDialog }, 'Raise a campaign'),
+          h('button', { type: 'button', class: 'ghost', onclick: () => helpDialog() }, 'How to play')));
       state.homeDrawn = true;
 
       mount(h('div', { class: 'wrap' }, topbar(),
-        h('div', { class: 'home' },
-          h('aside', { class: 'panel house' },
-            crestHolder,
-            h('h2', { onclick: renameDialog, title: 'Change your name', style: 'cursor:pointer' }, profile.display_name || 'Lord'),
-            h('div', { class: 'record' },
-              h('div', {}, campaignsB, 'campaigns'),
-              h('div', {}, h('b', {}, profile.total_wins ?? 0), 'victories'),
-              h('div', {}, h('b', {}, profile.honor ?? 0), 'honor')),
-            h('div', { class: 'actions' },
-              h('button', { class: 'primary', onclick: createDialog }, 'Raise a campaign'),
-              h('button', { onclick: quickStart, title: 'Four houses with three AI rivals and default rules, ready to play' }, 'Quick start'),
-              h('button', { class: 'ghost', onclick: helpDialog }, 'How to play'))),
-          h('main', {},
-            inviteStrip,
-            h('div', { class: 'section-title' }, h('h2', {}, 'Your campaigns')),
-            bannerGrid,
-            h('div', { class: 'section-title' }, h('h2', {}, 'Open lobbies'), h('button', { class: 'ghost', onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh')),
-            h('div', { class: 'panel' }, h('div', { class: 'joincode' }, codeInput, h('button', { class: 'small', onclick: () => { const v = codeInput.value.trim(); if (v) joinByCode(v); } }, 'Join by code')), openList),
-            h('div', { class: 'section-title' }, h('h2', {}, 'Roll of honor')),
-            h('div', { class: 'panel' }, boardList),
-            legalLinks()))));
-
-      sb.rpc('get_leaderboard', { p_limit: 15 }).then(({ data, error }) => {
-        if (error) return toast(error.message);
-        boardList.replaceChildren(...(data.length
-          ? data.map((r, i) => h('div', { class: 'honor' },
-            h('span', { class: 'rank' }, i + 1),
-            h('div', {}, h('div', { class: 'name', style: 'font-weight:700' }, r.display_name), h('div', { class: 'meta', style: 'color:var(--dim);font-size:.88rem' }, `${r.total_wins} wins in ${r.total_games} campaigns`)),
-            h('span', { class: 'tag gold' }, `${r.honor} honor${r.infamy ? `, ${r.infamy} infamy` : ''}`)))
-          : [h('div', { class: 'empty' }, 'No finished campaigns yet. The first victory will be recorded here.')]));
-      });
+        h('div', { class: 'home2' },
+          ruler,
+          inviteStrip,
+          h('section', { class: 'hsec' }, h('div', { class: 'section-title' }, h('h2', {}, 'Your campaigns')), campGrid),
+          h('div', { class: 'home-cols' },
+            h('section', { class: 'hsec' },
+              h('div', { class: 'section-title' }, h('h2', {}, 'Open lobbies'), h('button', { type: 'button', class: 'ghost', onclick: (e) => run(e.currentTarget, refresh) }, 'Refresh')),
+              h('div', { class: 'joincode' }, codeInput, h('button', { type: 'button', onclick: () => { const v = codeInput.value.trim(); if (v) joinByCode(v); } }, 'Join by code')),
+              openList),
+            h('section', { class: 'hsec' }, h('div', { class: 'section-title' }, h('h2', {}, 'Roll of honor')), boardList)),
+          legalLinks())));
 
       await refresh();
       try { const pending = sessionStorage.getItem('ss-join'); if (pending) { sessionStorage.removeItem('ss-join'); joinByCode(pending); } } catch {}
 
       const timer = setInterval(refresh, 8000);
-      state.cleanup.push(() => clearInterval(timer));
+      const clock = setInterval(fillLive, 30000);
+      state.cleanup.push(() => { clearInterval(timer); clearInterval(clock); });
     }
 
     const JOIN_HASH = /^#join=([A-Za-z0-9-]{3,12})$/;
@@ -2303,7 +2379,8 @@
 
     async function quickStart(e) {
       const btn = e.currentTarget;
-      btn.disabled = true;
+      btn.classList.add('pending');
+      toast('Raising the realm. The map is drawn in a few seconds.', true);
       try {
         const { data, error } = await sb.rpc('create_game', { p_settings: { name: 'Quick start', max_players: 4 } });
         if (error) throw error;
@@ -2320,7 +2397,7 @@
         await openGame(data);
       } catch (err) {
         toast(err.message || 'Could not start the game');
-        btn.disabled = false;
+        btn.classList.remove('pending');
       }
     }
 
@@ -2407,7 +2484,15 @@
 
       let schoolsDraft = null;
       let inviteInfo = null;
-      const chatInput = h('input', { type: 'text', maxlength: '500', placeholder: 'Message the lobby' });
+      const chatInput = h('input', { type: 'text', id: 'roomchatinput', maxlength: '500', placeholder: 'Message the lobby' });
+      const head = h('div', { class: 'room-head2' });
+      const mainCol = h('div', { class: 'room-main' });
+      const sideCol = h('aside', { class: 'room-side' });
+      container.append(topbar(), h('div', { class: 'room2' }, head, h('div', { class: 'room-cols' }, mainCol, sideCol)));
+
+      const statusText = { lobby: 'Gathering', picking: 'Choosing starts', active: 'In progress', finished: 'Finished' };
+      const statusTone = { lobby: 'info', picking: 'warn', active: 'you', finished: 'good' };
+      const sec = (title, ...kids) => h('div', { class: 'panel' }, h('h2', {}, title), ...kids);
 
       const draw = async () => {
         if (state.view !== 'room' || state.roomId !== gameId) return;
@@ -2428,160 +2513,131 @@
         const me = players.find((p) => p.is_me);
         if (me) me.starting_schools = schoolsRes.data;
         const isHost = game.created_by === state.session.user.id;
-
-        const parts = [topbar(), h('div', { class: 'row', style: 'margin-bottom:14px' },
-          h('button', { onclick: showHome }, 'Back to games'))];
-
-        const statusText = { lobby: 'Gathering', picking: 'Choosing starts', active: 'In progress', finished: 'Finished' }[game.status];
         const host = players.find((p) => p.is_host);
-        parts.push(h('div', { class: 'room-head' },
-          sigil(host ? host.faction_slug : 'kaldran', 64),
-          h('div', {}, h('h1', { style: 'margin:0' }, game.name), h('div', { class: 'tip' }, `Hosted by ${host ? host.display_name : 'unknown'}${game.has_password ? ' · password required' : ''}`)),
-          h('span', { class: 'tag' + (game.status === 'active' ? ' gold' : '') }, statusText)));
-        parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Articles of war'), articlesOfWar(game, players.length)));
+        const lobby = game.status === 'lobby';
 
-        const slots = players.map((p) => h('div', { class: 'slot' },
-          sigil(p.faction_slug, 44),
-          h('div', {},
-            h('div', { class: 'nm' }, p.display_name, p.is_host ? h('span', { class: 'tag gold' }, 'host') : null, p.is_me ? h('span', { class: 'tag green' }, 'you') : null, p.is_ai ? h('span', { class: 'tag' }, 'AI') : null),
-            h('div', { class: 'fn' }, factionOf(p.faction_slug).name + (p.is_ai && game.status === 'lobby' && p.ai_style ? ` · ${(AI_STYLES.find(([k]) => k === p.ai_style) || [0, p.ai_style])[1]}` : '') + (p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined ? ' · eliminated' : '')),
-            p.is_ai && game.status === 'lobby' && isHost
-              ? h('div', { class: 'row', style: 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap' },
-                (() => { const sel = selectOf(Object.fromEntries(AI_LEVELS.map(([n], i) => [String(i + 1), `${n}`])), String(p.ai_difficulty || 3)); sel.style.cssText = 'width:auto;padding:3px 26px 3px 8px;font-size:.85rem'; sel.title = 'AI strength'; sel.addEventListener('change', () => run(sel, async () => { const { error } = await sb.rpc('set_ai_seat', { p_game_id: gameId, p_player_id: p.id, p_difficulty: Number(sel.value), p_faction: null }); if (error) throw error; await draw(); })); return sel; })(),
-                (() => { const sel = selectOf(Object.fromEntries(AI_STYLES.map(([k, t]) => [k, t])), p.ai_style || 'balanced'); sel.style.cssText = 'width:auto;padding:3px 26px 3px 8px;font-size:.85rem'; sel.title = 'AI style'; sel.addEventListener('change', () => run(sel, async () => { const { error } = await sb.rpc('set_ai_seat', { p_game_id: gameId, p_player_id: p.id, p_difficulty: p.ai_difficulty || 3, p_faction: null, p_style: sel.value }); if (error) throw error; await draw(); })); return sel; })(),
-                h('button', { class: 'small', title: 'Remove this AI and leave the seat open for a player', onclick: (e) => run(e.currentTarget, async () => { const { error } = await sb.rpc('remove_ai_seat', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }) }, 'Open to a player'))
-              : null,
-            game.status === 'lobby' && isHost && !p.is_me && !p.is_ai
-              ? h('button', {
-                style: 'padding:2px 8px;font-size:.78rem;margin-top:4px',
-                onclick: async (e) => { if (await confirmDialog(`Remove ${p.display_name} from the lobby?`, 'Remove')) run(e.currentTarget, async () => { const { error } = await sb.rpc('kick_player', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }); },
-              }, 'Remove')
-              : null)));
-        if (game.status === 'lobby') {
-          for (let i = players.length; i < game.max_players; i++) {
-            slots.push(h('div', { class: 'slot empty' }, h('div', {}, h('div', {}, 'Open seat'), isHost ? h('button', { class: 'small', style: 'margin-top:6px', title: 'Fill this seat with an AI opponent', onclick: (e) => run(e.currentTarget, async () => { const { error } = await sb.rpc('add_ai_seat', { p_game_id: gameId, p_difficulty: 3, p_faction: null }); if (error) throw error; await draw(); }) }, 'Fill with AI') : null)));
-          }
+        patchKeyed(head, [{ key: 'head', sig: JSON.stringify([game.name, game.status, host && host.display_name, host && host.faction_slug, game.has_password]), build: () => h('div', { class: 'room-head2-in' },
+          h('button', { type: 'button', class: 'ib', onclick: showHome, title: 'Back to games', 'aria-label': 'Back to games' }, icon('back')),
+          sigil(host ? host.faction_slug : 'kaldran', 56),
+          h('div', { class: 'room-title' }, h('h1', {}, game.name), h('div', { class: 'room-sub' }, `Hosted by ${host ? host.display_name : 'unknown'}${game.has_password ? ' · password required' : ''}`)),
+          h('span', { class: `chip ${statusTone[game.status] || 'info'}` }, statusText[game.status] || game.status)) }]);
+
+        const seat = (p) => {
+          const aiCtl = p.is_ai && lobby && isHost
+            ? h('div', { class: 'seat-ctl' },
+              (() => { const sel = selectOf(Object.fromEntries(AI_LEVELS.map(([n], i) => [String(i + 1), `${n}`])), String(p.ai_difficulty || 3)); sel.title = 'AI strength'; sel.addEventListener('change', () => run(sel, async () => { const { error } = await sb.rpc('set_ai_seat', { p_game_id: gameId, p_player_id: p.id, p_difficulty: Number(sel.value), p_faction: null }); if (error) throw error; await draw(); })); return sel; })(),
+              (() => { const sel = selectOf(Object.fromEntries(AI_STYLES.map(([k, t]) => [k, t])), p.ai_style || 'balanced'); sel.title = 'AI style'; sel.addEventListener('change', () => run(sel, async () => { const { error } = await sb.rpc('set_ai_seat', { p_game_id: gameId, p_player_id: p.id, p_difficulty: p.ai_difficulty || 3, p_faction: null, p_style: sel.value }); if (error) throw error; await draw(); })); return sel; })(),
+              h('button', { type: 'button', class: 'ghost', title: 'Remove this AI and leave the seat open for a player', onclick: (e) => run(e.currentTarget, async () => { const { error } = await sb.rpc('remove_ai_seat', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }) }, 'Remove'))
+            : null;
+          const kick = lobby && isHost && !p.is_me && !p.is_ai
+            ? h('button', { type: 'button', class: 'ghost', onclick: async (e) => { if (await confirmDialog(`Remove ${p.display_name} from the lobby?`, 'Remove')) run(e.currentTarget, async () => { const { error } = await sb.rpc('kick_player', { p_game_id: gameId, p_player_id: p.id }); if (error) throw error; await draw(); }); } }, 'Remove')
+            : null;
+          const f = factionOf(p.faction_slug);
+          return h('div', { class: 'seat', style: `--tint:${f.color}` },
+            sigil(p.faction_slug, 44),
+            h('div', { class: 'seat-in' },
+              h('div', { class: 'seat-nm' }, p.display_name, p.is_host ? h('span', { class: 'chip you' }, 'Host') : null, p.is_me ? h('span', { class: 'chip good' }, 'You') : null, p.is_ai ? h('span', { class: 'chip info' }, 'AI') : null, p.eliminated_at_tick != null ? h('span', { class: 'chip danger' }, 'Out') : null),
+              h('div', { class: 'seat-fn' }, `House ${f.name}${p.is_ai && lobby && p.ai_style ? ` · ${(AI_STYLES.find(([k]) => k === p.ai_style) || [0, p.ai_style])[1]}` : ''}`),
+              aiCtl, kick));
+        };
+        const emptySeat = () => h('div', { class: 'seat empty' }, openShield(44), h('div', { class: 'seat-in' }, h('div', { class: 'seat-nm' }, 'Open seat'), h('div', { class: 'seat-fn' }, 'Waiting for a player'),
+          isHost ? h('button', { type: 'button', class: 'ghost', title: 'Fill this seat with an AI opponent', onclick: (e) => run(e.currentTarget, async () => { const { error } = await sb.rpc('add_ai_seat', { p_game_id: gameId, p_difficulty: 3, p_faction: null }); if (error) throw error; await draw(); }) }, 'Seat an AI') : null));
+        const tableSig = JSON.stringify([players.map((p) => [p.id, p.display_name, p.faction_slug, p.is_ai, p.ai_difficulty, p.ai_style, p.is_host, p.is_me, p.eliminated_at_tick]), game.max_players, isHost, game.status]);
+        const articles = { key: 'articles', sig: JSON.stringify([game.id, players.length]), build: () => h('details', { class: 'panel articles-fold', open: !lobby }, h('summary', {}, h('h2', {}, 'Articles of war'), h('span', { class: 'fold-sub' }, describeGame(game))), articlesOfWar(game, players.length)) };
+        const names = new Map(players.map((pl) => [pl.id, pl.display_name]));
+        const chat = (chatRes.data || []).slice().reverse();
+        const chatSig = JSON.stringify([chat.map((m) => m.id), players.map((p) => p.id), !!me]);
+        const send = async () => {
+          const text = chatInput.value.trim();
+          if (!text) return;
+          chatInput.value = '';
+          const { error } = await sb.rpc('send_chat_message', { p_game_id: gameId, p_message: text });
+          if (error) { chatInput.value = text; toast(error.message); return; }
+          await draw();
+        };
+        patchKeyed(mainCol, [
+          { key: 'table', sig: tableSig, build: () => sec(`The table · ${players.length} of ${game.max_players}`, h('div', { class: 'seats' }, players.map(seat), lobby ? Array.from({ length: Math.max(0, game.max_players - players.length) }, emptySeat) : null)) },
+          articles,
+          me ? { key: 'chat', sig: chatSig, build: () => sec('Chat',
+            h('div', { class: 'chatlist', id: 'roomchat' }, chat.length
+              ? chat.map((m) => h('div', { class: 'chatline' }, h('b', { style: `color:${factionOf((players.find((pl) => pl.id === m.player_id) || {}).faction_slug).color}` }, `${names.get(m.player_id) || 'Player'}: `), m.message))
+              : h('div', { class: 'empty' }, 'No messages yet.')),
+            h('form', { class: 'composer', onsubmit: (e) => { e.preventDefault(); send(); } }, chatInput, h('button', { type: 'submit', class: 'primary' }, 'Send'))) } : null,
+        ]);
+        const box = document.getElementById('roomchat');
+        if (box) box.scrollTop = box.scrollHeight;
+
+        const actions = [];
+        let note = null;
+        if (lobby) {
+          const canStart = isHost && players.length >= 2;
+          if (isHost) {
+            actions.push(h('button', { type: 'button', class: 'primary', disabled: !canStart, onclick: (e) => run(e.currentTarget, async () => {
+              e.target.classList.add('pending');
+              const { error } = await sb.functions.invoke('start-game', { body: { game_id: gameId } });
+              if (error) {
+                e.target.classList.remove('pending');
+                let detail = error.message;
+                try { detail = (await error.context.json()).error || detail; } catch {}
+                throw new Error(detail);
+              }
+              toast('The game has begun', true);
+              await openGame(gameId);
+            }) }, 'Start game'));
+            note = canStart ? `${players.length} houses are seated. Start when you are ready, or wait for more players.` : 'Needs at least 2 houses. Seat an AI to start alone.';
+          } else note = 'Waiting for the host to start.';
+        } else if (game.status === 'active') {
+          actions.push(h('button', { type: 'button', class: 'primary', onclick: () => showMap(gameId) }, 'Open map'));
+        } else if (game.status === 'finished') {
+          const winner = players.find((p) => p.id === game.winner_player_id);
+          note = winner ? `Winner: ${winner.display_name}` : 'No winner recorded';
+          actions.push(h('button', { type: 'button', class: 'primary', onclick: () => storyDialog(gameId) }, 'The story'), h('button', { type: 'button', onclick: () => showMap(gameId) }, 'Open map'));
         }
-        parts.push(h('div', { class: 'panel' }, h('h2', {}, 'The table'), h('div', { class: 'slots' }, slots)));
-        if (game.status === 'lobby' && isHost) {
-          if (!inviteInfo) sb.rpc('game_invite_info', { p_game_id: gameId }).then((r) => { if (r.data) { inviteInfo = r.data; draw(); } });
-          const link = inviteInfo ? `${location.origin}${location.pathname}#join=${inviteInfo.code}` : '';
-          const copy = (text, what) => { try { navigator.clipboard.writeText(text); toast(`${what} copied`, true); } catch { toast(text); } };
-          parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Invite players'),
+        const danger = [];
+        if (lobby && isHost) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog('Cancel this game for everyone?', 'Cancel game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('cancel_game', { p_game_id: gameId }); if (error) throw error; toast('Game cancelled', true); await showHome(); }); } }, 'Cancel game'));
+        if (lobby && me) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog('Leave this game?', 'Leave game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('leave_game', { p_game_id: gameId }); if (error) throw error; await showHome(); }); } }, 'Leave'));
+        if (game.status === 'finished' && isHost) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog('Delete this finished game and all its data?', 'Delete game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('delete_game', { p_game_id: gameId }); if (error) throw error; await showHome(); }); } }, 'Delete game'));
+
+        if (lobby && isHost && !inviteInfo) sb.rpc('game_invite_info', { p_game_id: gameId }).then((r) => { if (r.data) { inviteInfo = r.data; draw(); } });
+        const link = inviteInfo ? `${location.origin}${location.pathname}#join=${inviteInfo.code}` : '';
+        const copy = (text, what) => { try { navigator.clipboard.writeText(text); toast(`${what} copied`, true); } catch { toast(text); } };
+        const count = 1 + game.starting_commanders;
+        if (lobby && me && !schoolsDraft) schoolsDraft = me.starting_schools && me.starting_schools.length === count ? [...me.starting_schools] : Array(count).fill('');
+        const schoolsSig = JSON.stringify([lobby, !!me, me && me.starting_schools, count]);
+        patchKeyed(sideCol, [
+          { key: 'go', sig: JSON.stringify([game.status, isHost, players.length, game.max_players, !!me, game.winner_player_id]), build: () => h('div', { class: 'panel go' }, h('h2', {}, lobby ? 'Begin' : game.status === 'finished' ? 'The war is over' : 'In progress'),
+            note ? h('p', { class: 'tip', style: 'margin:0 0 12px' }, note) : null,
+            actions.length ? h('div', { class: 'go-actions' }, actions) : null,
+            danger.length ? h('div', { class: 'go-danger' }, danger) : null) },
+          lobby && isHost ? { key: 'invite', sig: JSON.stringify([inviteInfo && inviteInfo.code, inviteInfo && inviteInfo.visibility]), build: () => sec('Invite players',
             inviteInfo ? h('div', {},
-              h('div', { class: 'frow', style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0' }, h('b', { class: 'fcode' }, inviteInfo.code),
-                h('span', { class: 'row', style: 'gap:6px;display:flex' }, h('button', { class: 'small', onclick: () => copy(inviteInfo.code, 'Code') }, 'Copy code'), h('button', { class: 'small', onclick: () => copy(link, 'Link') }, 'Copy link'))),
-              h('div', { class: 'tip' }, { open: 'Anyone can also find this game in Open lobbies.', friends: 'Your friends can find this game in Open lobbies. Anyone with the code or link can join.', invite: 'This game is not listed. Players need the code, the link or an invitation.' }[inviteInfo.visibility]),
-              h('div', { style: 'margin-top:12px' }, h('button', { class: 'primary', onclick: () => inviteFriendsDialog(gameId) }, 'Invite friends')))
-              : h('div', { class: 'empty' }, 'Loading')));
-        }
-
-        if (game.status === 'lobby' && me) {
-          const count = 1 + game.starting_commanders;
-          if (!schoolsDraft) schoolsDraft = me.starting_schools && me.starting_schools.length === count ? [...me.starting_schools] : Array(count).fill('');
-          const selects = schoolsDraft.map((val, i) => {
-            const el = h('select', {},
-              h('option', { value: '' }, 'Random'),
-              SCHOOLS.map((s) => h('option', { value: s.slug }, s.name)));
-            el.value = val;
-            el.addEventListener('change', () => { schoolsDraft[i] = el.value; });
-            return h('div', {}, h('label', {}, i === 0 ? 'King' : `Commander ${i}`), el);
-          });
-          const saved = me.starting_schools && me.starting_schools.length ? me.starting_schools.join(', ') : 'all random';
-          parts.push(h('div', { class: 'panel' },
-            h('h2', {}, 'Starting schools'),
-            h('div', { class: 'grid2' }, selects),
-            h('div', { class: 'row', style: 'margin-top:14px' },
-              h('button', {
-                onclick: (e) => run(e.currentTarget, async () => {
-                  const none = schoolsDraft.every((s) => !s);
-                  if (!none && schoolsDraft.some((s) => !s)) throw new Error('Pick a school for every slot, or leave all as Random');
+              h('div', { class: 'code-row' }, h('b', { class: 'fcode' }, inviteInfo.code), h('span', { class: 'row' }, h('button', { type: 'button', onclick: () => copy(inviteInfo.code, 'Code') }, 'Copy code'), h('button', { type: 'button', onclick: () => copy(link, 'Link') }, 'Copy link'))),
+              h('p', { class: 'tip' }, { open: 'Anyone can also find this game in Open lobbies.', friends: 'Your friends can find this game in Open lobbies. Anyone with the code or link can join.', invite: 'This game is not listed. Players need the code, the link or an invitation.' }[inviteInfo.visibility] || ''),
+              h('button', { type: 'button', class: 'primary', style: 'margin-top:10px', onclick: () => inviteFriendsDialog(gameId) }, 'Invite friends'))
+              : h('div', { class: 'empty' }, 'Loading')) } : null,
+          lobby && me ? { key: 'schools', sig: schoolsSig, build: () => {
+            const selects = schoolsDraft.map((val, i) => {
+              const el = h('select', {}, h('option', { value: '' }, 'Random'), SCHOOLS.map((s2) => h('option', { value: s2.slug }, s2.name)));
+              el.value = val;
+              el.addEventListener('change', () => { schoolsDraft[i] = el.value; });
+              return h('div', { class: 'sx-field' }, h('label', {}, i === 0 ? 'King' : `Commander ${i}`), el);
+            });
+            const saved = me.starting_schools && me.starting_schools.length ? me.starting_schools.map((s2) => (SCHOOLS.find((x) => x.slug === s2) || { name: s2 }).name).join(', ') : 'all random';
+            return sec('Starting schools', h('p', { class: 'tip', style: 'margin:0 0 10px' }, 'Where your king and commanders trained. It sets which abilities grow fastest.'),
+              h('div', { class: 'schools' }, selects),
+              h('div', { class: 'row', style: 'margin-top:12px;gap:10px;flex-wrap:wrap' },
+                h('button', { type: 'button', onclick: (e) => run(e.currentTarget, async () => {
+                  const none = schoolsDraft.every((s2) => !s2);
+                  if (!none && schoolsDraft.some((s2) => !s2)) throw new Error('Pick a school for every slot, or leave all as Random');
                   const { error } = await sb.rpc('set_starting_schools', { p_game_id: gameId, p_schools: none ? null : schoolsDraft });
                   if (error) throw error;
                   toast('Schools saved', true);
                   schoolsDraft = null;
                   await draw();
-                }),
-              }, 'Save schools'),
-              h('span', { style: 'color:var(--dim);font-size:.82rem' }, `Saved: ${saved}`))));
-        }
-
-        const actions = [];
-        if (game.status === 'lobby') {
-          const canStart = isHost && players.length >= 2;
-          if (isHost) {
-            actions.push(h('button', {
-              class: 'primary',
-              disabled: !canStart,
-              onclick: (e) => run(e.currentTarget, async () => {
-                const { error } = await sb.functions.invoke('start-game', { body: { game_id: gameId } });
-                if (error) {
-                  let detail = error.message;
-                  try { detail = (await error.context.json()).error || detail; } catch {}
-                  throw new Error(detail);
-                }
-                toast('The game has begun', true);
-                await openGame(gameId);
-              }),
-            }, 'Start game'));
-            if (!canStart) actions.push(h('span', { style: 'color:var(--dim);font-size:.85rem' }, 'Needs at least 2 players. Fill an open seat with an AI to start alone.'));
-            actions.push(h('button', {
-              class: 'danger',
-              onclick: async (e) => { if (await confirmDialog('Cancel this game for everyone?', 'Cancel game')) run(e.currentTarget, async () => {
-                const { error } = await sb.rpc('cancel_game', { p_game_id: gameId });
-                if (error) throw error;
-                toast('Game cancelled', true);
-                await showHome();
-              }); },
-            }, 'Cancel game'));
-          } else {
-            actions.push(h('span', { style: 'color:var(--dim)' }, 'Waiting for the host to start.'));
-          }
-          if (me) actions.push(h('button', {
-            class: 'danger',
-            onclick: async (e) => { if (await confirmDialog('Leave this game?', 'Leave game')) run(e.currentTarget, async () => {
-              const { error } = await sb.rpc('leave_game', { p_game_id: gameId });
-              if (error) throw error;
-              await showHome();
-            }); },
-          }, 'Leave'));
-        } else if (game.status === 'active') {
-          actions.push(h('button', { class: 'primary', onclick: () => showMap(gameId) }, 'Open map'));
-        } else if (game.status === 'finished') {
-          const winner = players.find((p) => p.id === game.winner_player_id);
-          actions.push(h('span', { style: 'color:var(--gold2)' }, winner ? `Winner: ${winner.display_name}` : 'No winner recorded'), h('button', { class: 'primary', onclick: () => storyDialog(gameId) }, 'The story'), h('button', { onclick: () => showMap(gameId) }, 'Open map'));
-          if (isHost) actions.push(h('button', {
-            class: 'danger',
-            onclick: async (e) => { if (await confirmDialog('Delete this finished game and all its data?', 'Delete game')) run(e.currentTarget, async () => {
-              const { error } = await sb.rpc('delete_game', { p_game_id: gameId });
-              if (error) throw error;
-              await showHome();
-            }); },
-          }, 'Delete game'));
-        }
-        if (me) {
-          const names = new Map(players.map((pl) => [pl.id, pl.display_name]));
-          const send = async () => {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            chatInput.value = '';
-            const { error } = await sb.rpc('send_chat_message', { p_game_id: gameId, p_message: text });
-            if (error) { chatInput.value = text; toast(error.message); return; }
-            await draw();
-          };
-          parts.push(h('div', { class: 'panel' }, h('h2', {}, 'Chat'),
-            h('div', { class: 'chatlist', id: 'roomchat' }, (chatRes.data || []).length
-              ? (chatRes.data || []).slice().reverse().map((m) => h('div', { class: 'chatline' }, h('b', { style: `color:${factionOf((players.find((pl) => pl.id === m.player_id) || {}).faction_slug).color};font-weight:bold` }, `${names.get(m.player_id) || 'Player'}: `), m.message))
-              : h('div', { class: 'empty' }, 'No messages yet.')),
-            h('form', { class: 'composer', onsubmit: (e) => { e.preventDefault(); send(); } }, chatInput, h('button', { type: 'submit', class: 'primary' }, 'Send'))));
-        }
-        parts.push(h('div', { class: 'row wrap2' }, actions));
-
-        const focused = document.activeElement === chatInput;
-        container.replaceChildren(...parts);
-        const box = document.getElementById('roomchat');
-        if (box) box.scrollTop = box.scrollHeight;
-        if (focused) chatInput.focus();
+                }) }, 'Save schools'),
+                h('span', { class: 'tip', style: 'margin:0' }, `Saved: ${saved}`)));
+          } } : null,
+        ]);
       };
 
       await draw();
