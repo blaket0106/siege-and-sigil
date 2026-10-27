@@ -1811,3 +1811,39 @@ button.pending::after { content: ''; position: absolute; inset: 0; margin: auto;
   .strip .small { height: 34px; padding: 0 10px; flex: none; }
   .strip .ccard { width: 34px; height: 34px; flex: none; }
 }
+
+/* Screens v3: mail, empires, castles, quick upgrade, help in the slot */
+.side .scr-tabs.mail-tabs { margin: 0 0 6px; }
+.side .scr-tabs .badge { margin-left: 6px; }
+.mapbody.wide .side { width: min(920px, 78%); }
+.emp-nav { display: flex; align-items: center; gap: 8px; padding: 6px 0 8px; border-bottom: 1px solid var(--rule-soft); }
+.emp-nav .emp-id { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.emp-nav .emp-id b { display: block; font-family: var(--font-display); font-size: 1.05rem; color: var(--gilt-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-nav .emp-id span { display: block; font-size: 0.78rem; color: var(--dim); }
+.emp-nav .ib.flip svg { transform: scaleX(-1); }
+.emp-stats { padding: 10px 0 4px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.swatch { width: 44px; height: 44px; border-radius: 50%; padding: 0; min-height: 0; background: var(--sw); border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); display: grid; place-items: center; }
+.swatch.on { border-color: var(--gilt-hi); }
+.swatch span { font: 700 0.58rem var(--font-sc); color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.04em; }
+.side .research-now { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 4px 0 10px; border-bottom: 1px solid var(--rule-soft); margin-bottom: 8px; }
+.side .research-now .eta { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
+.side .research-now .eta .k { font-family: var(--font-sc); font-size: 0.72rem; letter-spacing: 0.1em; color: var(--faint); font-weight: 700; }
+.side .research-now .eta b { color: var(--gilt-hi); font-family: var(--font-display); }
+svg.quick .mk-layer { display: inline; }
+svg.quick .castles-layer { display: none; }
+svg.quick .mk-q { cursor: pointer; }
+svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; stroke: none; }
+.modebar select { height: 30px; padding: 0 8px; width: auto; font-size: 0.85rem; }
+.modebar .dim { color: var(--dim); font-size: 0.85rem; }
+.manual-slot .mhead2 { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.manual-slot .mhead2 input { flex: 1; min-width: 0; }
+.manual-slot .mtoc { border: 1px solid var(--rule-soft); border-radius: var(--radius); background: var(--ink-2); margin-bottom: 10px; }
+.manual-slot .mtoc summary { cursor: pointer; padding: 8px 12px; font-family: var(--font-sc); font-size: 0.8rem; letter-spacing: 0.1em; color: var(--gilt); font-weight: 700; }
+.manual-slot .mtoc .mnav { max-height: 40vh; overflow-y: auto; border-right: 0; padding: 4px 6px 10px; }
+.manual-slot .mpane { padding: 4px 0 20px; overflow: visible; }
+.manual-slot .mpane h2 { font-size: 1.3rem; }
+.manual-slot .mpane p, .manual-slot .mpane li { max-width: none; }
+.side .strow-id .link { padding: 0; min-height: 0; font-family: var(--font-display); font-size: 1rem; color: var(--gilt-hi); text-decoration: none; text-align: left; }
+.side .strow-id .link:hover { text-decoration: underline; }
+.side { overflow-x: hidden; }

@@ -464,6 +464,7 @@
       coins: 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 4v8m-2.5-5.5H13a1.5 1.5 0 0 1 0 3h-3',
       refresh: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5',
       pen: 'M4 20l4-1 10-10-3-3L5 16l-1 4ZM13 7l3 3',
+      quick: 'M12 20V6M6 12l6-6 6 6M5 20h14',
       mute: 'M4 9v6h4l5 4V5L8 9H4ZM17 9l5 6M22 9l-5 6',
       back: 'M15 6l-6 6 6 6', close: 'M6 6l12 12M18 6L6 18', menu: 'M4 7h16M4 12h16M4 17h16', home: 'M4 11l8-7 8 7v9H4z',
       help: 'M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
@@ -888,7 +889,7 @@
           ['1', 'The back arrow to your games, your crest, the game name and the current tick.'],
           ['2', 'The top bar tiles. Production stays in the centre with a clock to the next production and a bar that fills over the cycle. The four tiles around it are yours to choose with the gear at the right of the bar or in Options: Road to victory (click for the leaderboard), Treasury (click for Spend), Research (the active area and when it levels), Armies (how many are marching and the next arrival), Next arrival, Troops, Threats, Proposals, Day and season. While a castle of yours is under attack a red Threats tile takes the last slot whatever you chose, and a Proposals tile appears while an offer waits for your answer.'],
           ['3', 'Mail, with the count of unread reports, battles and messages, and the Menu.'],
-          ['4', 'The menu drops down under the button and does not dim the map. The top row is tools: Ruler, Spend, Legend, Rings (scan rings, fog games only), Sound and Refresh. Below it every screen with its key: Leaderboard, Research, Castles, Ledger, Intel, Recorder, Battle calculator, Inbox, Chat, News, then Game rules, Host tools, Options and Help, and Main menu to leave the game. Every screen opens in the side panel, in the same slot a castle or commander uses. Options can dock the menu beside the map instead.'],
+          ['4', 'The menu drops down under the button and does not dim the map. The top row is tools: Ruler, Quick upgrade, Spend, Legend, Rings (scan rings, fog games only), Sound and Refresh. Below it every screen with its key: Leaderboard, Empires, Research, Castles, Ledger, Intel, Battle calculator and Mail, then Game rules, Options and Help, and Main menu to leave the game. Every screen opens in the side panel, in the same slot a castle or commander uses. Options can dock the menu beside the map instead, and holds Host tools and Concede defeat.'],
           ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
@@ -951,9 +952,18 @@
       { id: 'map', group: 'The world', title: 'The map', blocks: [
         ['h', 'Keys'],
         ['list', [
-          'L leaderboard, R research, S castles, D ledger, G intel, I inbox, N new message, C battle calculator, O options, ? help. Pressing a screen\'s key again closes it.',
-          'V ruler, B spend, Z scan rings, H centre the map on your realm, plus and minus zoom. Escape cancels an order or a mode, then steps back, then returns to the leaderboard.',
+          'L leaderboard, E empires, R research, S castles, F armies, D ledger, G intel, I mail, N new message, C battle calculator, O options, ? help. Pressing a screen\'s key again closes it. Left and right arrows cycle houses on the Empires screen.',
+          'V ruler, Q quick upgrade, B spend, Z scan rings, H centre the map on your realm, plus and minus zoom. Escape cancels an order or a mode, then steps back, then returns to the leaderboard.',
           'Keys do nothing while you are typing in a box.',
+        ]],
+        ['h', 'The screens'],
+        ['list', [
+          'Mail has four tabs: Reports (production reports and battle reports, with Mark all read), Messages (private threads and New message), Chat (the game channel) and Events (everything that happened across the realm, with a button for the full filtered history).',
+          'Empires shows one house at a time, with arrows to cycle through them: castles, troops seen, commanders and honours, the diplomacy actions for that house, and its castles; a Production tab with the yields of the castles you can see; a Research tab (your own areas; other houses\' areas are hidden); and a Colour tab where you pick the colour that house wears on your map, which only you see. Alt-click any castle on the map to open its house, or click a name on the leaderboard.',
+          'Research shows every realm area with its level, progress and the time to the next level. Researching now switches the active area at once. Research next queues an area that takes over the moment the active one levels up.',
+          'Castles is every castle in one table with a filter and sortable columns; the Armies tab is every commander you can see, yours first, with troops, where they are, what they are doing and the ETA. Expand widens the panel over the map for the tables.',
+          'Quick upgrade is a map mode: every castle you own shows a plate with the price of its cheapest upgrade, or the track you choose in the bar at the top of the map; click a castle to buy. Plates you cannot afford are dim. Done or Escape leaves the mode.',
+          'Help opens the field manual in the panel with a search box and a contents list; the ? on any screen opens the page about that screen.',
         ]],
         ['h', 'Selecting things'],
         ['list', [
@@ -1526,6 +1536,15 @@
       };
       search.addEventListener('input', drawNav);
 
+      if (slotHost) {
+        document.removeEventListener('keydown', onKey);
+        const toc = h('details', { class: 'mtoc' }, h('summary', {}, 'Contents'), nav);
+        nav.addEventListener('click', (e) => { if (e.target.closest('.mnavbtn')) toc.open = false; });
+        screen('Help', h('div', { class: 'manual-slot' }, h('div', { class: 'mhead2' }, backBtn, search), toc, pane), { help: null });
+        manualGo = (id, anchor) => showSection(id, anchor);
+        showSection(startId);
+        return;
+      }
       overlay.append(h('div', { class: 'modal manual', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Field manual' },
         h('div', { class: 'mhead' }, h('h2', {}, 'Field manual'), backBtn, search, h('button', { class: 'ghost', onclick: close }, 'Close')),
         h('div', { class: 'mbody' }, nav, pane)));
@@ -3372,7 +3391,7 @@
         firstRow, result), { sub: 'Predict a fight before you commit to it.', help: 'battles' });
     }
 
-    function optionsDialog() {
+    function optionsDialog(extras = []) {
       const action = selectOf(ACTION_NAMES, PREFS.action);
       const side = selectOf({ right: 'Right of the map', left: 'Left of the map' }, PREFS.side);
       const menuStyle = selectOf({ drop: 'Drops down from the Menu button', docked: 'Docked beside the map' }, PREFS.menu);
@@ -3393,6 +3412,7 @@
         h('label', {}, 'Map text: army troop counts'), armiesSel,
         h('label', {}, 'Map text: castle upgrade levels'), infra,
         h('label', { class: 'check', style: 'margin-top:10px' }, sound, 'Sound effects'),
+        extras.length ? h('div', { class: 'row wrap2', style: 'margin-top:14px;padding-top:12px;border-top:1px solid var(--rule-soft)' }, h('span', { class: 'dim', style: 'width:100%;font-family:var(--font-sc);font-size:.72rem;letter-spacing:.1em;color:var(--faint)' }, 'This game'), ...extras) : null,
         h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { type: 'button', class: 'small', onclick: () => { Sfx.fanfare(); setTimeout(Sfx.lost, 1100); setTimeout(Sfx.alarm, 2200); setTimeout(Sfx.bell, 3200); } }, 'Play sample sounds'), h('span', { class: 'tip', style: 'margin:0' }, 'Castle gained, castle lost, a threat, then a new tick.'))), (close) => [
         h('button', { onclick: close }, 'Cancel'),
         h('button', {
@@ -3506,7 +3526,10 @@
       const touchTimer = setInterval(touch, 5 * 60 * 1000);
       state.cleanup.push(() => clearInterval(touchTimer));
 
-      const color = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color : '#6b6b78');
+      const COLOUR_KEY = `ss-colours-${gameId}`;
+      ms.colours = (() => { try { return JSON.parse(localStorage.getItem(COLOUR_KEY)) || {}; } catch { return {}; } })();
+      const setColour = (pid, hex) => { if (hex) ms.colours[pid] = hex; else delete ms.colours[pid]; try { localStorage.setItem(COLOUR_KEY, JSON.stringify(ms.colours)); } catch {} ms.castleCache = new Map(); };
+      const color = (pid) => (pid && ms.colours[pid]) || (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color : '#6b6b78');
       const color2 = (pid) => (pid && ms.players.get(pid) ? factionOf(ms.players.get(pid).faction_slug).color2 : '#2a2a35');
       state.cleanup.push(() => { const r = document.documentElement.style; r.removeProperty('--house'); r.removeProperty('--house2'); });
       const pname = (pid) => (pid && ms.players.get(pid) ? ms.players.get(pid).display_name : 'Unclaimed');
@@ -3762,7 +3785,7 @@
       };
       const hashFor = () => `#g${gameId}` + (ms.sel ? `/${ms.sel.type}${ms.sel.id}` : '');
       const leaveMode = () => { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; };
-      const currentView = () => (ms.scr ? { scr: ms.scr } : ms.tab !== 'info' ? { tab: ms.tab } : ms.sel ? { sel: ms.sel } : null);
+      const currentView = () => (ms.scr ? { scr: ms.scr } : ms.tab !== 'info' ? { tab: ms.tab, sub: ms.mailTab } : ms.sel ? { sel: ms.sel } : null);
       const pushView = () => { ms.stack = [...ms.stack, currentView()].slice(-20); };
       const atHome = () => !ms.scr && ms.tab === 'info' && !ms.sel;
       const goBack = () => {
@@ -3770,6 +3793,7 @@
         const prev = ms.stack.pop() || null;
         ms.scr = prev && prev.scr ? prev.scr : null;
         ms.tab = prev && prev.tab ? prev.tab : 'info';
+        if (prev && prev.sub) ms.mailTab = prev.sub;
         ms.sel = prev && prev.sel ? prev.sel : null;
         ms.navDir = 'back';
         if (location.hash !== hashFor()) history.replaceState(null, '', hashFor());
@@ -3789,14 +3813,18 @@
         drawSide();
         drawHud();
       };
+      const MAIL_SUB = { inbox: 'reports', reports: 'reports', messages: 'messages', chat: 'chat', news: 'events', events: 'events' };
       const openTab = async (k) => {
-        if (ms.tab === k && !ms.scr) { if (isPhone() && ms.sheet === 'peek') setSheet('half'); return; }
+        const sub = MAIL_SUB[k] || ms.mailTab || 'reports';
+        if (ms.tab === 'mail' && !ms.scr && (ms.mailTab || 'reports') === sub) { if (isPhone() && ms.sheet === 'peek') setSheet('half'); return; }
         pushView();
         leaveMode();
         ms.scr = null;
-        ms.tab = k;
+        ms.tab = 'mail';
+        ms.mailTab = sub;
+        ms.report = null; ms.thread = null; ms.compose = null;
         ms.navDir = 'fwd';
-        if (k === 'inbox') await markRead();
+        if (sub === 'reports') await markRead();
         if (isPhone() && ms.sheet === 'peek') setSheet('half');
         render();
         drawSide();
@@ -3805,6 +3833,7 @@
       slotHost = (title, content, opts) => {
         pushView();
         leaveMode();
+        mapBody.classList.remove('wide');
         ms.scr = { title, content, opts };
         ms.navDir = 'fwd';
         if (isPhone()) setSheet('full');
@@ -3981,6 +4010,7 @@
           }
         }
 
+        svg.classList.toggle('quick', !!ms.quick);
         const cells = [];
         const castles = [];
         const marks = [];
@@ -4029,7 +4059,8 @@
           const nameLabel = `${isCap ? '♛ ' : ''}${t.name}`;
           const flashing = !!(ms.flash && ms.flash.has(t.id) && Date.now() - ms.flash.get(t.id) < 1600);
           const selC = ms.sel && ms.sel.type === 'c' ? ms.sel.id : null;
-          const csig = JSON.stringify([owner, seen, mine, showTroops, t.troops, selected, threatened.has(t.id), sieged, siegers.map((c) => c.id), here.map((c) => [c.id, c.troops, c.status, c.id === selC]), reach, nameLabel, tagOf(t.id), k, tier, !!ms.replay, plate, ms.mem[t.id] ? ms.mem[t.id].tr : null, t.x, t.y, isCap, ms.game.fog_of_war, flashing]);
+          const quick = ms.quick && mine && canAct() ? quickPrice(t) : null;
+          const csig = JSON.stringify([owner, seen, mine, showTroops, t.troops, selected, threatened.has(t.id), sieged, siegers.map((c) => c.id), here.map((c) => [c.id, c.troops, c.status, c.id === selC]), reach, nameLabel, tagOf(t.id), k, tier, !!ms.replay, plate, ms.mem[t.id] ? ms.mem[t.id].tr : null, t.x, t.y, isCap, ms.game.fog_of_war, flashing, quick, ms.colours[owner] || null]);
           const hit = ms.castleCache.get(t.id);
           if (hit && hit.sig === csig) { castles.push(hit.g); marks.push(hit.mk); return; }
           const g = plate
@@ -4058,7 +4089,8 @@
               owner && count !== '' ? sv('path', { d: `M${-cw / 2 + 4} 20.5h11v2.5h-11Z`, fill: color2(owner), opacity: 0.9, style: 'pointer-events:none' }) : null,
               count === '' ? null : sv('text', { class: owner ? 'mk-tp' : 'mk-tp mk-nt', x: owner ? 8 : 0, y: 29, 'font-size': 14, fill: showTroops ? '#f5dc94' : '#9a8a64', style: 'stroke:none;paint-order:normal' }, count),
               isCap ? sv('text', { y: -MW * 0.9, 'font-size': 14, fill: '#f5dc94' }, '♛') : null,
-              sv('text', { class: 'mk-name', y: count === '' ? 30 : 48, 'font-size': 11, fill: '#efe3c4' }, t.name))));
+              quick ? sv('g', { class: 'mk-q' + (quick.ok ? '' : ' no') }, sv('rect', { x: -34, y: 30, width: 68, height: 22, rx: 5, fill: quick.ok ? '#f5dc94' : 'rgba(16,11,6,0.9)', stroke: quick.ok ? '#8d6a28' : 'rgba(214,171,82,0.5)', 'stroke-width': 1.5 }), sv('text', { y: 46, 'font-size': 13, fill: quick.ok ? '#1a1206' : '#9a8a64', style: 'stroke:none;font-weight:700' }, `${INFRA.find((i) => i.type === quick.type).name[0]} ${quick.cost}`)) : null,
+              sv('text', { class: 'mk-name', y: quick ? 66 : count === '' ? 30 : 48, 'font-size': 11, fill: '#efe3c4' }, t.name))));
           ms.castleCache.set(t.id, { sig: csig, g, mk: marks[marks.length - 1] });
         });
         if (ms.sel && ms.sel.type === 't') {
@@ -4484,7 +4516,18 @@
               ms.areas.forEach((x) => { x.is_active = x.area === a.area; });
               return () => ms.areas.forEach((x, k) => { x.is_active = prev[k]; });
             }) }, 'Make active') : null)));
-        scr = screen('Research', h('div', { class: 'research' }, ...rows, h('p', { class: 'tip' }, 'The next level costs 144 times the current level, times the game\'s research cost. More Prestige upgrades on your castles speed it up.')),
+        const areasOn = data.areas.filter((a) => !a.disabled);
+        const activeA = areasOn.find((a) => a.active);
+        const nowSel = selectOf(Object.fromEntries(areasOn.map((a) => [a.area, AREA_NAMES[a.area] || a.area])), activeA ? activeA.area : areasOn[0].area);
+        const nextSel = selectOf({ none: 'Nothing queued', ...Object.fromEntries(areasOn.map((a) => [a.area, AREA_NAMES[a.area] || a.area])) }, nextArea() || 'none');
+        nowSel.onchange = (e) => act(null, async () => { const r = await sb.rpc('set_active_area', { p_game_id: gameId, p_area: nowSel.value }); if (r.error) throw r.error; scr.close(); researchDialog(); }, () => {
+          const prev = ms.areas.map((x) => x.is_active);
+          ms.areas.forEach((x) => { x.is_active = x.area === nowSel.value; });
+          return () => ms.areas.forEach((x, k) => { x.is_active = prev[k]; });
+        });
+        nextSel.onchange = () => { setNextArea(nextSel.value === 'none' ? null : nextSel.value); toast(nextSel.value === 'none' ? 'Nothing queued' : `${AREA_NAMES[nextSel.value]} starts when ${activeA ? AREA_NAMES[activeA.area] : 'the active area'} levels up`, true); };
+        const queue = live ? h('div', { class: 'scr-toolbar research-now' }, h('label', {}, 'Researching now', nowSel), h('label', {}, 'Research next', nextSel), activeA ? h('div', { class: 'eta' }, h('span', { class: 'k' }, 'Next level'), h('b', {}, etaOf(activeA))) : null) : null;
+        scr = screen('Research', h('div', { class: 'research' }, queue, ...rows, h('p', { class: 'tip' }, 'The next level costs 144 times the current level, times the game\'s research cost. More Prestige upgrades on your castles speed it up. Research next switches the active area the moment the current one levels up.')),
           { help: 'areas', sub: `Your castles earn ${per} prestige each production (every ${data.cycle_ticks} ticks, next in ${data.ticks_to_cycle}). It all goes to the active area${data.library_bonus ? `, and your Library adds about ${data.library_bonus} to a random area` : ''}.` });
       };
 
@@ -4622,7 +4665,103 @@
       state.cleanup.push(() => window.removeEventListener('ss-replay', onReplay));
 
       let closeMenu = () => {};
-      const spendDialog = () => { const [, upgrade] = realmSection(); screen('Spend', h('div', {}, upgrade), { help: 'economy', sub: 'Upgrade everywhere, cheapest castle first.' }); };
+      const spendDialog = () => { screen('Spend', h('div', {}, spendSection()), { help: 'economy', sub: 'Upgrade everywhere, cheapest castle first.' }); };
+      const quickPrice = (t) => {
+        const mult = ms.game.infra_cost_mult;
+        const costs = INFRA.map((i) => ({ type: i.type, cost: Math.max(1, Math.floor(i.base * (t[i.col] + 1) / t.resources * mult * ms.game[i.mult])) }));
+        const pick = ms.quick.type === 'cheapest' ? costs.sort((a, b) => a.cost - b.cost)[0] : costs.find((c) => c.type === ms.quick.type);
+        return { type: pick.type, cost: pick.cost, ok: ms.me.gold >= pick.cost };
+      };
+      const quickBuy = (id) => {
+        const t = ms.t.get(id);
+        if (!t || t.owner_player_id !== ms.me.id || !canAct()) { toast('Quick upgrade works on castles you own'); return; }
+        const q = quickPrice(t);
+        if (!q.ok) { toast(`You need ${q.cost - ms.me.gold} more gold for that`); return; }
+        const i = INFRA.find((x) => x.type === q.type);
+        const lvl = t[i.col];
+        order('upgrade_infrastructure', { p_territory_id: t.id, p_type: q.type }, (d) => `${t.name}: ${i.name} is now level ${d.level}`, () => {
+          const prev = [t[i.col], ms.me.gold];
+          t[i.col] = lvl + 1;
+          ms.me.gold -= q.cost;
+          return () => { t[i.col] = prev[0]; ms.me.gold = prev[1]; };
+        })({ currentTarget: null });
+      };
+      const toggleQuick = () => {
+        if (ms.quick) ms.quick = null;
+        else { leaveMode(); ms.ruler = null; ms.quick = { type: ms.quickType || 'cheapest' }; }
+        render();
+        drawSide();
+        drawHud();
+      };
+      const empireOrder = () => [...ms.players.values()].sort((a, b) => castlesOf(b.id) - castlesOf(a.id) || a.id - b.id);
+      const empireStep = (d) => {
+        const list = empireOrder();
+        const i = list.findIndex((p) => p.id === ms.empirePid);
+        const next = list[(i + d + list.length) % list.length];
+        goBack();
+        empireDialog(next.id, ms.empireTab);
+      };
+      const PALETTE = ['#B3202A', '#1F6FB2', '#2E8B57', '#8E44AD', '#D98E04', '#0E9AA7', '#C2185B', '#6D4C41'];
+      const empireDialog = (pid, tab = 'empire') => {
+        const p = ms.players.get(pid);
+        if (!p) return;
+        ms.empirePid = pid;
+        ms.empireTab = tab;
+        const self = pid === ms.me.id;
+        const out = p.eliminated_at_tick !== null && p.eliminated_at_tick !== undefined;
+        const winAtE = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
+        const castles = [...ms.t.values()].filter((t) => !t.is_junction && t.owner_player_id === pid);
+        const seenC = castles.filter((t) => ms.vis.has(t.id));
+        const troopsSeen = seenC.reduce((n, t) => n + (t.troops || 0), 0);
+        const cmds = ms.cmd.filter((c) => c.owner_player_id === pid && commanderSeen(c, tickF()));
+        const marching = cmds.filter((c) => c.status === 'moving').length;
+        const styleTag = p.is_ai && p.ai_style ? (AI_STYLES.find(([k]) => k === p.ai_style) || [0, p.ai_style, ''])[1] : null;
+        const stat = (big, small) => h('div', { class: 'st' }, h('b', {}, big), h('span', {}, small));
+        const toolbar = h('div', { class: 'emp-nav' },
+          h('button', { type: 'button', class: 'ib', title: 'Previous house', 'aria-label': 'Previous house', onclick: () => empireStep(-1) }, icon('back')),
+          h('div', { class: 'emp-id' }, sigil(p.faction_slug, 40), h('div', {}, h('b', {}, p.display_name), h('span', {}, `House ${houseOf(pid) || ''} · ${p.is_ai ? `AI${styleTag ? ' · ' + styleTag : ''}` : 'Player'}${out ? ' · eliminated' : ''}`)), dipChip(pid)),
+          h('button', { type: 'button', class: 'ib flip', title: 'Next house', 'aria-label': 'Next house', onclick: () => empireStep(1) }, icon('back')));
+        const empireTab = () => {
+          const ctl = diplomacyControls(p);
+          return [
+            h('div', { class: 'sel-stats emp-stats' }, stat(`${castles.length} of ${winAtE}`, 'castles'), stat(self || seenC.length ? String(troopsSeen) : '?', self ? 'troops in castles' : 'troops seen'), stat(String(cmds.length), `commanders · ${marching} marching`)),
+            profileLine(p),
+            !self && !out && (ctl || !p.is_ai) ? h('div', { class: 'sec' }, h('b', {}, 'Diplomacy'), h('div', { class: 'dipbox' }, ctl, h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { onclick: () => openDm(p.id) }, 'Message'), !p.is_ai && canAct() ? h('button', { onclick: () => sendGoldDialog(p) }, 'Send gold') : null))) : null,
+            h('div', { class: 'sec' }, h('b', {}, `Castles · ${castles.length}`), castles.length ? castles.sort((a, b) => (b.troops || 0) - (a.troops || 0)).map((t) => h('button', { class: 'cmdrow', onclick: () => { select('t', t.id); if (ms.focusOn) ms.focusOn(t.id); } }, t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, ms.vis.has(t.id) ? `${t.troops} troops` : 'out of sight'))) : h('div', { class: 'empty' }, 'No castles.')),
+          ];
+        };
+        const productionTab = () => {
+          const rows = seenC.map((t) => ({ t, gold: t.treasury_level * 10, troops: t.industry_level * 5, prestige: t.prestige_level }));
+          const tot = rows.reduce((a, r) => ({ gold: a.gold + r.gold, troops: a.troops + r.troops, prestige: a.prestige + r.prestige }), { gold: 0, troops: 0, prestige: 0 });
+          return [
+            h('div', { class: 'sel-stats emp-stats' }, stat(`+${tot.gold}`, 'gold a cycle'), stat(`+${tot.troops}`, 'troops a cycle'), stat(`+${tot.prestige}`, 'prestige a tick')),
+            h('p', { class: 'tip' }, self ? 'Base yields from your castle levels. The Mint and scholars add to these.' : `From the ${seenC.length} of ${castles.length} castles you can see. Base yields only.`),
+            h('div', { class: 'ctable-wrap' }, h('table', { class: 'ctable' }, h('thead', {}, h('tr', {}, h('th', {}, 'Castle'), h('th', {}, 'Troops'), h('th', {}, 'T / R / P'), h('th', {}, 'Gold'), h('th', {}, 'Troops'))),
+              h('tbody', {}, rows.map((r) => h('tr', { onclick: () => { select('t', r.t.id); if (ms.focusOn) ms.focusOn(r.t.id); } }, h('td', {}, r.t.name), h('td', { class: 'num' }, String(r.t.troops)), h('td', { class: 'num' }, `${r.t.treasury_level} / ${r.t.industry_level} / ${r.t.prestige_level}`), h('td', { class: 'num' }, `+${r.gold}`), h('td', { class: 'num' }, `+${r.troops}`)))))),
+          ];
+        };
+        const researchTab = () => (self
+          ? [...ms.areas].sort((a, b) => Object.keys(AREA_NAMES).indexOf(a.area) - Object.keys(AREA_NAMES).indexOf(b.area)).map((a) => h('div', { class: 'line' }, h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[a.area] || a.area}${a.is_active ? ' (active)' : ''}`), h('span', {}, `Level ${a.level}`)))
+          : [emptyState('Another house\'s realm areas are not visible. Their Armory shows in the damage of battles you fight against them, and their Stables in how far their armies reach.')]);
+        const colourTab = () => {
+          const cur = ms.colours[pid] || null;
+          const swatch = (hex, label) => h('button', { type: 'button', class: 'swatch' + ((hex === cur) || (!hex && !cur) ? ' on' : ''), style: hex ? `--sw:${hex}` : `--sw:${factionOf(p.faction_slug).color}`, title: label, 'aria-label': label, 'aria-pressed': ((hex === cur) || (!hex && !cur)) ? 'true' : 'false', onclick: () => { setColour(pid, hex); render(); drawSide(); drawHud(); scr.show('colour'); } }, hex ? null : h('span', {}, 'House'));
+          return [h('p', { class: 'tip' }, `Choose the colour ${self ? 'your' : 'this'} house wears on your map. Only you see it.`), h('div', { class: 'swatches' }, swatch(null, 'House colour'), ...PALETTE.map((c) => swatch(c, c)))];
+        };
+        let scr = null;
+        scr = screen(`Empire: ${p.display_name}`, null, { help: 'diplomacy', empire: true, tabs: [['empire', 'Empire'], ['production', 'Production'], ['research', 'Research'], ['colour', 'Colour']], tab, toolbar,
+          render: (k) => { ms.empireTab = k; return k === 'empire' ? empireTab() : k === 'production' ? productionTab() : k === 'research' ? researchTab() : colourTab(); } });
+      };
+      const openOptions = () => {
+        const g = ms.game;
+        const extras = [];
+        if (g.status === 'active' && g.created_by === state.session.user.id) extras.push(h('button', { onclick: () => { document.querySelector('.overlay')?.remove(); hostDialog(); } }, 'Host tools'));
+        if (canAct()) extras.push(h('button', { class: 'danger', onclick: async () => { if (await confirmDialog('Concede defeat? You are eliminated at once, your commanders die and your castles become unowned. This cannot be undone.', 'Concede defeat')) { document.querySelector('.overlay')?.remove(); order('concede_defeat', {}, 'You have conceded')({ currentTarget: null }); } } }, 'Concede defeat'));
+        optionsDialog(extras);
+      };
+      const NEXT_KEY = `ss-next-${gameId}`;
+      const nextArea = () => { try { return localStorage.getItem(NEXT_KEY) || null; } catch { return null; } };
+      const setNextArea = (a) => { try { if (a) localStorage.setItem(NEXT_KEY, a); else localStorage.removeItem(NEXT_KEY); } catch {} };
       const toggleLegend = () => { ms.legendOpen = !ms.legendOpen; try { localStorage.setItem('ss-legend', ms.legendOpen ? '1' : '0'); } catch {} wrap.classList.toggle('legend-open', ms.legendOpen); drawHud(); };
       const toggleRings = () => { if (!ms.game.fog_of_war) return; ms.rings = !ms.rings; render(); drawHud(); };
       const toggleSound = () => { Sfx.toggle(); drawHud(); };
@@ -4648,8 +4787,8 @@
         applyView();
       };
       const KEYS = [
-        ['L', 'Leaderboard'], ['R', 'Research'], ['S', 'Castles'], ['D', 'Ledger'], ['G', 'Intel'], ['I', 'Inbox'], ['N', 'New message'], ['C', 'Battle calculator'], ['O', 'Options'], ['?', 'Help'],
-        ['V', 'Ruler'], ['B', 'Spend'], ['Z', 'Scan rings'], ['H', 'Centre on your realm'], ['+ −', 'Zoom'], ['Esc', 'Back, close or cancel']];
+        ['L', 'Leaderboard'], ['E', 'Empires'], ['R', 'Research'], ['S', 'Castles'], ['F', 'Armies'], ['D', 'Ledger'], ['G', 'Intel'], ['I', 'Mail'], ['N', 'New message'], ['C', 'Battle calculator'], ['O', 'Options'], ['?', 'Help'],
+        ['V', 'Ruler'], ['Q', 'Quick upgrade'], ['B', 'Spend'], ['Z', 'Scan rings'], ['H', 'Centre on your realm'], ['+ −', 'Zoom'], ['Esc', 'Back, close or cancel']];
       const toggleScreen = (title, open) => { if (ms.scr && ms.scr.title === title) goBack(); else open(); };
       const onShortcut = (e) => {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -4659,11 +4798,14 @@
         const k = e.key;
         const map = {
           l: () => (atHome() ? null : goRoot()), r: () => toggleScreen('Research', researchDialog), s: () => toggleScreen('All castles', castlesDialog), d: () => toggleScreen('Ledger', ledgerDialog),
-          g: () => toggleScreen('Intel', intelDialog), i: () => (ms.tab === 'inbox' && !ms.scr ? goBack() : openTab('inbox')), n: () => { openTab('chat').then(() => { ms.chatTab = 'messages'; ms.compose = { ids: new Set() }; drawSide(); }); },
-          c: () => toggleScreen('Battle calculator', battleCalcDialog), o: optionsDialog, '?': () => helpDialog('screen'), v: toggleRuler, b: () => toggleScreen('Spend', spendDialog), z: toggleRings,
+          g: () => toggleScreen('Intel', intelDialog), i: () => (ms.tab === 'mail' && !ms.scr ? goBack() : openTab('mail')), n: () => { openTab('messages').then(() => { ms.compose = { ids: new Set() }; drawSide(); }); },
+          c: () => toggleScreen('Battle calculator', battleCalcDialog), o: openOptions, '?': () => helpDialog('screen'), v: toggleRuler, b: () => toggleScreen('Spend', spendDialog), z: toggleRings, q: toggleQuick,
+          e: () => (ms.scr && ms.empirePid ? goBack() : empireDialog(ms.me.id)), f: () => castlesDialog('armies'),
           h: () => ms.goHome && ms.goHome(), '+': () => zoomBy(ZOOM_STEP), '=': () => zoomBy(ZOOM_STEP), '-': () => zoomBy(1 / ZOOM_STEP),
+          ArrowLeft: () => { if (ms.scr && ms.empirePid) empireStep(-1); }, ArrowRight: () => { if (ms.scr && ms.empirePid) empireStep(1); },
         };
         const fn = map[k.length === 1 ? k.toLowerCase() : k];
+        if (fn && k.length > 1 && !(ms.scr && ms.empirePid)) return;
         if (!fn) return;
         e.preventDefault();
         if (document.querySelector('.menu-pop')) closeMenu();
@@ -4700,26 +4842,24 @@
         return [
           h('div', { class: 'tools' },
             tool('ruler', 'Ruler', 'V', () => { toggleRuler(); after(); }, !!ms.ruler),
+            tool('quick', 'Quick upgrade', 'Q', () => { toggleQuick(); after(); }, !!ms.quick),
             tool('coins', 'Spend', 'B', () => { after(); spendDialog(); }),
             tool('list', 'Legend', null, toggleLegend, !!ms.legendOpen),
             tool('eye', 'Rings', 'Z', toggleRings, !!ms.rings, !g.fog_of_war, g.fog_of_war ? 'Show the sight radius of every castle and commander' : 'Scan rings apply only in fog of war games'),
             tool(Sfx.on ? 'sound' : 'mute', 'Sound', null, toggleSound, Sfx.on),
             tool('refresh', 'Refresh', null, refreshNow)),
           item('Leaderboard', 'L', goRoot),
+          item('Empires', 'E', () => empireDialog(ms.me.id)),
           item('Research', 'R', researchDialog),
           item('Castles', 'S', castlesDialog),
           item('Ledger', 'D', ledgerDialog),
           item('Intel', 'G', intelDialog),
-          item('Recorder', null, recorderDialog),
           item('Battle calculator', 'C', battleCalcDialog),
-          item('Inbox', 'I', () => openTab('inbox'), unreadN ? `${unreadN} new` : null),
-          item('Chat', null, () => openTab('chat'), chatUnreadN ? `${chatUnreadN} new` : null),
-          item('News', null, () => openTab('news')),
+          item('Mail', 'I', () => openTab('mail'), unreadN + chatUnreadN ? `${unreadN + chatUnreadN} new` : null),
           g.status === 'finished' ? item('Replay', null, startReplay) : null,
           h('div', { class: 'mi-sep' }),
           item('Game rules', null, () => screen(`${g.name}: rules`, articlesOfWar(g, ms.players.size), { wide: true, help: 'hosting' })),
-          g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', null, hostDialog) : null,
-          item('Options', 'O', optionsDialog),
+          item('Options', 'O', openOptions),
           item('Help', '?', () => helpDialog()),
           h('div', { class: 'mi-sep' }),
           item('Main menu', 'Esc', showHome, 'back to your games'),
@@ -4816,7 +4956,7 @@
               g.status === 'finished' ? h('button', { onclick: () => summaryDialog(gameId) }, 'Final standings') : null),
             g.status === 'active' ? h('button', { type: 'button', class: 'ib gear', title: 'Choose what the bar shows', 'aria-label': 'Choose what the bar shows', onclick: barPicker }, icon('gear')) : null)),
           keep('r', h('div', { class: 'hud-r' },
-            h('button', { type: 'button', class: 'ib mail', title: mailN ? `Mail: ${mailN} unread` : 'Mail', 'aria-label': 'Mail', onclick: () => openTab('inbox') }, icon('mail'), mailN ? h('span', { class: 'badge' }, String(mailN)) : null),
+            h('button', { type: 'button', class: 'ib mail', title: mailN ? `Mail: ${mailN} unread` : 'Mail', 'aria-label': 'Mail', onclick: () => openTab('mail') }, icon('mail'), mailN ? h('span', { class: 'badge' }, String(mailN)) : null),
             PREFS.menu === 'docked' ? null : h('button', { type: 'button', class: 'primary hud-menu', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: menuDialog }, 'Menu')))]);
         place(mapCtl, [keep('m', h('div', { class: 'mapctl-in' },
           h('button', { type: 'button', class: 'ib', title: 'Centre on your realm', 'aria-label': 'Centre on your realm', onclick: () => ms.goHome && ms.goHome() }, icon('home')),
@@ -4897,29 +5037,9 @@
         return label ? h('span', { class: `chip ${tone}` }, label) : null;
       };
 
-      const realmSection = () => {
+      const spendSection = () => {
         const g = ms.game;
         const live = canAct();
-        const order_ = Object.keys(AREA_NAMES);
-        const per = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id && !t.is_junction).reduce((n, t) => n + (t.prestige_level || 0), 0);
-        const cyc = g.production_cycle_ticks;
-        const etaOf = (a, need) => {
-          if (per <= 0) return 'no prestige income';
-          const cycles = Math.max(1, Math.ceil(Math.max(0, need - a.prestige_accumulated) / per));
-          const ticks = cyc - (g.current_tick % cyc) + (cycles - 1) * cyc;
-          return `${a.is_active ? 'next level in' : 'if active,'} ${pluralN(cycles, 'cycle')} (${ticks}t)`;
-        };
-        const rows = [...ms.areas].sort((x, y) => order_.indexOf(x.area) - order_.indexOf(y.area)).map((a) => {
-          const need = Math.ceil(144 * a.level * g.area_cost_mult * ((g.area_cost_mults || {})[a.area] ?? 1));
-          return h('div', { class: 'line' },
-            h('span', { style: 'color:var(--text)' }, `${AREA_NAMES[a.area] || a.area}${a.is_active ? ' (active)' : ''}`),
-            h('span', { title: etaOf(a, need) }, `Lv ${a.level} · ${a.prestige_accumulated}/${need}`, h('small', { class: 'eta' }, etaOf(a, need))),
-            live && !a.is_active ? h('button', { style: 'padding:2px 8px;font-size:.78rem', onclick: order('set_active_area', { p_area: a.area }, `${AREA_NAMES[a.area]} is now the active area`, () => {
-              const prev = ms.areas.map((x) => x.is_active);
-              ms.areas.forEach((x) => { x.is_active = x.area === a.area; });
-              return () => ms.areas.forEach((x, k) => { x.is_active = prev[k]; });
-            }) }, 'Activate') : null);
-        });
         const type = h('select', {}, INFRA.map((i) => h('option', { value: i.type }, i.name)));
         type.value = 'recruitment';
         const budget = h('input', { type: 'number', min: '1', value: Math.max(1, ms.me.gold), style: 'width:90px' });
@@ -4963,21 +5083,9 @@
           return () => { ms.me.gold = prev; };
         })(e);
         if (live) paintPlan();
-        return [
-          h('div', { class: 'sec' }, h('b', {}, 'Realm areas (level, prestige to next)'), rows),
-          live ? h('div', { class: 'sec' }, h('b', {}, 'Upgrade everywhere, cheapest first'),
+        return live ? h('div', { class: 'sec' }, h('b', {}, 'Upgrade everywhere, cheapest first'),
             h('div', { class: 'row wrap2' }, type, budget, spend), plan,
-            h('div', { class: 'tip' }, 'Recruitment adds troops each cycle, Treasury adds gold, Prestige speeds your realm areas. Early on, Recruitment wins the most castles.')) : null,
-          live ? h('div', { class: 'sec' }, h('b', {}, 'Surrender'),
-            h('button', {
-              class: 'danger',
-              onclick: async (e) => {
-                if (await confirmDialog('Concede defeat? You are eliminated at once, your commanders die and your castles become unowned. This cannot be undone.', 'Concede defeat')) {
-                  order('concede_defeat', {}, 'You have conceded')(e);
-                }
-              },
-            }, 'Concede defeat')) : null,
-        ];
+            h('div', { class: 'tip' }, 'Recruitment adds troops each cycle, Treasury adds gold, Prestige speeds your realm areas. Early on, Recruitment wins the most castles.')) : h('div', { class: 'empty' }, 'The game is over.');
       };
 
       const assaultButton = (t) => h('button', {
@@ -5661,22 +5769,23 @@
       const openDm = (pid) => {
         const want = [ms.me.id, pid].sort((a, b) => a - b).join(',');
         const t = [...ms.threads.values()].find((x) => [...x.parts].sort((a, b) => a - b).join(',') === want);
-        if (!(currentView() && currentView().tab === 'chat')) pushView();
+        if (!(currentView() && currentView().tab === 'mail' && currentView().sub === 'messages')) pushView();
         ms.scr = null;
-        ms.tab = 'chat';
+        ms.tab = 'mail';
+        ms.mailTab = 'messages';
         ms.chatTab = 'messages';
         ms.thread = t ? t.id : null;
         ms.compose = t ? null : { ids: new Set([pid]) };
         drawSide();
       };
 
-      const chatView = () => {
+      const chatView = (noBar) => {
         const nThreads = [...ms.threads.values()].filter(threadUnread).length;
         const sub = (k, label) => h('button', {
           class: ms.chatTab === k ? 'primary' : '',
           onclick: () => { ms.chatTab = k; ms.thread = null; ms.compose = null; drawSide(); },
         }, label);
-        const bar = h('div', { class: 'row', style: 'margin:12px 0' }, sub('general', 'General'), sub('messages', `Messages${nThreads ? ` (${nThreads})` : ''}`));
+        const bar = noBar ? null : h('div', { class: 'row', style: 'margin:12px 0' }, sub('general', 'General'), sub('messages', `Messages${nThreads ? ` (${nThreads})` : ''}`));
 
         if (ms.chatTab === 'general') {
           markChatSeen();
@@ -5749,9 +5858,10 @@
       };
 
       const openBattle = (id) => {
-        if (!(currentView() && currentView().tab === 'inbox')) pushView();
+        if (!(currentView() && currentView().tab === 'mail' && currentView().sub === 'reports')) pushView();
         ms.scr = null;
-        ms.tab = 'inbox';
+        ms.tab = 'mail';
+        ms.mailTab = 'reports';
         ms.inboxTab = 'battles';
         ms.report = id;
         drawSide();
@@ -5834,7 +5944,7 @@
 
       const dipRow = (pid) => ms.dip.find((d) => d.player_a_id === pid || d.player_b_id === pid);
 
-      const castlesDialog = () => {
+      const castlesDialog = (tab = 'castles') => {
         const state2 = { sort: 'troops', dir: -1, filter: 'all' };
         let closeCastles = null;
         const mineList = [...ms.t.values()].filter((t) => !t.is_junction && t.owner_player_id === ms.me.id);
@@ -5865,7 +5975,29 @@
         };
         filterSel.addEventListener('change', () => { state2.filter = filterSel.value; draw(); });
         draw();
-        closeCastles = screen('All castles', wrap, { wide: true, help: 'economy' }).close;
+        const armies = h('div', {});
+        const drawArmies = () => {
+          const tf = tickF();
+          const list = ms.cmd.filter((c) => commanderSeen(c, tf) && c.status !== 'dead').map((c) => {
+            const m = ms.mov.get(c.id);
+            const atT = c.current_territory_id ? ms.t.get(c.current_territory_id) : null;
+            const dest = m ? ms.t.get(m.to_territory_id) : null;
+            return { c, mine: c.owner_player_id === ms.me.id, troops: typeof c.troops === 'number' ? c.troops : null, where: atT ? atT.name : dest ? `to ${dest.name}` : '?', doing: c.status === 'moving' ? 'marching' : c.status === 'sieging' ? 'besieging' : c.status === 'idle' ? (atT && atT.garrison_commander_id === c.id ? 'garrison' : 'waiting') : c.status, eta: m ? m.arrival_tick : null };
+          }).sort((a, b) => (b.mine - a.mine) || ((b.troops || 0) - (a.troops || 0)));
+          armies.replaceChildren(h('div', { class: 'ctable-wrap' }, h('table', { class: 'ctable' },
+            h('thead', {}, h('tr', {}, h('th', {}, 'Commander'), h('th', {}, 'House'), h('th', {}, 'Troops'), h('th', {}, 'Where'), h('th', {}, 'Doing'), h('th', {}, 'ETA'))),
+            h('tbody', {}, list.map((r) => h('tr', { onclick: () => { if (closeCastles) closeCastles(); select('c', r.c.id); if (r.c.current_territory_id && ms.focusOn) ms.focusOn(r.c.current_territory_id); } },
+              h('td', {}, h('span', { class: 'cdot', style: `background:${color(r.c.owner_player_id)}` }), `${r.c.role === 'king' ? '♛ ' : ''}${r.c.name}`),
+              h('td', {}, pname(r.c.owner_player_id)),
+              h('td', { class: 'num' }, r.troops === null ? '?' : String(r.troops)),
+              h('td', {}, r.where),
+              h('td', {}, r.doing),
+              h('td', { class: 'num' }, r.eta != null ? `t${r.eta}` : '')))))),
+            h('p', { class: 'tip' }, 'Every army you can see, yours first. Click a row to open the commander.'));
+        };
+        drawArmies();
+        const expand = h('button', { type: 'button', class: 'small', 'aria-pressed': mapBody.classList.contains('wide') ? 'true' : 'false', onclick: () => { mapBody.classList.toggle('wide'); expand.setAttribute('aria-pressed', mapBody.classList.contains('wide') ? 'true' : 'false'); expand.textContent = mapBody.classList.contains('wide') ? 'Narrow' : 'Expand'; } }, mapBody.classList.contains('wide') ? 'Narrow' : 'Expand');
+        closeCastles = screen('All castles', null, { wide: true, help: 'economy', tabs: [['castles', 'Castles'], ['armies', 'Armies']], tab, toolbar: h('div', { class: 'scr-toolbar', style: 'justify-content:flex-end' }, expand), render: (k) => (k === 'castles' ? wrap : armies) }).close;
       };
 
       const sendGoldDialog = (p) => {
@@ -6085,31 +6217,43 @@
         const tf = tickF();
         const sel = ms.sel;
         const parts = [];
+        if (!ms.scr) { mapBody.classList.remove('wide'); ms.empirePid = null; }
         if (ms.scr) {
-          patchSide([slotHeader(ms.scr.title, null, ms.scr.opts.help || 'screen'), ms.scr.content]);
+          if (!ms.scr.opts.empire) ms.empirePid = null;
+          patchSide([selStrip(), slotHeader(ms.scr.title, null, ms.scr.opts.help), ms.scr.content]);
           return;
         }
-        if (ms.tab === 'news') {
-          patchSide([slotHeader('News', 'What happened across the realm', 'screen'), h('div', { class: 'sec' }, ms.moments.length
-            ? ms.moments.map((m) => feedRow(m.tick, momentText(m)))
-            : emptyState('Nothing has happened yet. Captures, sieges, wars and alliances across the realm are listed here as they happen.'))]);
-          return;
-        }
-        if (ms.tab === 'chat') {
-          const focused = [ms.chatInput, ms.threadInput].includes(document.activeElement) ? document.activeElement : null;
-          const body = chatView();
-          ms.sideKey = `chat:${ms.tab}`;
-          drawMode();
-          sideEl.replaceChildren(slotHeader('Chat', null, 'friends'), ...body.flat());
-          const scroller = document.getElementById('chatscroll');
-          if (scroller) scroller.scrollTop = scroller.scrollHeight;
-          if (focused) focused.focus();
-          return;
-        }
-        if (ms.tab === 'inbox') {
-          const sub = (k, label) => h('button', { type: 'button', class: ms.inboxTab === k ? 'on' : '', 'aria-pressed': ms.inboxTab === k ? 'true' : 'false', onclick: () => { ms.inboxTab = k; ms.report = null; drawSide(); drawHud(); } }, label);
+        if (ms.tab === 'mail') {
+          const sub = ms.mailTab || 'reports';
+          const unread = ms.inbox.filter((i) => !i.is_read).length + battlesUnread();
+          const nThreads = [...ms.threads.values()].filter(threadUnread).length;
+          const chatN = sub === 'chat' ? 0 : chatUnread();
+          const tabBtn = (k, label, n) => h('button', { type: 'button', role: 'tab', class: sub === k ? 'on' : '', 'aria-selected': sub === k ? 'true' : 'false', onclick: () => { ms.mailTab = k; ms.report = null; ms.thread = null; ms.compose = null; if (k === 'reports') markRead(); drawSide(); drawHud(); } }, label, n ? h('span', { class: 'badge' }, String(n)) : null);
+          const tabs = h('div', { class: 'scr-tabs mail-tabs', role: 'tablist' }, tabBtn('reports', 'Reports', unread), tabBtn('messages', 'Messages', nThreads), tabBtn('chat', 'Chat', chatN), tabBtn('events', 'Events', 0));
+          const head = slotHeader('Mail', null, 'screen');
+          if (sub === 'messages' || sub === 'chat') {
+            ms.chatTab = sub === 'chat' ? 'general' : 'messages';
+            const focused = [ms.chatInput, ms.threadInput].includes(document.activeElement) ? document.activeElement : null;
+            const body = chatView(true);
+            ms.sideKey = `mail:${sub}`;
+            drawMode();
+            sideEl.replaceChildren(selStrip(), head, tabs, ...body.flat().filter(Boolean));
+            const scroller = document.getElementById('chatscroll');
+            if (scroller) scroller.scrollTop = scroller.scrollHeight;
+            if (focused) focused.focus();
+            return;
+          }
+          if (sub === 'events') {
+            patchSide([selStrip(), head, tabs, h('div', { class: 'sec' }, ms.moments.length
+              ? ms.moments.map((m) => feedRow(m.tick, momentText(m)))
+              : emptyState('Nothing has happened yet. Captures, sieges, wars and alliances across the realm are listed here as they happen.')),
+              h('div', { class: 'row wrap2', style: 'margin-top:10px' }, h('button', { onclick: recorderDialog }, 'Full history with filters'))]);
+            return;
+          }
+          const seg = (k, label) => h('button', { type: 'button', class: ms.inboxTab === k ? 'on' : '', 'aria-pressed': ms.inboxTab === k ? 'true' : 'false', onclick: () => { ms.inboxTab = k; ms.report = null; drawSide(); drawHud(); } }, label);
           if (ms.inboxTab === 'battles') markBattlesSeen();
-          const bar = h('div', { class: 'seg side-seg' }, sub('reports', 'Reports'), sub('battles', `Battles${ms.battles.length ? ` · ${ms.battles.length}` : ''}`));
+          const bar = h('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:4px 0 8px' }, h('div', { class: 'seg side-seg', style: 'margin:0' }, seg('reports', 'Reports'), seg('battles', `Battles${ms.battles.length ? ` · ${ms.battles.length}` : ''}`)),
+            unread ? h('button', { type: 'button', class: 'small', onclick: async () => { await markRead(); markBattlesSeen(); drawSide(); drawHud(); } }, 'Mark all read') : null);
           const open = ms.report ? ms.battles.find((x) => x.id === ms.report) : null;
           let body;
           if (ms.inboxTab === 'battles') {
@@ -6119,7 +6263,7 @@
               ? ms.inbox.map((i) => feedRow(i.tick, i.title, ms.newIds.has(i.id)))
               : emptyState('No reports yet. Each production cycle, every battle you fight and every proposal you receive arrives here.'))];
           }
-          patchSide([slotHeader('Inbox', 'Reports and battles', 'screen'), bar, ...body.flat()]);
+          patchSide([selStrip(), head, tabs, bar, ...body.flat()]);
           return;
         }
         if (sel && sel.type === 't') {
@@ -6222,7 +6366,6 @@
           if (pr && pr.bio) parts.push(pfold('bio', 'About', null, h('p', { class: 'cbio' }, pr.bio)));
         } else {
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
-          const [areas, , surrender] = realmSection();
           const winAtH = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
           const mineN = castlesOf(ms.me.id);
           const rivalN = Math.max(0, ...pl.filter(({ p }) => p.id !== ms.me.id).map(({ n }) => n));
@@ -6240,7 +6383,7 @@
             return h('div', { class: 'strow' + (self ? ' me' : '') },
               h('div', { class: 'strow-top' },
                 sigil(p.faction_slug, 28),
-                h('div', { class: 'strow-id' }, h('b', {}, p.display_name), h('span', {}, [p.is_ai ? `AI${styleTag ? ' · ' + styleTag : ''}` : 'Player', out ? ' · eliminated' : '', self || isFriend(p.id) || seenTroops ? ` · ${seenTroops} troops seen` : ''].join(''))),
+                h('div', { class: 'strow-id' }, h('button', { type: 'button', class: 'link', title: 'Open this house', onclick: () => empireDialog(p.id) }, p.display_name), h('span', {}, [p.is_ai ? `AI${styleTag ? ' · ' + styleTag : ''}` : 'Player', out ? ' · eliminated' : '', self || isFriend(p.id) || seenTroops ? ` · ${seenTroops} troops seen` : ''].join(''))),
                 h('div', { class: 'strow-right' }, out ? h('span', { class: 'chip' }, 'Out') : dipChip(p.id), h('b', { class: 'strow-n', title: `${n} of ${winAt} castles to win` }, String(n)))),
               h('div', { class: 'meter-track strow-meter' }, h('i', { class: self ? 'mine' : 'rival', style: `width:${Math.min(100, (n / Math.max(1, winAt)) * 100)}%;background:${color(p.id)}` })),
               profileLine(p),
@@ -6252,9 +6395,7 @@
           parts.push(offers);
           parts.push(eventsSection());
           parts.push(prisonersSection());
-          parts.push(areas);
           parts.push(h('div', { class: 'sec row wrap2' }, canAct() && ms.players.size > 2 ? h('button', { onclick: mediationDialog }, 'Offer mediation') : null, h('button', { onclick: fallenHall }, 'Hall of the Fallen')));
-          parts.push(surrender ? pfold('surrender', 'Surrender', null, surrender) : null);
         }
         if (ms.ruler) parts.unshift(rulerPanel());
         parts.unshift(selStrip());
@@ -6289,7 +6430,7 @@
         }
         if (ms.scr) return h('div', { class: 'strip' }, h('span', { class: 'snm' }, ms.scr.title), h('button', { type: 'button', class: 'small', onclick: view }, 'View'));
         const winAtS = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
-        return h('div', { class: 'strip' }, h('b', {}, `${castlesOf(ms.me.id)} of ${winAtS}`), h('span', { class: 'snm' }, ms.tab === 'info' ? 'Leaderboard' : ms.tab === 'inbox' ? 'Inbox' : ms.tab === 'chat' ? 'Chat' : 'News'), h('button', { type: 'button', class: 'small', onclick: view }, 'View'));
+        return h('div', { class: 'strip' }, h('b', {}, `${castlesOf(ms.me.id)} of ${winAtS}`), h('span', { class: 'snm' }, ms.tab === 'info' ? 'Leaderboard' : 'Mail'), h('button', { type: 'button', class: 'small', onclick: view }, 'View'));
       };
 
       const slotHeader = (title, sub, help, opts = {}) => {
@@ -6298,13 +6439,13 @@
           home ? null : h('button', { type: 'button', class: 'ib', 'aria-label': ms.stack.length ? 'Back' : 'Back to the leaderboard', title: ms.stack.length ? 'Back' : 'Leaderboard', onclick: goBack }, icon('back')),
           h('div', { class: 'title' }, title, opts.rename ? h('button', { type: 'button', class: 'pen', title: 'Rename', 'aria-label': 'Rename', onclick: opts.rename }, icon('pen')) : null, sub ? h('span', { class: 'sub' }, sub) : null),
           h('div', { class: 'ph-acts' },
-            h('button', { type: 'button', class: 'ib', 'aria-label': 'How this screen works', title: 'How this screen works', onclick: () => helpDialog(help) }, icon('help')),
+            help === null ? null : h('button', { type: 'button', class: 'ib', 'aria-label': 'How this screen works', title: 'How this screen works', onclick: () => helpDialog(help || 'screen') }, icon('help')),
             home ? null : h('button', { type: 'button', class: 'ib', 'aria-label': 'Close', title: 'Leaderboard', onclick: goRoot }, icon('close'))));
       };
 
       const patchSide = (nodes) => {
         nodes = nodes.flat().filter(Boolean);
-        const key = `${ms.scr ? 'scr:' + ms.scr.title : ms.sel ? ms.sel.type + ms.sel.id : 'home'}:${ms.tab}:${ms.marching ? 'm' : ''}${ms.ruler ? 'r' : ''}`;
+        const key = `${ms.scr ? 'scr:' + ms.scr.title : ms.sel ? ms.sel.type + ms.sel.id : 'home'}:${ms.tab}:${ms.mailTab || ''}:${ms.inboxTab}:${ms.marching ? 'm' : ''}${ms.ruler ? 'r' : ''}${ms.quick ? 'q' : ''}`;
         drawMode();
         if (key !== ms.sideKey) {
           ms.sideKey = key;
@@ -6344,6 +6485,11 @@
           modeEl.hidden = false;
         } else if (ms.ruler) {
           modeEl.replaceChildren(h('b', {}, 'Ruler'), h('span', {}, ms.ruler.a ? 'Click the second castle' : 'Click the first castle'), h('button', { type: 'button', class: 'ghost', onclick: toggleRuler }, 'Done'));
+          modeEl.hidden = false;
+        } else if (ms.quick) {
+          const track = selectOf({ cheapest: 'Cheapest', treasury: 'Treasury', recruitment: 'Recruitment', prestige: 'Prestige' }, ms.quick.type);
+          track.onchange = () => { ms.quick.type = track.value; ms.quickType = track.value; render(); drawMode(); };
+          modeEl.replaceChildren(h('b', {}, 'Quick upgrade'), h('span', {}, 'Click a castle you own to buy'), track, h('span', { class: 'dim' }, `${ms.me.gold} gold`), h('button', { type: 'button', class: 'ghost', onclick: toggleQuick }, 'Done'));
           modeEl.hidden = false;
         } else modeEl.hidden = true;
       };
@@ -6472,6 +6618,8 @@
             if (d < best) { best = d; hit = { type: 't', id: t.id }; }
           });
         }
+        if (hit && hit.type === 't' && e.altKey) { e.stopPropagation(); const o = ms.t.get(hit.id).owner_player_id; if (o) empireDialog(o); return; }
+        if (hit && hit.type === 't' && ms.quick) { e.stopPropagation(); quickBuy(hit.id); return; }
         if (hit) { e.stopPropagation(); select(hit.type, hit.id); return; }
         if (e.target === svg) select(null);
       }, true);
@@ -6590,6 +6738,13 @@
           ms.abil.set(a.commander_id, m);
         });
         ms.mov = new Map(view.movements.map((m) => [m.commander_id, m]));
+        const prevLv = ms.areaLv || null;
+        const nxt = nextArea();
+        const actA = view.areas.find((a) => a.is_active);
+        if (prevLv && actA && prevLv[actA.area] != null && actA.level > prevLv[actA.area] && nxt && nxt !== actA.area && view.areas.some((a) => a.area === nxt)) {
+          sb.rpc('set_active_area', { p_game_id: gameId, p_area: nxt }).then((r) => { if (!r.error) { setNextArea(null); toast(`${AREA_NAMES[actA.area]} reached level ${actA.level}. Now researching ${AREA_NAMES[nxt]}`, true); load({ lite: true }); } });
+        }
+        ms.areaLv = Object.fromEntries(view.areas.map((a) => [a.area, a.level]));
         ms.areas = view.areas;
         ms.wl = (view.areas.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
         ms.dip = view.diplomacy;
@@ -6752,6 +6907,7 @@
         if (e.key !== 'Escape' || document.activeElement instanceof HTMLInputElement) return;
         if (ms.marching) { leaveMode(); render(); drawSide(); }
         else if (ms.ruler) toggleRuler();
+        else if (ms.quick) toggleQuick();
         else if (!atHome()) goBack();
       };
       window.addEventListener('keydown', onKey);
