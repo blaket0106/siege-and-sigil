@@ -1058,6 +1058,7 @@ const api = {
   dispose() { running = false; ro.disconnect(); renderer.dispose(); try { renderer.forceContextLoss(); } catch {} host.innerHTML = ''; host.classList.remove('map3d'); },
 };
 scene.traverse((o) => { if (o.isInstancedMesh) o.layers.set(1); }); cam.layers.enable(1);
+if (spec.debug) spec.debug({ THREE, scene, renderer, composer, cam, controls, sun, sao, water, marks });
 updateTiles(true); marks.push(['done', performance.now()]); $('load').remove(); frame();
 return api;
 }

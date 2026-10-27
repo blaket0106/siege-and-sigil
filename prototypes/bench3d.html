@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>3D map bench</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../styles.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0d12;color:#ecdfc2;font:13px system-ui}
+#host{position:fixed;inset:0}
+#hud{position:fixed;right:8px;bottom:8px;z-index:9;background:rgba(0,0,0,.7);padding:8px 10px;border-radius:6px;max-width:360px;white-space:pre;font:12px ui-monospace,monospace}
+</style></head><body>
+<div id="host" class="map3d-host"></div>
+<div id="hud">starting</div>
+<script type="module">
+import { generateWorld } from '../supabase/functions/start-game/generator.js';
+const q = new URLSearchParams(location.search);
+const seed = Number(q.get('seed') || 3), players = Number(q.get('players') || 4), shape = q.get('shape') || 'continent';
+const hud = document.getElementById('hud');
+const log = [];
+const say = (m) => { log.push(m); hud.textContent = log.join('\n'); };
+const t0 = performance.now();
+const layout = generateWorld({ seed, players, mapSize: 'standard', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: 20, trails: true, shape, preset: q.get('preset') || 'continental', homeDistance: 'medium' });
+const tGen = performance.now() - t0;
+say(`world generated ${Math.round(tGen)} ms, ${layout.territories.length} sites`);
+const cols = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#16a085', '#e67e22', '#7f8c8d'];
+const owners = new Map();
+layout.seats.forEach((s, i) => s.territory_idxs.forEach((t) => owners.set(t, i + 1)));
+const sites = layout.territories.map((t, i) => ({ id: i, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, junction: !!t.junction, owner: null, troops: null, mine: false }));
+const edges = layout.edges.map((e) => ({ a: e.a, b: e.b, kind: e.kind, length: e.length, mult: e.move_cost_mult, path: e.path }));
+const stages = [];
+const dbg = {};
+const t1 = performance.now();
+const { createMap3D } = await import('../map3d.js');
+const m3 = await createMap3D(document.getElementById('host'), {
+  map_w: layout.map_w, art: layout.art, sites, edges,
+  lowQuality: q.get('low') === '1',
+  colors: (pid) => [cols[(pid - 1) % cols.length], '#222'],
+  onProgress: (m) => stages.push([Math.round(performance.now() - t1), m]),
+  onSelect: () => {},
+  debug: (d) => Object.assign(dbg, d),
+});
+const tLoad = performance.now() - t1;
+m3.update(layout.territories.map((t, i) => ({ id: i, owner: owners.get(i) || null, troops: owners.has(i) ? 10 : null, mine: owners.get(i) === 1, threat: false })).filter((x) => !layout.territories[x.id].junction));
+say(`3D built ${Math.round(tLoad)} ms`);
+window.__bench = { m3, dbg, stages, tGen, tLoad, layout };
+window.__measure = async () => {
+  const r = dbg.renderer, c = dbg.composer, gl = r.getContext(), px = new Uint8Array(4);
+  const t = [];
+  for (let i = 0; i < 4; i++) { const a = performance.now(); c.render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); t.push(performance.now() - a); }
+  r.info.autoReset = false; r.info.reset(); c.render(); const info = { ...r.info.render }; r.info.autoReset = true;
+  let meshes = 0, inst = 0, tris = 0;
+  dbg.scene.traverse((o) => { if (o.isMesh || o.isPoints) { meshes++; const g = o.geometry; const idx = g.index ? g.index.count : g.attributes.position.count; const n = o.isInstancedMesh ? o.count : 1; if (o.isInstancedMesh) inst += o.count; tris += idx / 3 * n; } });
+  return { gpuMsMin: Math.round(Math.min(...t)), gpuMsMed: Math.round(t.sort((a, b) => a - b)[2]), drawCalls: info.calls, trisPerFrameM: +(info.triangles / 1e6).toFixed(2), meshes, instances: inst, residentTrisM: +(tris / 1e6).toFixed(1), size: r.getSize(new dbg.THREE.Vector2()).toArray(), loadMs: Math.round(tLoad), genMs: Math.round(tGen), stages };
+};
+</script></body></html>
