@@ -3538,7 +3538,7 @@
       const LEAGUE = 1500;
       const leagueText = (d) => `${(d / LEAGUE).toFixed(1)}`;
       const M = () => Math.pow(S(), 0.5);
-      const rangeOf = (stables) => (trailsOn() ? (75 + 75 * stables) * U() : ms.game.free_travel ? (210 + 60 * stables) * U() : (90 + 60 * stables) * (ms.game.league ? U() : 1));
+      const rangeOf = (stables) => (trailsOn() ? ((ms.game.gap || 3780) * (0.8 + 0.2 * stables)) : ms.game.free_travel ? (210 + 60 * stables) * U() : (90 + 60 * stables) * (ms.game.league ? U() : 1));
       const trailsOn = () => ms.game.travel_mode === 'trails';
       const myStables = () => (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
       const reachableFrom = (tid) => {

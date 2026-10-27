@@ -1971,8 +1971,15 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - `plan_march` and `plan_march_from` return `in_range` from the straight-line distance between the first and last path stops. Migration 20261024660000.
 - Out-of-range and no-route clicks now give separate messages.
 
-## 57. March range: 1 league at Stables 1, +0.5 league per level
+## 57. March range is relative to the world's gap
 
-- Range in leagues = 0.5 + 0.5 × Stables level (1 league at level 1, 2 leagues at level 3, 3 leagues at level 5). In map units that is (75 + 75 × level) × unit_scale.
-- Replaces (300 + 120 × level) × unit_scale (2.8 leagues at level 1). Intended feel: at about 2 leagues nearly the whole map can be crossed by hopping castle to castle.
-- Migration 20261024670000 (single patch from the old formula).
+- `games.gap` is the median trail length between neighbouring castles, set when the world is committed (`compute_gap`, called from `commit_world`). Existing games were backfilled.
+- Range = gap x (0.8 + 0.2 x Stables level), from `march_range(game_id, stables)`, used by `plan_march`, `plan_march_from` and the client's `rangeOf`. On a standard world (gap about 2.5 leagues) that is 2.6 leagues at Stables 1 and +0.5 league per level (locked after the Neptune's Pride benchmark, migration 20261024690000).
+- Because range follows the gap, changing spacing, map size or world scale no longer breaks reach. The two coefficients are the only tuning knobs.
+- Migration 20261024680000.
+
+## 58. Balance harness
+
+- `node sim/balance.mjs` generates worlds only (no sim games) and reports, per Stables level: castles with a linked neighbour in range, trails in range, options per castle, hops from a capital to the nearest enemy capital, share of the map reachable, trail length over straight distance (p90) and ticks per hop.
+- Env vars: SEEDS, PLAYERS, SIZES, SHAPES, PRESETS, RANGE_A, RANGE_B.
+- Findings on standard continent worlds: at 2.07 leagues (Stables 1) only 65% of castles have a linked neighbour in range and a capital reaches an enemy capital in 4% of worlds; at Stables 2 (2.6 leagues) it is 95% and 100%. Trail length is at most about 1.3 times straight distance at p90, so a trail-path cap of 1.5 would almost never apply.
