@@ -1970,3 +1970,9 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - Trail terrain multipliers are gone. All `move_cost_mult` values are 1, enforced by a trigger on `territory_edges` so newly generated worlds are flat too. Travel time depends on trail length, pace and commander speed only.
 - `plan_march` and `plan_march_from` return `in_range` from the straight-line distance between the first and last path stops. Migration 20261024660000.
 - Out-of-range and no-route clicks now give separate messages.
+
+## 57. March range: 1 league at Stables 1, +0.5 league per level
+
+- Range in leagues = 0.5 + 0.5 × Stables level (1 league at level 1, 2 leagues at level 3, 3 leagues at level 5). In map units that is (75 + 75 × level) × unit_scale.
+- Replaces (300 + 120 × level) × unit_scale (2.8 leagues at level 1). Intended feel: at about 2 leagues nearly the whole map can be crossed by hopping castle to castle.
+- Migration 20261024670000 (single patch from the old formula).
