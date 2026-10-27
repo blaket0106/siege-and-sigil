@@ -380,6 +380,7 @@ const TRAIL_CASES = [
   { players: 4, mapSize: 'standard', seed: 5, scale: 3 },
   { players: 4, mapSize: 'large', seed: 7, scale: 4 },
   { players: 8, mapSize: 'large', seed: 11, scale: 4 },
+  { players: 4, mapSize: 'standard', seed: 1, scale: 3 },
 ];
 const trailLayout = (c) => generateWorld({ style: 'scatter', startingTerritories: 4, startingGarrison: 10, freeTravel: true, trails: true, ...c });
 

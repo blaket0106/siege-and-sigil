@@ -1,4 +1,4 @@
-import { generateWorld } from '../supabase/functions/start-game/generator.js';
+import { generateWorld, castleLinks, GAP_CAP } from '../supabase/functions/start-game/generator.js';
 
 const LEAGUE = 1500;
 const SPEED = 577.5;
@@ -15,28 +15,7 @@ const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length 
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : 0; };
 const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
 
-function links(layout) {
-  const T = layout.territories;
-  const adj = T.map(() => []);
-  layout.edges.forEach((e) => { adj[e.a].push({ to: e.b, len: e.length }); adj[e.b].push({ to: e.a, len: e.length }); });
-  const out = new Map();
-  T.forEach((t, i) => {
-    if (t.junction) return;
-    const walk = (id, len, seen) => {
-      adj[id].forEach((n) => {
-        if (seen.has(n.to)) return;
-        const nl = len + n.len;
-        if (T[n.to].junction) walk(n.to, nl, new Set([...seen, n.to]));
-        else if (n.to !== i) {
-          const key = i < n.to ? `${i}-${n.to}` : `${n.to}-${i}`;
-          if (!out.has(key) || out.get(key).len > nl) out.set(key, { a: Math.min(i, n.to), b: Math.max(i, n.to), len: nl });
-        }
-      });
-    };
-    walk(i, 0, new Set([i]));
-  });
-  return [...out.values()].map((l) => ({ ...l, straight: Math.hypot(T[l.a].x - T[l.b].x, T[l.a].y - T[l.b].y) }));
-}
+const links = castleLinks;
 
 function bfs(n, edges, src) {
   const adj = Array.from({ length: n }, () => []);
@@ -49,6 +28,7 @@ function bfs(n, edges, src) {
 }
 
 const rows = [];
+const needs = [];
 let worlds = 0;
 let failed = 0;
 for (const mapSize of SIZES) for (const shape of SHAPES) for (const preset of PRESETS) for (const players of PLAYERS) for (const seed of SEEDS) {
@@ -60,10 +40,22 @@ for (const mapSize of SIZES) for (const shape of SHAPES) for (const preset of PR
   const T = layout.territories;
   const castles = T.map((t, i) => i).filter((i) => !T[i].junction);
   const L = links(layout);
-  const gap = median(L.map((l) => l.len));
+  const med = median(L.map((l) => l.len));
+  const gap = layout.gap || med;
   const homes = new Map();
   T.forEach((t, i) => { if (t.owner_seat !== null && t.owner_seat !== undefined && !t.junction) { if (!homes.has(t.owner_seat)) homes.set(t.owner_seat, []); homes.get(t.owner_seat).push(i); } });
   const caps = (layout.seats || []).map((s) => s.capital_idx);
+  const need = (() => {
+    const par = T.map((_, i) => i);
+    const find = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    const sorted = [...L].sort((p, q) => p.straight - q.straight);
+    for (const l of sorted) {
+      par[find(l.a)] = find(l.b);
+      if (caps.every((c) => find(c) === find(caps[0]))) return l.straight / gap;
+    }
+    return Infinity;
+  })();
+  needs.push({ shape, preset, mapSize, players, need, mult: gap / med });
   LEVELS.forEach((lv) => {
     const R = gap * (A + B * lv);
     const inr = L.filter((l) => l.straight <= R);
@@ -103,3 +95,10 @@ const table = (rs) => {
 console.log('\nALL WORLDS');
 table(rows);
 PLAYERS.forEach((p) => { console.log(`\n${p} players`); table(rows.filter((r) => r.players === p)); });
+
+console.log('\nconnect threshold = smallest range (in gaps) at which every capital can reach every other; level 1 gives ' + (A + B) + ' gaps');
+const by2 = new Map();
+const mults = [];
+needs.forEach((n) => { const k = `${n.shape}/${n.preset}/${n.mapSize}`; if (!by2.has(k)) by2.set(k, []); by2.get(k).push(n.need); mults.push(n.mult); });
+by2.forEach((v, k) => console.log(k.padEnd(34), 'median', f(median(v)), 'p90', f(pct(v, 0.9)), 'worlds passing level 1:', f(100 * v.filter((x) => x <= A + B + 1e-9).length / v.length, 0) + '%'));
+console.log('range multiplier from the connectivity guarantee: mean', f(mean(mults)), 'p90', f(pct(mults, 0.9)), 'capped at', GAP_CAP, ':', f(100 * mults.filter((m) => m >= GAP_CAP - 1e-6).length / mults.length, 0) + '% of worlds');

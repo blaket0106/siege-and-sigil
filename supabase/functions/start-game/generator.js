@@ -608,6 +608,126 @@ function neutralResources(rng, count, ratio) {
   return values;
 }
 
+
+export const REACH_GAP = 1.26;
+export const GAP_CAP = 2;
+
+function longestTreeEdges(points) {
+  const n = points.length;
+  const inTree = new Array(n).fill(false);
+  const dist = new Array(n).fill(Infinity);
+  const from = new Array(n).fill(-1);
+  dist[0] = 0;
+  const out = [];
+  for (let step = 0; step < n; step++) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!inTree[i] && (u < 0 || dist[i] < dist[u])) u = i;
+    inTree[u] = true;
+    if (from[u] >= 0) out.push({ a: from[u], b: u, len: dist[u] });
+    for (let i = 0; i < n; i++) {
+      if (inTree[i]) continue;
+      const d = Math.hypot(points[u].x - points[i].x, points[u].y - points[i].y);
+      if (d < dist[i]) { dist[i] = d; from[i] = u; }
+    }
+  }
+  return out.sort((x, y) => y.len - x.len);
+}
+
+function bridgeLongLinks(points, fixed, spacing, inside) {
+  const reach = spacing * REACH_GAP * 1.0;
+  const worstOf = (pts) => longestTreeEdges(pts)[0].len;
+  let best = worstOf(points);
+  let bestPos = points.map((q) => ({ x: q.x, y: q.y }));
+  for (let round = 0; round < 60; round++) {
+    const tree = longestTreeEdges(points);
+    const worst = tree[0];
+    if (worst.len < best - 1e-6) {
+      best = worst.len;
+      bestPos = points.map((q) => ({ x: q.x, y: q.y }));
+    }
+    if (worst.len <= reach) break;
+    const need = Math.ceil(worst.len / reach) - 1;
+    const A = points[worst.a];
+    const B = points[worst.b];
+    const slots = Array.from({ length: need }, (_, k) => ({ x: A.x + ((B.x - A.x) * (k + 1)) / (need + 1), y: A.y + ((B.y - A.y) * (k + 1)) / (need + 1) }));
+    if (!slots.every((q) => inside(q))) break;
+    const taken = new Set();
+    let ok = true;
+    for (const slot of slots) {
+      const nearOf = (i) => points.reduce((m, q, j) => (j === i || taken.has(j) ? m : Math.min(m, Math.hypot(q.x - points[i].x, q.y - points[i].y))), Infinity);
+      const cands = points
+        .map((_, i) => i)
+        .filter((i) => i >= fixed && i !== worst.a && i !== worst.b && !taken.has(i))
+        .map((i) => ({ i, d: nearOf(i) }))
+        .sort((x, y) => x.d - y.d || x.i - y.i)
+        .slice(0, 14);
+      let pick = null;
+      for (const c of cands) {
+        const old = { x: points[c.i].x, y: points[c.i].y };
+        points[c.i].x = slot.x;
+        points[c.i].y = slot.y;
+        const w = worstOf(points);
+        points[c.i].x = old.x;
+        points[c.i].y = old.y;
+        if (!pick || w < pick.w) pick = { i: c.i, w };
+      }
+      if (!pick) { ok = false; break; }
+      points[pick.i].x = slot.x;
+      points[pick.i].y = slot.y;
+      taken.add(pick.i);
+    }
+    if (!ok) break;
+  }
+  points.forEach((q, i) => {
+    q.x = bestPos[i].x;
+    q.y = bestPos[i].y;
+  });
+}
+
+export function castleLinks(layout) {
+  const T = layout.territories;
+  const adj = T.map(() => []);
+  layout.edges.forEach((e) => {
+    adj[e.a].push({ to: e.b, len: e.length });
+    adj[e.b].push({ to: e.a, len: e.length });
+  });
+  const out = new Map();
+  T.forEach((t, i) => {
+    if (t.junction) return;
+    const walk = (id, len, seen) => {
+      adj[id].forEach((n) => {
+        if (seen.has(n.to)) return;
+        const nl = len + n.len;
+        if (T[n.to].junction) walk(n.to, nl, new Set([...seen, n.to]));
+        else if (n.to !== i) {
+          const key = i < n.to ? `${i}-${n.to}` : `${n.to}-${i}`;
+          if (!out.has(key) || out.get(key).len > nl) out.set(key, { a: Math.min(i, n.to), b: Math.max(i, n.to), len: nl });
+        }
+      });
+    };
+    walk(i, 0, new Set([i]));
+  });
+  return [...out.values()].map((l) => ({ ...l, straight: Math.hypot(T[l.a].x - T[l.b].x, T[l.a].y - T[l.b].y) }));
+}
+
+function reachGap(layout) {
+  const links = castleLinks(layout);
+  if (!links.length) return null;
+  const lens = links.map((l) => l.len).sort((x, y) => x - y);
+  const median = lens[Math.floor(lens.length / 2)];
+  const caps = layout.seats.map((s) => s.capital_idx);
+  const parent = layout.territories.map((_, i) => i);
+  let bottleneck = 0;
+  for (const l of [...links].sort((x, y) => x.straight - y.straight)) {
+    parent[findRoot(parent, l.a)] = findRoot(parent, l.b);
+    if (caps.every((c) => findRoot(parent, c) === findRoot(parent, caps[0]))) {
+      bottleneck = l.straight;
+      break;
+    }
+  }
+  return Math.min(Math.max(median, bottleneck * 1.02), median * GAP_CAP);
+}
+
 export function generateWorld({ seed, players, mapSize, startingTerritories, style, startingGarrison, terrain = true, scale = 1, freeTravel = false, shape: requestedShape = 'continent', richness = 'standard', randomRoads = 'none', starScatter = 'random', mirrored = false, trails = false, preset = 'continental', homeDistance = 'medium' }) {
   const perPlayer = TERRITORIES_PER_PLAYER[mapSize];
   const styleConfig = STYLES[style];
@@ -694,6 +814,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   if (!neutrals) throw new Error('could not place territories for these settings');
 
   const points = [...locals, ...neutrals];
+  if (!mirrored && starScatter !== 'twin_rings') bridgeLongLinks(points, startTotal, spacing, (p) => shape.inside({ x: p.x - center, y: p.y - center }));
   const resourcesAt = [
     ...Array.from({ length: players }, () => START_RESOURCES.slice(0, startingTerritories)).flat(),
     ...neutralValues,
@@ -889,6 +1010,10 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
     });
   }
   layout.world_scale = scale;
+  if (layout.trails) {
+    const g = reachGap(layout);
+    if (g) layout.gap = round4(g);
+  }
 
   return layout;
 }
