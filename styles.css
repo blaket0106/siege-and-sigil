@@ -1859,3 +1859,7 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 .wp-sum { padding: 6px 10px; margin: 4px 0 8px; background: var(--ink-2); border: 1px solid var(--rule-soft); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; }
 .march-tip { margin: 0 0 8px; color: var(--gold2); }
 .stop-main b .dim { font-family: var(--font-ui); font-weight: 400; font-size: 0.78rem; color: var(--dim); }
+
+.map3d .ovb { position: absolute; left: 0; top: 0; min-width: 24px; height: 24px; padding: 0 3px; box-sizing: border-box; border-radius: 12px; background: #3a2f12; border: 2px solid #f0cf7d; color: #f0cf7d; font: 700 13px/20px 'Cinzel', serif; text-align: center; pointer-events: none; will-change: transform; }
+.map3d .ovb.wide { padding: 0 9px; border-radius: 5px; background: rgba(16, 11, 6, .9); border-color: #f5dc94; color: #f5dc94; font-size: 12px; white-space: nowrap; }
+.map3d .bn.fog { opacity: .55; filter: grayscale(.6); }
