@@ -6382,7 +6382,7 @@
           return;
         }
         const old = [...sideEl.children];
-        const busy = (el, i) => i !== ms.allowBusy && (el.contains(document.activeElement) || el.matches(':hover'));
+        const busy = (el, i) => i !== ms.allowBusy && i !== ms.clickSec && (el.contains(document.activeElement) || el.matches(':hover'));
         nodes.forEach((n, i) => {
           const o = old[i];
           if (!o) { sideEl.append(n); return; }
@@ -6392,6 +6392,11 @@
         });
         for (let i = nodes.length; i < old.length; i++) old[i].remove();
       };
+      sideEl.addEventListener('click', (e) => {
+        const sec = e.target.closest('.side > *');
+        ms.clickSec = sec ? [...sideEl.children].indexOf(sec) : -1;
+        setTimeout(() => { ms.clickSec = -1; }, 0);
+      }, true);
       sideEl.addEventListener('pointerleave', () => { if (ms.sideDirty) { ms.sideDirty = false; drawSide(); } });
       sideEl.addEventListener('pointermove', (e) => {
         const sec = e.target.closest('.side > *');
