@@ -42,6 +42,23 @@ const tLoad = performance.now() - t1;
 m3.update(layout.territories.map((t, i) => ({ id: i, owner: owners.get(i) || null, troops: owners.has(i) ? 10 : null, mine: owners.get(i) === 1, threat: false })).filter((x) => !layout.territories[x.id].junction));
 say(`3D built ${Math.round(tLoad)} ms`);
 window.__bench = { m3, dbg, stages, tGen, tLoad, layout };
+window.__view = (name) => {
+  const d = dbg, T = layout.territories, caps = layout.seats.map((s) => s.capital_idx);
+  const cap = T[caps[0]];
+  const hAt = (x, z) => m3.groundAt(x, z);
+  let tx = cap.x, tz = cap.y, dist = 1300, polar = 0.9;
+  if (name === 'mid') dist = 5200;
+  if (name === 'far') { dist = 13000; tx = layout.map_w / 2; tz = layout.map_w / 2; }
+  if (name === 'trail') {
+    const e = layout.edges.find((x) => !T[x.a].junction && !T[x.b].junction && x.length > 2500) || layout.edges[0];
+    const A = T[e.a], B = T[e.b]; tx = (A.x + B.x) / 2; tz = (A.y + B.y) / 2; dist = 1500; polar = 0.85;
+  }
+  if (name === 'farm') { const c = T.find((t) => t.tier >= 2 && !t.junction) || cap; tx = c.x + 450; tz = c.y; dist = 1100; polar = 0.8; }
+  d.controls.target.set(tx, hAt(tx, tz) + 50, tz);
+  d.cam.position.set(tx + dist * Math.sin(polar) * 0.55, hAt(tx, tz) + dist * Math.cos(polar), tz + dist * Math.sin(polar) * 0.83);
+  d.controls.update(); d.composer.render();
+  return name;
+};
 window.__measure = async () => {
   const r = dbg.renderer, c = dbg.composer, gl = r.getContext(), px = new Uint8Array(4);
   const t = [];
