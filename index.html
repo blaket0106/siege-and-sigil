@@ -1028,7 +1028,7 @@
         ['list', [
           'Linked castles: every castle this one connects to by a trail, each with the number of ticks an army takes to get there. Click one to look at it.',
           'Last scouted: for a castle hidden by fog, the tick you last saw it and what you saw then.',
-          'Under threat: when hostile armies you can see are marching on your castle or besieging it, the page shows their force and arrival tick.',
+          'Under threat: a red chip beside the castle name while hostile armies you can see are marching on it or besieging it.',
           'History: who took the castle, who held it, the sieges it has seen and the commanders who led them. You only see events you were part of or that were public.',
         ]],
       ] },
@@ -5517,22 +5517,6 @@
         return box;
       };
 
-      const castleThreat = (t) => {
-        if (t.owner_player_id !== ms.me.id || !ms.vis.has(t.id)) return null;
-        const hostile = (pid) => pid && pid !== ms.me.id && dipStatus(pid) !== 'allied';
-        const incoming = ms.cmd.filter((c) => hostile(c.owner_player_id)).map((c) => ({ c, m: ms.mov.get(c.id) })).filter((x) => x.m && x.m.to_territory_id === t.id);
-        const besiegers = ms.cmd.filter((c) => hostile(c.owner_player_id) && c.status === 'sieging' && c.current_territory_id === t.id);
-        const force = incoming.reduce((a, x) => a + (typeof x.c.troops === 'number' ? x.c.troops : 0), 0) + besiegers.reduce((a, c) => a + (typeof c.troops === 'number' ? c.troops : 0), 0);
-        const near = castleLinks(t.id).filter((l) => ms.vis.has(l.t.id) && hostile(l.t.owner_player_id) && !l.t.is_junction).sort((a, b) => a.len - b.len).slice(0, 4);
-        return h('div', { class: 'sec' }, h('b', {}, 'Threats'),
-          besiegers.map((c) => h('div', { class: 'line k-threat' }, h('span', {}, `${houseOf(c.owner_player_id) || 'An enemy'} army, ${c.troops} troops`), h('span', {}, 'besieging now'))),
-          incoming.length ? incoming.map(({ c, m }) => h('div', { class: 'line k-threat' }, h('span', {}, `${houseOf(c.owner_player_id) || 'An enemy'} army, ${c.troops} troops`), h('span', {}, `arrives tick ${m.arrival_tick}`)))
-            : (besiegers.length ? null : h('div', { class: 'empty' }, 'No hostile armies are marching here that you can see.')),
-          incoming.length + besiegers.length > 1 ? h('div', { class: 'line k-threat' }, h('b', {}, 'Total force you can see'), h('b', {}, String(force))) : null,
-          near.length ? h('div', { class: 'tip' }, 'Nearest hostile castles:') : null,
-          near.map((l) => h('div', { class: 'line' }, h('span', {}, `${l.t.name}, House ${houseOf(l.t.owner_player_id) || '?'}`), h('span', {}, `${l.t.troops} troops`))));
-      };
-
       const castleHistory = (t) => {
         const box = h('div', { class: 'sec chron' }, h('h4', {}, `History of ${t.name}`), h('div', { class: 'chron-body' }, skeleton(3)));
         ms.chist = ms.chist || new Map();
@@ -6226,8 +6210,6 @@
               own ? h('button', { type: 'button', class: 'small', title: c.troops ? 'Give a march order' : 'Give this commander troops', onclick: () => { select('c', c.id); if (c.troops) { ms.marching = true; ms.preview = null; render(); drawSide(); } } }, c.troops ? 'March' : 'Troops') : null,
               h('button', { type: 'button', class: 'small', onclick: () => select('c', c.id) }, 'View'));
           })));
-          const threatBox = castleThreat(t);
-          if (threatBox && (ms.threats || []).includes(t.id)) parts.push(threatBox);
           const fought = ms.battles.filter((b) => b.territory_id === t.id);
           const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
           const links = castleLinks(t.id).filter((l) => l.len <= reachRange).sort((a, b) => a.len - b.len);
