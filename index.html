@@ -3609,11 +3609,13 @@
           });
         }
         const out = new Map();
+        const o = ms.t.get(fromId);
         cost.forEach((c, id) => {
-          if (id === fromId || (ms.t.get(id) && ms.t.get(id).is_junction)) return;
+          const td = ms.t.get(id);
+          if (id === fromId || (td && td.is_junction)) return;
           const path = [id];
           while (path[0] !== fromId) path.unshift(prev.get(path[0]));
-          if (c <= range) out.set(id, { cost: c, path });
+          if (o && td && Math.hypot(o.x - td.x, o.y - td.y) <= range) out.set(id, { cost: c, path });
         });
         return out;
       };
@@ -3912,7 +3914,12 @@
           if (leg) push(id, leg.path, leg.cost);
           else {
             const legs = legsTo(last, id, 10 - ms.stops.length);
-            if (!legs) { toast(`${dest.name} cannot be reached from ${ms.t.get(last).name} through castles you hold. Castles in range are the bright ones.`); return; }
+            if (!legs) {
+              const from = ms.t.get(last);
+              const inCircle = Math.hypot(from.x - dest.x, from.y - dest.y) <= rangeOf(myStables());
+              toast(inCircle ? `${dest.name} is in range but no trail leads there through castles you hold.` : `${dest.name} is outside the range circle. Add a closer stop first; castles in range are the bright ones.`);
+              return;
+            }
             legs.forEach((l) => push(l.id, l.path, l.cost));
             toast(`${dest.name} is ${legs.length} legs away. Added the stops on the way.`, true);
           }

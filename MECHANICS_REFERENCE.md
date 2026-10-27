@@ -1963,3 +1963,10 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - **Range circle.** In march mode a dotted circle with the range as its radius is drawn around the commander, or around the last stop added (it was drawn only in free-travel games). Castles inside it that your trails reach glow.
 - **Measured effect (sim game 286, three AIs, idle human, base range 2.8 leagues at Stables 1):** castles were 6, 4, 4, 4 at tick 40 and 11, 5, 4, 4 at tick 108, against about 35, 28, 19, 4 at tick 114 before. The first capture came at tick 27 instead of 8 to 14. About half of all trails (49 to 61 percent in three maps) are longer than the base range, and Stables research is too slow to change that early (about 144 prestige per level at a few prestige a cycle). Decision October 2026: keep it and see how it plays. Levers if it plays too slowly: raise the base range (3.6 leagues makes about 82 percent of trails usable), or make Stables research cheaper.
 
+
+## 56. Range is the circle (terrain modifiers removed)
+
+- A stop is in range when the straight-line distance from the previous stop to it is within the Stables range, which is exactly the dotted circle drawn in march mode. The trail still decides the path, but only through castles you hold.
+- Trail terrain multipliers are gone. All `move_cost_mult` values are 1, enforced by a trigger on `territory_edges` so newly generated worlds are flat too. Travel time depends on trail length, pace and commander speed only.
+- `plan_march` and `plan_march_from` return `in_range` from the straight-line distance between the first and last path stops. Migration 20261024660000.
+- Out-of-range and no-route clicks now give separate messages.
