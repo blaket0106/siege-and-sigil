@@ -1932,3 +1932,10 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - **Menu.** The Menu button opens a drop-down (`.menu-pop`) under the button instead of a full dialog, closing on outside click, Escape, a second press or choosing an item, with `aria-expanded`. Options, How to play, confirmations and action dialogs stay modal.
 - **Production-only countdown.** See the earlier note in this section: the top bar and home cards count down to the next production, not the next tick.
 
+## 52. Simplified Hiring And Castle Page (October 2026)
+
+- **One hire button.** A castle page offers a single Hire a commander button at `games.commander_cost` (25 gold by default). The client calls `hire_commander` with the Battleschool, so every hired commander starts the same way. The school picker is gone; the server function, the three schools and the starting-school choice in the wizard are untouched, and schools are no longer shown in commander headers and lists. Parking lot: choosing a school at hire.
+- **Mercenaries removed from the live game.** The Hire mercenaries button and its panel are deleted from the castle page. The server (`hire_mercenaries`, `mercenaries_enabled`, default false and hidden from setup) is untouched. Parking lot.
+- **Castle page sections removed:** Defence and production (the castle report box), Threats as a folded section (a castle that is under threat still shows the incoming force box), Supply lines, and Your note with its tags and map badges. The `castle_notes` table and its RPCs stay for later. The Taking this castle panel still gives an enemy castle's defenders and the troops needed.
+- **Linked castles.** The Trails section is now Linked castles: each castle joined to this one by a trail, with only the number of ticks an army takes to walk there, from the leg's length, its terrain cost and the march speed (17.5 x speed multiplier x speed basis x unit scale, or the speed of the last march preview). Distance, terrain and speed text are gone. `games.speed_basis` is now read by the client.
+

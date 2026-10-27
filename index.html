@@ -42,7 +42,7 @@
       return guestAttempt;
     }
 
-    const GAME_COLS = 'id, name, status, neutral_armory, unit_scale, league, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, victory_decay_start, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
+    const GAME_COLS = 'id, name, status, neutral_armory, unit_scale, league, created_by, current_tick, last_tick_processed_at, tick_speed, production_cycle_ticks, commander_speed_mult, speed_basis, infra_cost_mult, area_cost_mult, victory_pct, fog_of_war, fog_dark, map_shape, start_selection, pick_minutes, pick_deadline, victory_decay, victory_decay_start, allow_alliances, roads_mode, random_roads, treasury_cost_mult, recruitment_cost_mult, prestige_cost_mult, trade_cost, trade_requires_scan, terraforming_enabled, experimentation_enabled, experiment_bonus_mult, area_start_levels, area_cost_mults, turn_fixed, auto_start, has_password, resource_richness, star_scatter, mirrored, starting_gold, starting_garrison, starting_treasury_level, starting_industry_level, starting_prestige_level, fill_with_ai, ai_difficulty, truce_ticks, grace_period_ticks, time_limit_ticks, winner_player_id, turn_timeout_minutes, ticks_per_turn, current_turn_ends_at, max_players, map_style, map_size, map_w, map_h, starting_territories, starting_commanders, commander_cost, coronation_ticks, created_at, grace_period_ticks, seasons_enabled, season_length_ticks, events_enabled, mercenaries_enabled, world_scale, free_travel, travel_mode, map_preset, home_distance, anonymity';
 
     function watchGame(gameId, onRefresh) {
       const channel = sb.channel('game:' + gameId, { config: { private: true } })
@@ -1026,12 +1026,9 @@
         ['h', 'The castle page'],
         ['p', 'Select a castle to open its page. Besides the owner, troops and levels, you will find:'],
         ['list', [
-          'Your note: a private tag (Staging, Target, Watch, Fortress, Supply or Danger) and up to 160 characters. The tag shows beside the castle on the map. Only you can see it.',
+          'Linked castles: every castle this one connects to by a trail, each with the number of ticks an army takes to get there. Click one to look at it.',
           'Last scouted: for a castle hidden by fog, the tick you last saw it and what you saw then.',
-          'Production (your castles): troops, gold and prestige the castle yields, and what the next level of each upgrade would add. Garrison commanders and your realm areas are included.',
-          'Defence (your and allied castles): the damage per round the defenders deal, split into Armory, the leader\'s Valor and terrain, plus the fewest troops an attacker needs to take the castle for each level of damage they deal.',
-          'Threats (your castles): hostile armies you can see marching here, with their arrival tick, and the nearest hostile castles.',
-          'Supply lines (your castles): every route of yours that starts at, or stops at, this castle, and what the commander does there.',
+          'Under threat: when hostile armies you can see are marching on your castle or besieging it, the page shows their force and arrival tick.',
           'History: who took the castle, who held it, the sieges it has seen and the commanders who led them. You only see events you were part of or that were public.',
         ]],
       ] },
@@ -1053,7 +1050,7 @@
       { id: 'commanders', group: 'Your forces', title: 'Commanders', blocks: [
         ['p', 'Commanders carry troops, and there is no limit to how many. Gather troops from several castles into one army before a big attack. Commanders are cheap, and you will lose some. A commander who survives [[battles|battles]] gets stronger and becomes worth protecting.'],
         ['h', 'Hiring'],
-        ['p', 'Pick a school and pay the price. You get a new commander with a name from your house\'s own culture and one level in a random ability of that school.'],
+        ['p', 'Press Hire a commander on one of your castles and pay the price. You get a new commander with a name from your house\'s own culture and one level in a random ability.'],
         ['h', 'Names, faces and backgrounds'],
         ['p', 'Every commander has a profile card: a portrait, an age, sometimes an epithet such as "Quillhand", and a short background made of where they grew up, something that happened to them, and a habit. Your house\'s starting king and commanders are its named [[lore|leaders]]. The card shows the commander\'s school, rank and troops. Select a commander to read the full profile. Portraits and backgrounds are for flavor only and do not change any ability.'],
         ['h', 'The chronicle'],
@@ -1248,7 +1245,7 @@
           ['Relief', 'A friendly army that breaks a siege ([[sieges|Sieges]]).'],
           ['Route', 'A march through several castles, optionally looping ([[marching#routes|Routes]]).'],
           ['Sally', 'A garrison sortie that fights the besiegers in the open ([[sieges|Sieges]]).'],
-          ['School', 'Battleschool, University or Rangers: the three groups of commander abilities ([[commanders#hiring|Hiring]]).'],
+          ['School', 'The group of abilities a commander learns fastest. Hired commanders all start the same way; the three schools (Battleschool, University, Rangers) are kept for a later release.'],
           ['Siege', 'Starving a castle instead of storming it ([[sieges|Sieges]]).'],
           ['Stables', 'The realm area that sets how far one order can reach ([[marching#range|Range]]).'],
           ['Tick', 'The unit of game time ([[basics#how-time-works|How time works]]).'],
@@ -2822,7 +2819,6 @@
     }
 
     const TERRAIN_NAMES = { plains: 'Plains', forest: 'Forest', hills: 'Hills', mountain: 'Mountain fortress', coast: 'Coast' };
-    const EDGE_NAMES = { land: 'open ground', pass: 'mountain pass', river: 'river crossing', sea: 'sea lane' };
     const ACTION_NAMES = { nothing: 'Do nothing', collect_all: 'Collect all', drop_all: 'Drop all', collect: 'Collect', drop: 'Drop', collect_all_but: 'Collect all but', drop_all_but: 'Drop all but', garrison: 'Garrison to' };
     const ACTION_NEEDS_AMOUNT = new Set(['collect', 'drop', 'collect_all_but', 'drop_all_but', 'garrison']);
     const orderControls = (st, onChange) => {
@@ -3259,7 +3255,7 @@
     }
 
     function plateCastle(o) {
-      const { t, tier, owner, seen, mine, showTroops, selected, sieged, siegeCol, siegeTier, here, reach, colors, pick, nameLabel, onCmd, cmdSel, tag } = o;
+      const { t, tier, owner, seen, mine, showTroops, selected, sieged, siegeCol, siegeTier, here, reach, colors, pick, nameLabel, onCmd, cmdSel } = o;
       const W = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
       const ownerCol = owner ? colors.c : '#8e8a82';
       const tagY = Math.round(W * 0.2) + 10;
@@ -3289,9 +3285,6 @@
           owner ? sv('path', { d: `M${x0 + 5} ${tagY + 8}h12v3h-12Z`, fill: colors.c2, opacity: 0.9 }) : null,
           sv('text', { x: x0 + 23, y: tagY + 15, 'font-size': 12.5, style: 'fill:#efe3c4;font-family:Cinzel,serif;font-weight:600;letter-spacing:.03em;paint-order:stroke;stroke:rgba(16,11,6,0.9);stroke-width:2px' }, nameLabel),
           troop === '' ? null : sv('text', { x: x0 + tw - 8, y: tagY + 15.5, 'text-anchor': 'end', 'font-size': 13, style: `fill:${showTroops ? '#f5dc94' : '#9a8a64'};font-family:Cinzel,serif;font-weight:700` }, troop)),
-        tag ? sv('g', { class: 'lbl-plate', style: 'pointer-events:none' },
-          sv('rect', { x: -(tag[1].length * 6.4 + 10) / 2, y: -W * 1.3 - 14, width: tag[1].length * 6.4 + 10, height: 17, rx: 8, fill: 'rgba(16,11,6,0.82)', stroke: tag[2], 'stroke-width': 1.3 }),
-          sv('text', { x: 0, y: -W * 1.3 - 2, 'text-anchor': 'middle', 'font-size': 10.5, style: `fill:${tag[2]};font-family:Cinzel,serif;font-weight:700` }, tag[1])) : null,
         showTroops && t.treasury_level !== null && t.treasury_level !== undefined ? sv('text', { class: 'lbl-infra', x: 0, y: tagY + 36, 'text-anchor': 'middle', 'font-size': 12, style: 'fill:#f5dc94;paint-order:stroke;stroke:#000;stroke-width:3px;stroke-linejoin:round;pointer-events:none' }, `T${t.treasury_level} · R${t.industry_level} · P${t.prestige_level}`) : null,
         here.map((c, i) => sv('circle', {
           cx: (i - (here.length - 1) / 2) * 16, cy: dotY, r: c.role === 'king' ? 7 : 5.8, fill: colors.cmd(c.owner_player_id),
@@ -3300,7 +3293,6 @@
         })));
     }
 
-    const NOTE_TAGS = [['staging', 'Staging', '#7fb6e8'], ['target', 'Target', '#e0685c'], ['watch', 'Watch', '#e0b84a'], ['fortress', 'Fortress', '#a8b0b8'], ['supply', 'Supply', '#7ac48a'], ['danger', 'Danger', '#c27ae0']];
     const ABILITY_FX = {
       valor: 'More damage dealt per round in every battle.', tactics: 'Strikes first in battles in the open field.', siegecraft: 'Besieged garrisons starve faster, and a bonus for breaking a castle.',
       bulwark: 'A garrison holds out better when besieged.', muster: '+10% troops per level at the castle this commander leads.', steward: '+10% gold per level at the castle this commander leads.',
@@ -3776,7 +3768,7 @@
         ms.scr = null;
         ms.tab = 'info';
         ms.sel = next;
-        ms.hireOpen = false; ms.mercOpen = false; ms.editStop = null;
+        ms.editStop = null;
         ms.navDir = 'fwd';
         if (location.hash !== hashFor()) history.pushState(null, '', hashFor());
         if (type && isPhone() && ms.sheet === 'peek') setSheet('half');
@@ -4060,11 +4052,11 @@
           const flashing = !!(ms.flash && ms.flash.has(t.id) && Date.now() - ms.flash.get(t.id) < 1600);
           const selC = ms.sel && ms.sel.type === 'c' ? ms.sel.id : null;
           const quick = ms.quick && mine && canAct() ? quickPrice(t) : null;
-          const csig = JSON.stringify([owner, seen, mine, showTroops, t.troops, selected, threatened.has(t.id), sieged, siegers.map((c) => c.id), here.map((c) => [c.id, c.troops, c.status, c.id === selC]), reach, nameLabel, tagOf(t.id), k, tier, !!ms.replay, plate, ms.mem[t.id] ? ms.mem[t.id].tr : null, t.x, t.y, isCap, ms.game.fog_of_war, flashing, quick, ms.colours[owner] || null]);
+          const csig = JSON.stringify([owner, seen, mine, showTroops, t.troops, selected, threatened.has(t.id), sieged, siegers.map((c) => c.id), here.map((c) => [c.id, c.troops, c.status, c.id === selC]), reach, nameLabel, k, tier, !!ms.replay, plate, ms.mem[t.id] ? ms.mem[t.id].tr : null, t.x, t.y, isCap, ms.game.fog_of_war, flashing, quick, ms.colours[owner] || null]);
           const hit = ms.castleCache.get(t.id);
           if (hit && hit.sig === csig) { castles.push(hit.g); marks.push(hit.mk); return; }
           const g = plate
-            ? plateCastle({ t, tier, owner, seen, mine, showTroops, flash: flashing, unknown: ownerUnknown(t, seen), lastTr: !showTroops && ms.mem[t.id] && ms.mem[t.id].tr != null ? ms.mem[t.id].tr : null, selected, sieged, siegeCol: sieged ? color(siegers[0].owner_player_id) : null, siegeTier: sieged ? armyTier(siegers.reduce((a, c) => a + (typeof c.troops === 'number' ? c.troops : 30), 0)) : 0, here, reach, pick, nameLabel, tag: tagOf(t.id), colors: { c: color(owner), c2: color2(owner), cmd: color }, onCmd: (c) => select('c', c.id), cmdSel: (c) => !!ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id })
+            ? plateCastle({ t, tier, owner, seen, mine, showTroops, flash: flashing, unknown: ownerUnknown(t, seen), lastTr: !showTroops && ms.mem[t.id] && ms.mem[t.id].tr != null ? ms.mem[t.id].tr : null, selected, sieged, siegeCol: sieged ? color(siegers[0].owner_player_id) : null, siegeTier: sieged ? armyTier(siegers.reduce((a, c) => a + (typeof c.troops === 'number' ? c.troops : 30), 0)) : 0, here, reach, pick, nameLabel, colors: { c: color(owner), c2: color2(owner), cmd: color }, onCmd: (c) => select('c', c.id), cmdSel: (c) => !!ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id })
             : sv('g', {}, sv('circle', { cx: 0, cy: 0, r: 8 + 3 * tier, fill: owner ? color(owner) : '#6b6b78', stroke: owner ? color2(owner) : '#222', 'stroke-width': 2.5, style: 'cursor:pointer', onclick: pick }), sv('text', { x: 0, y: -8 - 3 * tier - 5, 'text-anchor': 'middle', 'font-size': 17, style: 'fill:#fff;font-weight:bold' }, showTroops ? t.troops : '?'));
           g.setAttribute('transform', `translate(${t.x},${t.y}) scale(${k},${k})`);
           castles.push(g);
@@ -5000,19 +4992,13 @@
             }, 'Buy for ', h('b', { class: 'cost' }, String(cost))));
         }));
         const hire = ms.game.commander_cost;
-        const acts = [h('button', { class: ms.hireOpen ? 'on' : '', 'aria-expanded': ms.hireOpen ? 'true' : 'false', disabled: gold < hire, title: gold < hire ? `You need ${hire - gold} more gold` : 'Hire a commander at this castle', onclick: () => { ms.hireOpen = !ms.hireOpen; ms.mercOpen = false; drawSide(); } }, `Hire a commander · ${hire}`)];
-        if (ms.game.mercenaries_enabled) acts.push(h('button', { class: ms.mercOpen ? 'on' : '', 'aria-expanded': ms.mercOpen ? 'true' : 'false', disabled: gold < 50, title: '5 gold per troop, 48 tick contract', onclick: () => { ms.mercOpen = !ms.mercOpen; ms.hireOpen = false; drawSide(); } }, 'Hire mercenaries'));
+        const acts = [h('button', { disabled: gold < hire, title: gold < hire ? `You need ${hire - gold} more gold` : 'Hire a commander at this castle', onclick: order('hire_commander', { p_territory_id: t.id, p_school: 'battleschool' }, (d) => `${d.name} joins${d.role === 'king' ? ' as king' : ''}`) }, `Hire a commander · ${hire}`)];
         if (t.has_road) acts.push(h('button', { onclick: order('demolish_road', { p_territory_id: t.id }, 'Road demolished') }, 'Demolish roads'));
         else if (ms.game.roads_mode !== 'disabled') {
           const cost = Math.max(1, Math.floor(6 * t.resources * mult * (ms.game.roads_mode === 'expensive' ? 3 : 1)));
           acts.push(h('button', { disabled: gold < cost, title: gold < cost ? `You need ${cost - gold} more gold` : 'Roads make every march from here faster', onclick: order('build_road', { p_territory_id: t.id }, 'Roads built') }, `Build roads · ${cost}`));
         }
         const out = [cols, h('div', { class: 'sel-actions' }, acts)];
-        if (ms.hireOpen) out.push(h('div', { class: 'sel-sub' }, h('span', {}, 'School'), SCHOOLS.map((sc) => h('button', { class: 'small', disabled: gold < hire, onclick: order('hire_commander', { p_territory_id: t.id, p_school: sc.slug }, (d) => `${d.name} joins${d.role === 'king' ? ' as king' : ''}`) }, sc.name))));
-        if (ms.mercOpen && ms.game.mercenaries_enabled) {
-          const size = h('input', { type: 'number', min: '10', max: '60', value: '20', style: 'width:72px' });
-          out.push(h('div', { class: 'sel-sub' }, h('span', {}, 'Troops'), size, h('button', { class: 'small', disabled: gold < 50, onclick: (e) => order('hire_mercenaries', { p_territory_id: t.id, p_troops: Number(size.value) }, (d) => `${d.name} hired for ${d.cost} gold`)(e) }, 'Hire company'), h('span', { class: 'dim' }, '5 gold a troop, 48 ticks')));
-        }
         return out;
       };
       const abandonButton = (t) => (t.owner_player_id !== ms.me.id || !canAct() ? null : h('div', { class: 'sec pfoot' }, h('button', {
@@ -5337,11 +5323,6 @@
       const slugOf = (pid) => (ms.players.get(pid) || {}).faction_slug;
 
       const houseOf = (pid) => { const p = ms.players.get(pid); return p ? factionOf(p.faction_slug).name : null; };
-      const tagOf = (id) => { const n = ms.notes && ms.notes.get(id); return n && n.tag ? NOTE_TAGS.find((x) => x[0] === n.tag) || null : null; };
-      const loadNotes = async () => {
-        const { data } = await sb.rpc('my_castle_notes', { p_game_id: gameId });
-        ms.notes = new Map((data || []).map((n) => [n.territory_id, n]));
-      };
 
       const nowText = (c) => {
         const m = ms.mov.get(c.id);
@@ -5408,22 +5389,6 @@
               f.deeds && f.deeds.length ? h('ul', {}, f.deeds.map((d) => h('li', {}, d))) : null,
               f.epitaph ? h('div', { class: 'fallen-epi' }, f.epitaph) : null))) : [h('div', { class: 'empty' }, 'No commander of yours has fallen yet.')]));
         });
-      };
-
-      const castleNotes = (t) => {
-        const cur = (ms.notes && ms.notes.get(t.id)) || {};
-        let tag = cur.tag || '';
-        const area = h('textarea', { rows: '2', maxlength: '160', placeholder: 'Private note, only you can see it', style: 'width:100%;margin-top:6px' }, cur.note || '');
-        const chips = h('div', { class: 'row wrap2' });
-        const draw = () => chips.replaceChildren(...NOTE_TAGS.map(([k, label, col]) => h('button', { type: 'button', class: 'notechip' + (tag === k ? ' on' : ''), style: `--nc:${col}`, onclick: () => { tag = tag === k ? '' : k; draw(); } }, label)));
-        draw();
-        return h('div', { class: 'sec' }, h('b', {}, 'Your note'), chips, area,
-          h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { onclick: (e) => act(e.currentTarget, async () => {
-            const { error } = await sb.rpc('set_castle_note', { p_game_id: gameId, p_territory_id: t.id, p_tag: tag || null, p_note: area.value });
-            if (error) throw error;
-            await loadNotes();
-            toast('Note saved', true);
-          }) }, 'Save note')));
       };
 
       const attackStats = (ids) => {
@@ -5552,36 +5517,6 @@
         return box;
       };
 
-      const castleReportBox = (t) => {
-        if (t.owner_player_id == null || !ms.vis.has(t.id)) return null;
-        const own = t.owner_player_id === ms.me.id;
-        if (!own && dipStatus(t.owner_player_id) !== 'allied') return null;
-        const box = h('div', {}, h('div', { class: 'sec' }, skeleton(4)));
-        ms.crep = ms.crep || new Map();
-        const paint = (r) => {
-          if (!r) return;
-          const y = r.yield; const d = r.defence;
-          const out = [];
-          if (own) {
-            out.push(h('div', { class: 'sec' }, h('b', {}, 'Production'),
-              line('Troops per cycle', String(y.troops)), line('Gold per cycle', String(y.gold)), line('Prestige per tick', String(y.prestige)),
-              h('div', { class: 'tip' }, `A cycle is ${r.cycle_ticks} ticks. The next level of each would add: Treasury +${y.next_gold} gold per cycle, Recruitment +${y.next_troops} troops per cycle, Prestige +${y.next_prestige} per tick.`)));
-          }
-          out.push(h('div', { class: 'sec' }, h('b', {}, 'Defence'),
-            line('Damage per round', String(d.damage)),
-            h('div', { class: 'tip' }, `Armory ${d.armory} + leader Valor ${d.valor} + 1 base${d.terrain_bonus ? ' + 1 for mountain' : ''}.`),
-            line('Troops', d.stationed ? `${d.troops} in the castle, ${d.total_troops - d.troops} with ${d.stationed} commander${d.stationed === 1 ? '' : 's'}` : String(d.troops)),
-            d.garrison ? line('Garrison leader', d.garrison.name) : null,
-            h('div', { class: 'tip' }, 'The fewest troops an attacker needs to take it, by the damage per round they deal:'),
-            h('div', { class: 'needs' }, d.needed.map((n) => h('span', { class: 'need' }, h('b', {}, String(n.troops_needed)), ` at ${n.attacker_damage}`)))));
-          box.replaceChildren(...out);
-        };
-        const hit = ms.crep.get(t.id);
-        if (hit) paint(hit.data);
-        if (!hit || Date.now() - hit.at > 12000) sb.rpc('castle_report', { p_game_id: gameId, p_territory_id: t.id }).then(({ data }) => { if (data) { ms.crep.set(t.id, { at: Date.now(), data }); paint(data); } });
-        return box;
-      };
-
       const castleThreat = (t) => {
         if (t.owner_player_id !== ms.me.id || !ms.vis.has(t.id)) return null;
         const hostile = (pid) => pid && pid !== ms.me.id && dipStatus(pid) !== 'allied';
@@ -5596,22 +5531,6 @@
           incoming.length + besiegers.length > 1 ? h('div', { class: 'line k-threat' }, h('b', {}, 'Total force you can see'), h('b', {}, String(force))) : null,
           near.length ? h('div', { class: 'tip' }, 'Nearest hostile castles:') : null,
           near.map((l) => h('div', { class: 'line' }, h('span', {}, `${l.t.name}, House ${houseOf(l.t.owner_player_id) || '?'}`), h('span', {}, `${l.t.troops} troops`))));
-      };
-
-      const castleSupply = (t) => {
-        if (t.owner_player_id !== ms.me.id) return null;
-        const rows = [];
-        ms.routes.forEach((r) => {
-          if (r.status !== 'active') return;
-          const cmd = ms.cmd.find((x) => x.id === r.commander_id);
-          if (!cmd) return;
-          const stops = (r.stops || []).filter((st) => st.territory_id === t.id);
-          if (r.origin_territory_id === t.id) rows.push([cmd, `starts here${r.looping ? ' and loops back' : ''}`]);
-          stops.forEach((st) => rows.push([cmd, `${(ACTION_NAMES[st.action] || st.action).toLowerCase()}${st.amount ? ' ' + st.amount : ''} here`]));
-        });
-        return h('div', { class: 'sec' }, h('b', {}, 'Supply lines'),
-          rows.length ? rows.map(([cmd, what]) => h('div', { class: 'line' }, h('span', {}, cmd.name), h('span', {}, what)))
-            : h('div', { class: 'empty' }, 'No route runs through this castle. Give a commander a looping route to feed it.'));
       };
 
       const castleHistory = (t) => {
@@ -5915,7 +5834,7 @@
           line('Troops', sd.garrison ? `${sd.troops} (${sd.garrison} in the garrison)` : sd.troops),
           line('Damage per strike', sd.damage),
           sd.commanders.map((c) => h('div', { style: 'padding:6px 0;border-bottom:1px solid var(--rule-soft)' },
-            h('div', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`, h('span', { style: 'color:var(--dim)' }, ` · ${c.school} · rank ${c.rank} · ${c.troops} troops`)),
+            h('div', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`, h('span', { style: 'color:var(--dim)' }, ` · rank ${c.rank} · ${c.troops} troops`)),
             Object.keys(c.abilities).length ? h('div', { style: 'color:var(--dim);font-size:.8rem' }, abilityChips(c.abilities)) : null)));
         return [
           h('div', { class: 'row', style: 'margin:10px 0' }, h('button', { onclick: () => { ms.report = null; drawSide(); } }, 'All battles')),
@@ -6312,12 +6231,11 @@
           const fought = ms.battles.filter((b) => b.territory_id === t.id);
           const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
           const links = castleLinks(t.id).filter((l) => l.len <= reachRange).sort((a, b) => a.len - b.len);
-          parts.push(pfold('report', mine ? 'Defence and production' : 'Defence', null, castleReportBox(t)));
-          const supply = castleSupply(t);
-          parts.push(pfold('trails', `${ms.game.free_travel ? 'Within your range' : trailsOn() ? 'Trails' : 'Roads'}${supply ? ' and supply lines' : ''}`, links.length ? `${links.length} · nearest ${links[0].t.name}` : 'none', links.slice(0, ms.game.free_travel ? 14 : 99).map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${l.kind && l.kind !== 'land' ? EDGE_NAMES[l.kind] + ' · ' : ''}${l.mult > 1.05 ? 'slow ×' + l.mult.toFixed(1) + ' · ' : ''}${Math.round(l.len)}`))), supply));
-          if (threatBox && !(ms.threats || []).includes(t.id)) parts.push(pfold('threats', 'Threats', 'none seen', threatBox));
+          const baseSpeed = ms.speed || 17.5 * ms.game.commander_speed_mult * (ms.game.speed_basis || 1) * (ms.game.league ? ms.game.unit_scale : ms.game.world_scale);
+          const linkEta = (l) => Math.max(1, Math.ceil((l.len * l.mult) / baseSpeed));
+          parts.push(pfold('links', 'Linked castles', links.length ? String(links.length) : 'none', links.map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${linkEta(l)} tick${linkEta(l) === 1 ? '' : 's'}`)))));
           if (fought.length) parts.push(pfold('battles', 'Battles here', String(fought.length), fought.map(battleRow)));
-          parts.push(pfold('note', `Your note and history`, tagOf(t.id) ? (NOTE_TAGS.find(([k]) => k === tagOf(t.id)) || [0, ''])[1] : null, castleNotes(t), castleHistory(t)));
+          parts.push(pfold('history', 'History', null, castleHistory(t)));
           parts.push(abandonButton(t));
         } else if (sel && sel.type === 'c') {
           const c = ms.cmd.find((x) => x.id === sel.id);
@@ -6329,7 +6247,7 @@
           const ab = ms.abil.get(c.id) || {};
           const pr = c.profile;
           const own = c.owner_player_id === ms.me.id;
-          parts.push(slotHeader(`${c.role === 'king' ? '♛ ' : ''}${c.name}`, `${pname(c.owner_player_id)} · ${c.school}${pr && pr.age ? ` · age ${pr.age}` : ''}`, 'commanders', own && canAct() ? { rename: () => renameDialog(c) } : {}));
+          parts.push(slotHeader(`${c.role === 'king' ? '♛ ' : ''}${c.name}`, `${pname(c.owner_player_id)}${pr && pr.age ? ` · age ${pr.age}` : ''}`, 'commanders', own && canAct() ? { rename: () => renameDialog(c) } : {}));
           parts.push(h('div', { class: 'cprofile' },
             cmdCard(c, { size: 'l', faction: slugOf(c.owner_player_id), rank: rankOf(c), troops: c.troops }),
             h('div', { class: 'cinfo' },
@@ -6806,7 +6724,6 @@
           const t = ms.threads.get(m.thread_id);
           if (t) t.msgs.push(m);
         });
-        if (!ms.notes) await loadNotes();
         if (view.game.status === 'finished' && !ms.storyShown) {
           ms.storyShown = true;
           try {
