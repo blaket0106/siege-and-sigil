@@ -1076,10 +1076,10 @@
         ['list', [
           'Open a commander and press March, or press March beside a commander in a castle panel (it is greyed out until the commander has troops). A bar across the top of the map says what to click; Escape or Cancel ends it.',
           'To put troops under a commander, press Move troops beside them in the castle panel, or open the commander. A slider shows how many stay in the castle and how many go with the commander, with All to commander, Half and All to castle shortcuts. The castle always keeps 1 troop. Press the button (Take or Leave) to make the move.',
-          'Click the destination. The panel shows whether it is in range of one order, the route, the arrival tick and the predicted result of an assault.',
-          'If the castle is out of range in one order but a path runs through castles you or an ally hold, the panel offers March in N legs, which sends the army stop by stop, and Edit route, which opens the same stops in the route editor so you can change them. If no such path exists, the panel says so: raise Stables or take a closer castle first.',
+          'Click castles on the map to build the march. Each click adds a stop and the lit castles move to show how far the army can go from there. The panel lists the waypoints with the ticks to reach each one, the predicted result of an assault on the last, and Undo last, Clear and Send. One stop is a plain march.',
+          'Click the castle the army started from to close a loop: the route returns there and repeats.',
+          'If a castle is out of range in one order but a path runs through castles you or an ally hold, the stops on the way are added for you. If no such path exists, the panel says so: raise Stables or take a closer castle first.',
         ]],
-        ['p', 'Select a [[commanders|commander]] and choose March, then click a destination. The map shows the path, the time to arrive and the cost.'],
         ['h', 'Range'],
         ['p', 'One order can cover only so much distance. Your [[areas|Stables]] level sets that distance. A single hop to a neighbouring castle is always allowed. Castles you can reach glow on the map.'],
         ['p', 'Distance is measured in leagues. One league is the spacing between neighbouring castles on a standard map. Range, scan radius and march speed are fixed in leagues and leagues per tick, so a bigger map means castles lie more leagues apart and journeys take longer. Games created before leagues keep their old scaling.'],
@@ -1104,6 +1104,7 @@
         ['h', 'Changing your mind'],
         ['p', 'When you build a route, each stop is a row with its name, a summary of the order it carries (assault or siege, what to do with the troops, any wait) and the ticks to reach it; Edit opens the controls for that stop and Done closes them. Each stop must be within range of the stop before it. While you are adding stops the map dims every castle the next leg cannot reach and keeps the ones in range bright, with the range measured from the last stop you added. Stops that are out of range cannot be added (the message names both castles), and the server refuses a route with one. If a later stop becomes unreachable (for example a castle changes hands) the army stops at the last castle it reached and you get a message naming the army and the stop.'],
         ['p', 'Orders lock at the first tick. From the moment you send an army until the next tick arrives you can press Cancel march and it stays where it was. After that the army is committed to its destination and cannot turn back.'],
+        ['p', 'Once an army is on its way, its page lists every stop with the action there and the tick it arrives. Edit route reopens the stops: the castle the army is heading for is locked in, but every stop after it can be changed, added or removed, and the actions and waits at each stop can be edited, until the army gets there.'],
         ['p', 'On a route with several stops you can still press Halt at next stop, or Drop remaining stops while it waits. The army finishes its current stretch, stops at that castle and does not go on.'],
       ] },
       { id: 'battles', group: 'War', title: 'Battles', blocks: [
@@ -3628,6 +3629,8 @@
         }
         return pts;
       };
+      const friendlyDest = (t) => !!(t.owner_player_id && isFriend(t.owner_player_id));
+      const marchSpeedOf = (c) => 17.5 * ms.game.commander_speed_mult * (ms.game.speed_basis || 1) * (1 + 0.1 * ((ms.abil.get(c.id) || {}).pace || 0)) * (ms.game.league ? ms.game.unit_scale : ms.game.free_travel ? (1 + ms.game.world_scale) / 2 : trailsOn() ? ms.game.world_scale : 1);
       const stopTicks = () => {
         let ticks = 0;
         return ms.stops.map((st) => {
@@ -3757,10 +3760,10 @@
       const select = (type, id) => {
         if (ms.dragged) return;
         if (ms.ruler && type === 't') return rulerPick(id);
-        if (ms.marching && type === 't') return ms.stops.length ? addStop(id) : previewTo(id);
+        if (ms.marching && type === 't') return addStop(id);
         ms.marching = false;
         ms.preview = null;
-        ms.stops = []; ms.loop = false;
+        ms.stops = []; ms.loop = false; ms.editRoute = null;
         const next = type ? { type, id } : null;
         if (next && (ms.scr || ms.tab !== 'info' || !ms.sel || next.type !== ms.sel.type || next.id !== ms.sel.id)) pushView();
         if (!next) ms.stack = [];
@@ -3775,7 +3778,7 @@
         drawSide();
       };
       const hashFor = () => `#g${gameId}` + (ms.sel ? `/${ms.sel.type}${ms.sel.id}` : '');
-      const leaveMode = () => { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; };
+      const leaveMode = () => { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; ms.editRoute = null; };
       const currentView = () => (ms.scr ? { scr: ms.scr } : ms.tab !== 'info' ? { tab: ms.tab, sub: ms.mailTab } : ms.sel ? { sel: ms.sel } : null);
       const pushView = () => { ms.stack = [...ms.stack, currentView()].slice(-20); };
       const atHome = () => !ms.scr && ms.tab === 'info' && !ms.sel;
@@ -3889,37 +3892,38 @@
 
       const addStop = (id) => {
         const c = ms.cmd.find((x) => x.id === ms.sel.id);
+        const rt = ms.routes.get(c.id);
+        const editing = !!(ms.editRoute && rt && rt.status === 'active' && rt.id === ms.editRoute.route_id);
+        const originId = editing ? ms.editRoute.origin : c.current_territory_id;
         const last = ms.stops.length ? ms.stops[ms.stops.length - 1].id : c.current_territory_id;
         if (id === last) return;
+        if (id === originId && ms.stops.length) {
+          ms.loop = !ms.loop;
+          toast(ms.loop ? `The route loops back to ${ms.t.get(id).name} and repeats` : 'Loop removed', true);
+          render();
+          drawSide();
+          return;
+        }
         if (ms.stops.length >= 10) { toast('A route can have at most 10 stops'); return; }
-        const stop = { id, type: 'assault', action: PREFS.action, amount: 0, delay: 0 };
+        const dest = ms.t.get(id);
+        const push = (sid, path, cost) => ms.stops.push({ id: sid, type: 'assault', action: PREFS.action, amount: 0, delay: 0, path, cost });
         if (trailsOn()) {
           const leg = trailReach(last).get(id);
-          if (!leg) { toast(`${ms.t.get(id).name} is out of range from ${ms.t.get(last).name}. Add a closer stop first; castles in range are the bright ones.`); return; }
-          stop.path = leg.path;
-          stop.cost = leg.cost;
+          if (leg) push(id, leg.path, leg.cost);
+          else {
+            const legs = legsTo(last, id, 10 - ms.stops.length);
+            if (!legs) { toast(`${dest.name} cannot be reached from ${ms.t.get(last).name} through castles you hold. Castles in range are the bright ones.`); return; }
+            legs.forEach((l) => push(l.id, l.path, l.cost));
+            toast(`${dest.name} is ${legs.length} legs away. Added the stops on the way.`, true);
+          }
         } else if (ms.game.free_travel) {
           const a = ms.t.get(last);
-          const b = ms.t.get(id);
-          const dd = a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
-          if (dd > rangeOf(myStables())) { toast(`${b.name} is out of range from ${a.name}. Add a closer stop first; castles in range are the bright ones.`); return; }
-          stop.cost = dd;
+          const dd = a && dest ? Math.hypot(a.x - dest.x, a.y - dest.y) : 0;
+          if (dd > rangeOf(myStables())) { toast(`${dest.name} is out of range from ${a.name}. Add a closer stop first; castles in range are the bright ones.`); return; }
+          push(id, undefined, dd);
+        } else {
+          push(id, undefined, 0);
         }
-        ms.stops.push(stop);
-        render();
-        drawSide();
-      };
-
-      const previewTo = async (id) => {
-        const c = ms.cmd.find((x) => x.id === ms.sel.id);
-        if (id === c.current_territory_id) return;
-        ms.preview = { to: id, type: ms.preview ? ms.preview.type : 'assault' };
-        render();
-        drawSide();
-        const { data, error } = await sb.rpc('preview_march', { p_game_id: gameId, p_commander_id: c.id, p_to_territory_id: id });
-        if (!ms.preview || ms.preview.to !== id) return;
-        if (error) ms.preview.error = error.message;
-        else { ms.preview.plan = data; ms.speed = data.speed; }
         render();
         drawSide();
       };
@@ -4155,15 +4159,6 @@
             });
           }
         }
-        if (ms.preview) {
-          const dest = ms.t.get(ms.preview.to);
-          const ok = !ms.preview.plan || ms.preview.plan.in_range;
-          const tone = ms.preview.error ? '#e0685c' : (ok ? '#7fd08a' : '#e0685c');
-          if (ms.preview.plan) {
-            pv.push(sv('polyline', { points: (trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id))).map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: tone, 'stroke-width': 4.5, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round', style: 'pointer-events:none' }));
-          }
-          pv.push(sv('circle', { cx: dest.x, cy: dest.y, r: 70 * M(), fill: 'none', stroke: tone, 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }));
-        }
         if (ms.ruler && ms.ruler.a) {
           const ra = ms.t.get(ms.ruler.a);
           const rb = ms.ruler.b ? ms.t.get(ms.ruler.b) : null;
@@ -4303,10 +4298,6 @@
         if (c && c.current_territory_id && ms.stops.length) {
           const pts = trailsOn() ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [ms.t.get(c.current_territory_id), ...ms.stops.map((st) => ms.t.get(st.id))];
           routes.push({ pts: pts.map((q) => [q.x, q.y]), color: 0xf5dc94 });
-        }
-        if (ms.preview && ms.preview.plan) {
-          const pts = trailsOn() ? trailPoly(ms.preview.plan.path) : ms.preview.plan.path.map((id) => ms.t.get(id));
-          routes.push({ pts: pts.map((q) => [q.x, q.y]), color: ms.preview.plan.in_range ? 0x62d44e : 0xe0685c });
         }
         const rings = ms.reachable ? [...ms.reachable] : [];
         if (ms.reachFrom) rings.push(ms.reachFrom);
@@ -5103,6 +5094,26 @@
         return h('div', { class: 'sec' }, out);
       };
 
+      const canEditRoute = (route, c) => route.status === 'active' && c.owner_player_id === ms.me.id && canAct()
+        && ((c.status === 'moving' && route.next_stop_index < route.stops.length) || (c.status === 'idle' && route.resume_tick != null));
+      const startRouteEdit = (route, c) => {
+        const moving = c.status === 'moving';
+        const rest = route.stops.slice(route.next_stop_index);
+        let prev = moving ? null : c.current_territory_id;
+        ms.stops = rest.map((st, i) => {
+          const leg = trailsOn() && prev != null ? trailReach(prev).get(st.territory_id) : null;
+          prev = st.territory_id;
+          return { id: st.territory_id, type: st.march_type || 'assault', action: st.action || 'nothing', amount: st.amount || 0, delay: st.delay || 0, path: leg ? leg.path : [st.territory_id], cost: moving && i === 0 ? 0 : (leg ? leg.cost : 0) };
+        });
+        ms.editRoute = { route_id: route.id, origin: route.origin_territory_id, lockFirst: moving };
+        ms.loop = !!route.looping;
+        ms.originOrder = route.origin_order || { action: 'nothing', amount: 0, delay: 0 };
+        ms.editStop = null;
+        ms.marching = true;
+        ms.preview = null;
+        render();
+        drawSide();
+      };
       const routeLines = (route, call, c) => {
         const m = ms.mov.get(c.id);
         const rows = route.stops.map((st, i) => {
@@ -5116,7 +5127,10 @@
           h('div', { class: 'rrow2 head' }, h('span', { class: 'n' }, '#'), h('span', {}, 'Stop'), h('span', { class: 'a' }, 'On arrival'), h('span', { class: 'e' }, 'ETA')),
           ...rows,
           route.looping ? h('div', { class: 'rrow2 loop' + (route.next_stop_index >= route.stops.length ? ' next' : '') }, h('span', { class: 'n' }, '↻'), h('b', {}, `Back to ${(ms.t.get(route.origin_territory_id) || { name: '?' }).name}`), h('span', { class: 'a' }, 'and repeat'), h('span', { class: 'e' })) : null,
-          h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { class: 'small', onclick: call('set_route_loop', { p_commander_id: c.id, p_loop: !route.looping }, route.looping ? 'Loop turned off' : 'Looping from the last stop') }, route.looping ? 'Stop looping' : 'Loop route')));
+          h('div', { class: 'row wrap2', style: 'margin-top:6px' },
+            canEditRoute(route, c) ? h('button', { class: 'small primary', onclick: () => startRouteEdit(route, c) }, 'Edit route') : null,
+            h('button', { class: 'small', onclick: call('set_route_loop', { p_commander_id: c.id, p_loop: !route.looping }, route.looping ? 'Loop turned off' : 'Looping from the last stop') }, route.looping ? 'Stop looping' : 'Loop route')),
+          canEditRoute(route, c) && c.status === 'moving' ? h('div', { class: 'tip' }, 'The castle the army is heading for is locked in. Every stop after it can be changed.') : null);
       };
 
       const troopMover = (c, t) => {
@@ -5158,6 +5172,73 @@
           h('div', { class: 'row wrap2' }, preset('All to commander', maxC), preset('Half', Math.round(maxC / 2)), preset('All to castle', 0), go));
       };
 
+      const stopPayload = (st) => ({ territory_id: st.id, march_type: st.type, action: st.action || 'nothing', amount: st.amount || 0, delay: st.delay || 0 });
+      const marchBuilder = (c) => {
+        const out = [];
+        const rt = ms.routes.get(c.id);
+        const editing = !!(ms.editRoute && rt && rt.status === 'active' && rt.id === ms.editRoute.route_id);
+        const lockFirst = editing && ms.editRoute.lockFirst;
+        const originId = editing ? ms.editRoute.origin : c.current_territory_id;
+        const origin = ms.t.get(originId);
+        ms.speed = marchSpeedOf(c);
+        out.push(h('div', { class: 'tip march-tip' }, ms.stops.length
+          ? `Click castles to add stops. Click ${origin.name} to loop back to it and repeat.`
+          : 'Click a castle on the map to choose where the army marches. Keep clicking to chain stops.'));
+        if (ms.stops.length) {
+          const when = stopTicks();
+          const last = ms.stops[ms.stops.length - 1];
+          const lastDest = ms.t.get(last.id);
+          const loopBlocked = ms.loop && last.id === originId;
+          out.push(h('div', { class: 'sec' }, h('b', {}, `${editing ? 'Route' : 'Waypoints'} (${ms.stops.length} of 10)`),
+            h('div', { class: 'wp-sum' }, ms.stops.map((st) => ms.t.get(st.id).name).join(', ') + (ms.loop ? `, then back to ${origin.name}` : '')),
+            ms.stops.map((st, i) => {
+              const dest = ms.t.get(st.id);
+              const friendly = dest.owner_player_id && isFriend(dest.owner_player_id);
+              const locked = lockFirst && i === 0;
+              const type = friendly || locked ? null : h('select', { style: 'width:auto;padding:3px 6px', onchange: (e) => { st.type = e.target.value; } },
+                h('option', { value: 'assault' }, 'Assault'), h('option', { value: 'siege' }, 'Siege'));
+              if (type) type.value = st.type;
+              const editingStop = ms.editStop === i;
+              const summary = `${friendly ? '' : (st.type === 'siege' ? 'Siege' : 'Assault') + ' · '}${st.action && st.action !== 'nothing' ? ACTION_NAMES[st.action] + (ACTION_NEEDS_AMOUNT.has(st.action) ? ' ' + (st.amount || 0) : '') : 'Do nothing'}${st.delay ? ` · wait ${st.delay}` : ''}`;
+              return h('div', { class: 'stop' + (editingStop ? ' editing' : '') },
+                h('span', { class: 'num' }, String(i + 1)),
+                h('div', { class: 'stop-main' }, h('b', {}, dest.name, locked ? h('span', { class: 'dim', title: 'The army is already on its way here' }, ' · on its way') : null),
+                  editingStop ? h('div', { class: 'stop-sub' }, type, dest.owner_player_id === ms.me.id ? orderControls(st, drawSide) : null, h('button', { type: 'button', class: 'small', onclick: () => { ms.editStop = null; drawSide(); } }, 'Done'))
+                    : h('div', { class: 'stop-sum' }, h('span', {}, summary), h('button', { type: 'button', class: 'link', onclick: () => { ms.editStop = i; drawSide(); } }, 'Edit'))),
+                h('span', { class: 'eta' }, st.cost || (locked && i === 0) ? `+${when[i]}` : ''),
+                locked ? null : h('button', { type: 'button', class: 'ib', 'aria-label': 'Remove this stop', title: trailsOn() ? 'Remove this stop and those after it' : 'Remove this stop', onclick: () => { if (trailsOn()) ms.stops.splice(i); else ms.stops.splice(i, 1); render(); drawSide(); } }, icon('close')));
+            }),
+            line('Reaches the last stop in', tickText(when[when.length - 1])),
+            !friendlyDest(lastDest) ? assaultPreview(lastDest, c) : null,
+            h('label', { class: 'check', style: 'margin:8px 0' }, h('input', { type: 'checkbox', checked: ms.loop, onchange: (e) => { ms.loop = e.target.checked; drawSide(); } }), `Loop: return to ${origin.name} and repeat`),
+            ms.loop ? h('div', {}, h('div', { style: 'color:var(--dim);font-size:.8rem' }, `On each return to ${origin.name}`), orderControls(ms.originOrder, drawSide)) : null,
+            loopBlocked ? h('div', { style: 'color:var(--gules-hi);margin:6px 0' }, 'A looping route must end somewhere other than where it starts.') : null,
+            h('div', { class: 'row wrap2', style: 'margin-top:8px' },
+              h('button', { type: 'button', disabled: ms.stops.length <= (lockFirst ? 1 : 0), onclick: () => { ms.stops.pop(); render(); drawSide(); } }, 'Undo last'),
+              h('button', { type: 'button', disabled: ms.stops.length <= (lockFirst ? 1 : 0), onclick: () => { ms.stops.splice(lockFirst ? 1 : 0); ms.loop = false; render(); drawSide(); } }, 'Clear')),
+            h('button', {
+              class: 'primary',
+              style: 'margin-top:8px',
+              disabled: loopBlocked,
+              onclick: (e) => act(e.currentTarget, async () => {
+                if (editing) {
+                  const { error } = await sb.rpc('edit_route', { p_game_id: gameId, p_commander_id: c.id, p_stops: ms.stops.map(stopPayload), p_options: { loop: ms.loop, origin_order: ms.originOrder } });
+                  if (error) throw error;
+                  leaveMode();
+                  toast('Route updated', true);
+                  return;
+                }
+                const { data, error } = await sb.rpc('send_on_route', { p_game_id: gameId, p_commander_id: c.id, p_march_type: 'assault', p_stops: ms.stops.map(stopPayload), p_options: { loop: ms.loop, origin_order: ms.originOrder } });
+                if (error) throw error;
+                leaveMode();
+                toast(`Marching. ${data.stops === 1 ? 'Arrives' : `First stop of ${data.stops} reached`} at tick ${data.arrival_tick}`, true);
+              }),
+            }, editing ? 'Save route changes' : `Send (${ms.stops.length} stop${ms.stops.length === 1 ? '' : 's'})`)));
+        }
+        out.push(h('div', { style: 'margin-top:10px' }, h('button', { onclick: () => { leaveMode(); render(); drawSide(); } }, editing ? 'Cancel changes' : 'Cancel')));
+        return h('div', { class: 'sec' }, out);
+      };
+
       const commanderActions = (c) => {
         if (c.owner_player_id !== ms.me.id || !canAct()) return null;
         const call = (fn, args, message) => (e) => act(e.currentTarget, async () => {
@@ -5167,6 +5248,7 @@
         });
 
         if (c.status === 'moving') {
+          if (ms.marching && ms.editRoute) return h('div', { class: 'sec' }, h('b', {}, 'Orders'), marchBuilder(c));
           const route = ms.routes.get(c.id);
           const m = ms.mov.get(c.id);
           if (route && route.status === 'aborted' && m) {
@@ -5222,105 +5304,7 @@
           return h('div', { class: 'sec' }, out);
         }
 
-        out.push(h('div', { style: 'color:var(--gold2);margin-bottom:8px' }, ms.stops.length ? 'Click a castle to add the next stop.' : 'Click a castle on the map to choose the destination.'));
-        const pv = ms.preview;
-        if (pv && pv.error) out.push(h('div', { style: 'color:var(--gules-hi);margin-bottom:8px' }, pv.error));
-        if (pv && !pv.plan && !pv.error) out.push(h('div', { class: 'empty' }, 'Planning route...'));
-        if (pv && pv.plan) {
-          const plan = pv.plan;
-          const dest = ms.t.get(pv.to);
-          const interval = TICK_MS[ms.game.tick_speed];
-          const eta = interval ? ` (about ${fmtDuration((plan.arrival_tick - tickF()) * interval)})` : '';
-          const legs = plan.in_range ? null : legsTo(c.current_territory_id, pv.to);
-          const legT = legs ? legsTicks(legs) : null;
-          out.push(h('div', { class: 'chips', style: 'margin-bottom:8px' },
-            plan.in_range ? h('span', { class: 'chip good' }, `In range · ${plan.travel_ticks} ticks`) : h('span', { class: 'chip warn' }, `Out of range in one order · ${leagueText(plan.raw_length)} of ${leagueText(plan.range)} leagues`),
-            !plan.in_range && legs ? h('span', { class: 'chip info' }, `${legs.length} legs via ${legs.slice(0, -1).map((l) => ms.t.get(l.id).name).join(', ')}`) : null));
-          out.push(h('div', {},
-            line('Destination', dest.name),
-            line('Route', plan.path.filter((id) => !ms.t.get(id).is_junction).map((id) => ms.t.get(id).name).join(' > ')),
-            line('Arrives', plan.in_range ? `tick ${plan.arrival_tick}${eta}` : legT != null ? `tick ${Math.ceil(tickF()) + legT} in ${legs.length} legs` : 'needs more than one order'),
-            line('Distance / range', `${leagueText(plan.raw_length)} / ${leagueText(plan.range)} leagues`)));
-          if (!plan.in_range && !legs) out.push(h('div', { class: 'tip', style: 'color:var(--warn)' }, 'No path through castles you hold reaches it in one order each. Raise Stables, or take a closer castle first.'));
-          const friendly = dest.owner_player_id && isFriend(dest.owner_player_id);
-          if (!friendly) {
-            const type = h('select', { onchange: (e) => { pv.type = e.target.value; } },
-              h('option', { value: 'assault' }, 'Assault the castle'),
-              h('option', { value: 'siege' }, 'Lay siege'));
-            type.value = pv.type;
-            out.push(h('label', {}, 'On arrival'), type, assaultPreview(dest, c));
-          }
-          if (ms.collectAt === pv.to) out.push(h('div', { class: 'tip', style: 'color:var(--gold2)' }, 'On arrival this army will collect all the troops in the castle.'));
-          out.push(h('div', { class: 'row wrap2', style: 'margin-top:10px' },
-            !plan.in_range && legs ? h('button', { class: 'primary', onclick: sendLegs(c, legs, pv.type) }, `March in ${legs.length} legs`) : null,
-            !plan.in_range && legs ? h('button', { onclick: () => { ms.stops = legs.map((l, i) => ({ id: l.id, type: i === legs.length - 1 ? pv.type : 'assault', action: PREFS.action, amount: 0, delay: 0, path: l.path, cost: l.cost })); ms.loop = false; ms.preview = null; render(); drawSide(); } }, 'Edit route') : null,
-            plan.in_range || !legs ? h('button', {
-              class: 'primary',
-              disabled: !plan.in_range,
-              title: plan.in_range ? null : 'Out of range in one order',
-              onclick: (e) => act(e.currentTarget, async () => {
-                const collecting = ms.collectAt === pv.to;
-                const { data, error } = collecting
-                  ? await sb.rpc('send_on_route', { p_game_id: gameId, p_commander_id: c.id, p_march_type: pv.type, p_stops: [{ territory_id: pv.to, march_type: pv.type, action: 'collect_all', amount: 0, delay: 0 }], p_options: {} })
-                  : await sb.rpc('march_commander', { p_game_id: gameId, p_commander_id: c.id, p_to_territory_id: pv.to, p_march_type: pv.type });
-                if (error) throw error;
-                ms.collectAt = null;
-                ms.marching = false;
-                ms.preview = null;
-                ms.stops = []; ms.loop = false;
-                toast(`Marching. Arrives at tick ${data.arrival_tick}`, true);
-              }),
-            }, 'March') : null,
-            plan.in_range ? h('button', {
-              onclick: () => { ms.stops = [{ id: pv.to, type: pv.type, action: PREFS.action, amount: 0, delay: 0, path: plan.path, cost: plan.raw_length }]; ms.loop = false; ms.preview = null; render(); drawSide(); },
-            }, 'Start a route here') : null));
-        }
-        if (ms.stops.length) {
-          const when = stopTicks();
-          const origin = ms.t.get(c.current_territory_id);
-          const loopBlocked = ms.loop && ms.stops[ms.stops.length - 1].id === c.current_territory_id;
-          out.push(h('div', { class: 'sec' }, h('b', {}, `Route (${ms.stops.length} of 10 stops)`),
-            ms.stops.map((st, i) => {
-              const dest = ms.t.get(st.id);
-              const friendly = dest.owner_player_id && isFriend(dest.owner_player_id);
-              const type = friendly ? null : h('select', { style: 'width:auto;padding:3px 6px', onchange: (e) => { st.type = e.target.value; } },
-                h('option', { value: 'assault' }, 'Assault'), h('option', { value: 'siege' }, 'Siege'));
-              if (type) type.value = st.type;
-              const editing = ms.editStop === i;
-              const summary = `${friendly ? '' : (st.type === 'siege' ? 'Siege' : 'Assault') + ' · '}${st.action && st.action !== 'nothing' ? ACTION_NAMES[st.action] + (ACTION_NEEDS_AMOUNT.has(st.action) ? ' ' + (st.amount || 0) : '') : 'Do nothing'}${st.delay ? ` · wait ${st.delay}` : ''}`;
-              return h('div', { class: 'stop' + (editing ? ' editing' : '') },
-                h('span', { class: 'num' }, String(i + 1)),
-                h('div', { class: 'stop-main' }, h('b', {}, dest.name),
-                  editing ? h('div', { class: 'stop-sub' }, type, dest.owner_player_id === ms.me.id ? orderControls(st, drawSide) : null, h('button', { type: 'button', class: 'small', onclick: () => { ms.editStop = null; drawSide(); } }, 'Done'))
-                    : h('div', { class: 'stop-sum' }, h('span', {}, summary), h('button', { type: 'button', class: 'link', onclick: () => { ms.editStop = i; drawSide(); } }, 'Edit'))),
-                h('span', { class: 'eta' }, ms.speed && st.cost ? `+${when[i]}` : ''),
-                h('button', { type: 'button', class: 'ib', 'aria-label': 'Remove this stop', title: trailsOn() ? 'Remove this stop and those after it' : 'Remove this stop', onclick: () => { if (trailsOn()) ms.stops.splice(i); else ms.stops.splice(i, 1); render(); drawSide(); } }, icon('close')));
-            }),
-            ms.speed ? line('Reaches the last stop in', tickText(when[when.length - 1])) : null,
-            h('label', { class: 'check', style: 'margin:8px 0' }, h('input', { type: 'checkbox', checked: ms.loop, onchange: (e) => { ms.loop = e.target.checked; drawSide(); } }), `Loop: return to ${origin.name} and repeat`),
-            ms.loop ? h('div', {}, h('div', { style: 'color:var(--dim);font-size:.8rem' }, `On each return to ${origin.name}`), orderControls(ms.originOrder, drawSide)) : null,
-            loopBlocked ? h('div', { style: 'color:var(--gules-hi);margin:6px 0' }, 'A looping route must end somewhere other than where it starts.') : null,
-            h('div', { style: 'color:var(--dim);font-size:.8rem;margin:6px 0' }, trailsOn()
-              ? 'Click castles to add stops. Each stop must be within range of the one before it. Orders run when the commander arrives at a castle you own.'
-              : 'Click more castles to add stops. Only the first leg is checked now; later legs are planned when the commander reaches each stop, and the route ends if one is blocked.'),
-            h('button', {
-              class: 'primary',
-              disabled: loopBlocked,
-              onclick: (e) => act(e.currentTarget, async () => {
-                const { data, error } = await sb.rpc('send_on_route', {
-                  p_game_id: gameId, p_commander_id: c.id, p_march_type: 'assault',
-                  p_stops: ms.stops.map((st) => ({ territory_id: st.id, march_type: st.type, action: st.action || 'nothing', amount: st.amount || 0, delay: st.delay || 0 })),
-                  p_options: { loop: ms.loop, origin_order: ms.originOrder },
-                });
-                if (error) throw error;
-                ms.marching = false;
-                ms.preview = null;
-                ms.stops = []; ms.loop = false;
-                toast(`Route started with ${data.stops} stop${data.stops === 1 ? '' : 's'}. First leg arrives at tick ${data.arrival_tick}`, true);
-              }),
-            }, `Send route (${ms.stops.length} stop${ms.stops.length === 1 ? '' : 's'})`)));
-        }
-        out.push(h('div', { style: 'margin-top:10px' }, h('button', { onclick: () => { ms.marching = false; ms.preview = null; ms.stops = []; ms.loop = false; render(); drawSide(); } }, 'Cancel')));
+        out.push(marchBuilder(c));
         return h('div', { class: 'sec' }, out);
       };
 
@@ -5447,27 +5431,14 @@
         }
         return null;
       };
-      const legsTicks = (legs) => (ms.speed ? legs.reduce((a, l) => a + Math.ceil(l.cost / ms.speed), 0) : null);
-      const sendLegs = (c, legs, type) => (e) => act(e.currentTarget, async () => {
-        const last = legs.length - 1;
-        const { data, error } = await sb.rpc('send_on_route', {
-          p_game_id: gameId, p_commander_id: c.id, p_march_type: type,
-          p_stops: legs.map((l, i) => ({ territory_id: l.id, march_type: i === last ? type : 'assault', action: 'nothing', amount: 0, delay: 0 })),
-          p_options: { loop: false, origin_order: { action: 'nothing', amount: 0, delay: 0 } },
-        });
-        if (error) throw error;
-        leaveMode();
-        ms.collectAt = null;
-        toast(`${c.name} marches in ${legs.length} legs. First stop at tick ${data.arrival_tick}`, true);
-      });
-
-      const sendHere = (c, t, collect) => {
+      const sendHere = (c, t) => {
         select('c', c.id);
-        ms.collectAt = collect ? t.id : null;
         ms.marching = true;
+        ms.stops = [];
+        ms.loop = false;
         render();
         drawSide();
-        previewTo(t.id);
+        addStop(t.id);
       };
 
       const assaultSection = (t) => {
