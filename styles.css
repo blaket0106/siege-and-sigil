@@ -1850,3 +1850,9 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 .mover .mv-nums { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: var(--dim); }
 .mover .mv-nums b { color: var(--text); font-family: var(--font-display); font-size: 1.05rem; }
 .mover input[type='range'] { width: 100%; min-height: 36px; }
+
+.linkrow { display: flex; align-items: center; gap: 8px; }
+.linkrow .cdot { flex: none; margin-right: 0; }
+.linkrow .ln { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linkrow .lw { font-size: 0.78rem; color: var(--dim); white-space: nowrap; }
+.linkrow .le { font-size: 0.8rem; color: var(--dim); white-space: nowrap; min-width: 56px; text-align: right; }

@@ -5151,6 +5151,7 @@
         };
         slider.addEventListener('input', sync);
         sync();
+        if (maxC === 0) return h('div', { class: 'mover' }, h('div', { class: 'tip', style: 'margin:0' }, `${t.name} has no spare troops to give ${c.name}. A castle always keeps 1.`));
         return h('div', { class: 'mover' },
           h('div', { class: 'mv-nums' }, h('span', {}, `${t.name} `, castleN), h('span', {}, `${c.name} `, cmdN)),
           slider,
@@ -6225,7 +6226,19 @@
           const links = castleLinks(t.id).filter((l) => l.len <= reachRange).sort((a, b) => a.len - b.len);
           const baseSpeed = ms.speed || 17.5 * ms.game.commander_speed_mult * (ms.game.speed_basis || 1) * (ms.game.league ? ms.game.unit_scale : ms.game.world_scale);
           const linkEta = (l) => Math.max(1, Math.ceil((l.len * l.mult) / baseSpeed));
-          parts.push(pfold('links', 'Linked castles', links.length ? String(links.length) : 'none', links.map((l) => h('button', { class: 'cmdrow', onclick: () => select('t', l.t.id) }, l.t.name, h('span', { style: 'color:var(--dim);margin-left:auto' }, `${linkEta(l)} tick${linkEta(l) === 1 ? '' : 's'}`)))));
+          const linkOwner = (lt) => ((ms.vis.has(lt.id) || lt.owner_player_id !== undefined) ? lt.owner_player_id : (ms.mem[lt.id] ? ms.mem[lt.id].o : null));
+          const linkRow = (l) => {
+            const lo = linkOwner(l.t);
+            const unknown = ownerUnknown(l.t, ms.vis.has(l.t.id));
+            const who = lo === ms.me.id ? 'Yours' : lo ? `House ${houseOf(lo) || pname(lo)}` : unknown ? 'Unknown' : 'Unclaimed';
+            const eta = linkEta(l);
+            return h('button', { class: 'cmdrow linkrow', onclick: () => select('t', l.t.id) },
+              h('i', { class: 'cdot', style: `background:${lo ? color(lo) : unknown ? 'transparent' : '#6b6b78'}${unknown ? ';border-style:dashed' : ''}`, 'aria-hidden': 'true' }),
+              h('span', { class: 'ln' }, l.t.name),
+              h('span', { class: 'lw', style: lo && lo !== ms.me.id ? `color:${color(lo)}` : '' }, who),
+              h('span', { class: 'le' }, `${eta} tick${eta === 1 ? '' : 's'}`));
+          };
+          parts.push(pfold('links', 'Linked castles', links.length ? String(links.length) : 'none', links.map(linkRow)));
           if (fought.length) parts.push(pfold('battles', 'Battles here', String(fought.length), fought.map(battleRow)));
           parts.push(pfold('history', 'History', null, castleHistory(t)));
           parts.push(abandonButton(t));
