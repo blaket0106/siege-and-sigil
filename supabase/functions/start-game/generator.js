@@ -814,7 +814,7 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
   if (!neutrals) throw new Error('could not place territories for these settings');
 
   const points = [...locals, ...neutrals];
-  if (!mirrored && starScatter !== 'twin_rings') bridgeLongLinks(points, startTotal, spacing, (p) => shape.inside({ x: p.x - center, y: p.y - center }));
+  if (!mirrored && starScatter !== 'twin_rings') bridgeLongLinks(points, startTotal, spacing, (p) => shape.crossCap > 0 || shape.inside({ x: p.x - center, y: p.y - center }));
   const resourcesAt = [
     ...Array.from({ length: players }, () => START_RESOURCES.slice(0, startingTerritories)).flat(),
     ...neutralValues,
