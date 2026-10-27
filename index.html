@@ -458,6 +458,11 @@
       sun: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z',
       moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z',
       sound: 'M4 9v6h4l5 4V5L8 9H4ZM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
+      gear: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z',
+      mail: 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm0 0l9 6 9-6',
+      lock: 'M5 11h14v10H5V11Zm3 0V8a4 4 0 0 1 8 0v3',
+      coins: 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 4v8m-2.5-5.5H13a1.5 1.5 0 0 1 0 3h-3',
+      refresh: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5',
       mute: 'M4 9v6h4l5 4V5L8 9H4ZM17 9l5 6M22 9l-5 6',
       back: 'M15 6l-6 6 6 6', close: 'M6 6l12 12M18 6L6 18', menu: 'M4 7h16M4 12h16M4 17h16', home: 'M4 11l8-7 8 7v9H4z',
       help: 'M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
@@ -879,10 +884,10 @@
         ['p', 'This is the map screen, where you spend nearly all of a game. The numbers in the picture match the list below it.'],
         ['diagram', 'screen'],
         ['table', { head: ['', 'What it shows'], rows: [
-          ['1', 'The back arrow to your games, your crest, the game name and the current tick. The Treasury figure beside it shows the gold the next production will pay, how many ticks away it is, and the clock time until it lands.'],
-          ['2', 'Road to victory: how close the leader is to the castle share that wins ([[basics#what-wins-the-game|how you win]]). Proposals waiting for your answer and castles under threat appear beside it; click either to jump to them.'],
-          ['3', 'Your gold and what the next production cycle adds ([[economy#how-production-works|production]]).'],
-          ['4', 'Castles (every castle in one table), Ruler, Menu and Help. The menu drops down under the button and does not dim the map. It is in four groups: Mail (Inbox, Chat, News), Your realm (Research, Castles, Ledger), The war (Intel, Recorder, Battle calculator, and Replay once a game ends) and This game (Game rules, Host tools, Options, How to play). Every item opens in the side panel, in the same slot a castle or commander uses: a title, a back arrow, a ? that opens the manual page for that screen, and a close. The map stays visible and live beside it. Opening another item replaces the screen, Escape or the back arrow returns to what was there before, and close returns to the leaderboard.'],
+          ['1', 'The back arrow to your games, your crest, the game name and the current tick.'],
+          ['2', 'The top bar tiles. Production stays in the centre with a clock to the next production and a bar that fills over the cycle. The four tiles around it are yours to choose with the gear at the right of the bar or in Options: Road to victory (click for the leaderboard), Treasury (click for Spend), Research (the active area and when it levels), Armies (how many are marching and the next arrival), Next arrival, Troops, Threats, Proposals, Day and season. While a castle of yours is under attack a red Threats tile takes the last slot whatever you chose, and a Proposals tile appears while an offer waits for your answer.'],
+          ['3', 'Mail, with the count of unread reports, battles and messages, and the Menu.'],
+          ['4', 'The menu drops down under the button and does not dim the map. The top row is tools: Ruler, Spend, Legend, Rings (scan rings, fog games only), Sound and Refresh. Below it every screen with its key: Leaderboard, Research, Castles, Ledger, Intel, Recorder, Battle calculator, Inbox, Chat, News, then Game rules, Host tools, Options and Help, and Main menu to leave the game. Every screen opens in the side panel, in the same slot a castle or commander uses. Options can dock the menu beside the map instead.'],
           ['5', 'Your castle. The plate shows its name and troops, and the ring is its colour.'],
           ['6', 'Castles you can reach with an order glow ([[marching#range|range]]).'],
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
@@ -943,6 +948,12 @@
         ['houses'],
       ] },
       { id: 'map', group: 'The world', title: 'The map', blocks: [
+        ['h', 'Keys'],
+        ['list', [
+          'L leaderboard, R research, S castles, D ledger, G intel, I inbox, N new message, C battle calculator, O options, ? help. Pressing a screen\'s key again closes it.',
+          'V ruler, B spend, Z scan rings, H centre the map on your realm, plus and minus zoom. Escape cancels an order or a mode, then steps back, then returns to the leaderboard.',
+          'Keys do nothing while you are typing in a box.',
+        ]],
         ['h', 'Selecting things'],
         ['list', [
           'Click or tap near a castle to select it; the nearest castle to your pointer wins, so you do not need to hit the sprite exactly. A marching or besieging army on top of a castle is selected before the castle, except while you are choosing a march destination or measuring with the ruler, when the castle always wins; commanders resting inside a castle are reached from the castle panel.',
@@ -3272,12 +3283,15 @@
     };
     const SCHOOL_ABILITIES = { battleschool: ['valor', 'tactics', 'siegecraft', 'bulwark'], university: ['muster', 'steward', 'scholar'], rangers: ['pace', 'scout', 'plunder'] };
 
+    const BAR_TILES = { victory: 'Road to victory', treasury: 'Treasury', research: 'Research', armies: 'Armies', arrival: 'Next arrival', troops: 'Troops', threats: 'Threats', proposals: 'Proposals', season: 'Day and season' };
     const PREFS = (() => {
       let v = {};
       try { v = JSON.parse(localStorage.getItem('ss-prefs')) || {}; } catch {}
       const when = (x, d) => (['always', 'zoomed', 'close', 'never'].includes(x) ? x : d);
-      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right', plates: when(v.plates, 'always'), armies: when(v.armies, 'always'), infra: when(v.infra, 'zoomed') };
-      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side, plates: prefs.plates, armies: prefs.armies, infra: prefs.infra })); } catch {} window.dispatchEvent(new Event('ss-prefs')); };
+      const BAR_DEFAULT = ['victory', 'treasury', 'research', 'armies'];
+      const bar = Array.isArray(v.bar) && v.bar.length === 4 && v.bar.every((k) => BAR_TILES[k]) ? v.bar : BAR_DEFAULT;
+      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right', plates: when(v.plates, 'always'), armies: when(v.armies, 'always'), infra: when(v.infra, 'zoomed'), bar, menu: v.menu === 'docked' ? 'docked' : 'drop' };
+      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side, plates: prefs.plates, armies: prefs.armies, infra: prefs.infra, bar: prefs.bar, menu: prefs.menu })); } catch {} window.dispatchEvent(new Event('ss-prefs')); };
       return prefs;
     })();
 
@@ -3355,6 +3369,8 @@
     function optionsDialog() {
       const action = selectOf(ACTION_NAMES, PREFS.action);
       const side = selectOf({ right: 'Right of the map', left: 'Left of the map' }, PREFS.side);
+      const menuStyle = selectOf({ drop: 'Drops down from the Menu button', docked: 'Docked beside the map' }, PREFS.menu);
+      const slots = PREFS.bar.map((k) => selectOf(BAR_TILES, k));
       const sound = h('input', { type: 'checkbox', checked: Sfx.on });
       const WHEN = { always: 'Always', zoomed: 'When zoomed in', close: 'Only when close up', never: 'Never' };
       const plates = selectOf(WHEN, PREFS.plates);
@@ -3364,6 +3380,9 @@
         h('label', {}, 'Default order at new route stops'), action,
         h('div', { class: 'tip' }, 'Do nothing is the safe choice. Collect all empties a castle\'s garrison into the commander.'),
         h('label', {}, 'Side panel'), side,
+        h('label', {}, 'Menu'), menuStyle,
+        h('label', {}, 'Top bar'), h('div', { class: 'tip', style: 'margin:0 0 6px' }, 'Production stays in the centre. Choose the four tiles around it.'),
+        h('div', { class: 'slotgrid' }, ...slots.map((sel, i) => h('label', { class: 'slot' }, `Slot ${i + 1}`, sel))),
         h('label', {}, 'Map text: castle names and troops'), plates,
         h('label', {}, 'Map text: army troop counts'), armiesSel,
         h('label', {}, 'Map text: castle upgrade levels'), infra,
@@ -3378,6 +3397,8 @@
             PREFS.plates = plates.value;
             PREFS.armies = armiesSel.value;
             PREFS.infra = infra.value;
+            PREFS.bar = slots.map((sel) => sel.value);
+            PREFS.menu = menuStyle.value;
             PREFS.save();
             if (sound.checked !== Sfx.on) Sfx.toggle();
             const body = document.querySelector('.mapbody');
@@ -3416,7 +3437,7 @@
       await loadFactions();
       const uid = state.session.user.id;
       const memKey = `ss-fog-${gameId}-${uid}`;
-      const ms = { council: [], worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, loop: false, originOrder: { action: 'nothing', amount: 0, delay: 0 }, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [], stack: [], navDir: 'fwd', sideKey: null, sideDirty: false, castleCache: new Map() };
+      const ms = { council: [], worldEvents: [], captives: [], offers: [], deals: [], locks: [], turn: null, stops: [], profiles: new Map(), battles: [], inboxTab: 'reports', report: null, battleSeen: 0, chatTab: 'general', thread: null, compose: null, chat: [], threads: new Map(), chatSeen: 0, tab: 'info', moments: [], inbox: [], newIds: new Set(), marching: false, loop: false, originOrder: { action: 'nothing', amount: 0, delay: 0 }, preview: null, xfer: 1, sel: null, edges: null, cells: null, mem: {}, rings: true, view: null, full: null, dragged: false, vis: new Set(), sources: [], stack: [], navDir: 'fwd', sideKey: null, sideDirty: false, castleCache: new Map(), legendOpen: (() => { try { return localStorage.getItem('ss-legend') === '1'; } catch { return false; } })() };
       try { ms.mem = JSON.parse(localStorage.getItem(memKey)) || {}; } catch { ms.mem = {}; }
       const mutedKey = `ss-muted-${gameId}-${uid}`;
       try { ms.muted = new Set(JSON.parse(localStorage.getItem(mutedKey)) || []); } catch { ms.muted = new Set(); }
@@ -3914,14 +3935,8 @@
         const rows = [h('div', {}, sv('svg', { width: 26, height: 18, viewBox: '-15 -9 30 18', class: 'lsw' }, sv('ellipse', { cy: 2, rx: 13.5, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 1.2 }), sv('ellipse', { cy: 2, rx: 12, ry: 5, fill: 'none', stroke: color(ms.me.id), 'stroke-width': 3 }), sv('path', { d: 'M-5 3v-9h2v2h2v-2h2v2h2v-2h2v9z', fill: '#d8ceb4', stroke: '#2a2216', 'stroke-width': 0.7 })), 'You')];
         [...ms.players.values()].filter((p) => p.id !== ms.me.id).forEach((p) => rows.push(h('div', {}, swatch(color(p.id)), (p.display_name || 'House').slice(0, 16))));
         rows.push(h('div', {}, swatch('#b9b09a', true), 'Unclaimed'));
-        if (ms.game.fog_of_war && ms.game.fog_dark) rows.push(h('div', {}, swatch('#7f8cab', true), 'Out of sight: owner unknown'));
-        rows.push(h('div', { class: 'lnote' }, h('b', {}, '12'), ' troops in the castle, ? if out of sight'));
-        rows.push(h('div', { class: 'lnote' }, 'T R P: treasury, recruitment, prestige levels'));
-        rows.push(h('div', { class: 'lnote' }, h('span', { style: 'color:#ff6a5a' }, 'Pulsing red ring'), ': an enemy army is heading there'));
-        let hidden = false;
-        try { hidden = localStorage.getItem('ss-legend') === '0'; } catch {}
-        box.classList.toggle('collapsed', hidden);
-        box.replaceChildren(h('button', { type: 'button', class: 'lhead', onclick: () => { try { localStorage.setItem('ss-legend', hidden ? '1' : '0'); } catch {} paintLegend(); } }, hidden ? 'Legend' : 'Hide legend'), ...rows);
+        if (ms.game.fog_of_war && ms.game.fog_dark) rows.push(h('div', {}, swatch('#7f8cab', true), 'Out of sight'));
+        box.replaceChildren(h('button', { type: 'button', class: 'ib lclose', 'aria-label': 'Hide the legend', title: 'Hide the legend', onclick: toggleLegend }, icon('close')), ...rows);
       };
 
       const render = () => {
@@ -4207,8 +4222,9 @@
       const productionText = () => { const left = productionLeft(); return left === null ? '' : ` · ${fmtDuration(left)}`; };
       const updateCountdown = () => {
         const g = ms.game;
-        const prod = hud.querySelector('.kpi.treasury .prod');
-        if (prod) prod.textContent = productionText();
+        const prod = hud.querySelector('.tile.prod .v');
+        const left = productionLeft();
+        if (prod && left !== null) prod.textContent = fmtDuration(left);
         if (g.status !== 'active') { nextEl.textContent = ''; return; }
         if (g.paused_at) { nextEl.textContent = 'paused by the host'; return; }
         const interval = TICK_MS[g.tick_speed];
@@ -4598,33 +4614,56 @@
       state.cleanup.push(() => window.removeEventListener('ss-replay', onReplay));
 
       let closeMenu = () => {};
-      const menuDialog = (e) => {
+      const spendDialog = () => { const [, upgrade] = realmSection(); screen('Spend', h('div', {}, upgrade), { help: 'economy', sub: 'Upgrade everywhere, cheapest castle first.' }); };
+      const toggleLegend = () => { ms.legendOpen = !ms.legendOpen; try { localStorage.setItem('ss-legend', ms.legendOpen ? '1' : '0'); } catch {} wrap.classList.toggle('legend-open', ms.legendOpen); drawHud(); };
+      const toggleRings = () => { if (!ms.game.fog_of_war) return; ms.rings = !ms.rings; render(); drawHud(); };
+      const toggleSound = () => { Sfx.toggle(); drawHud(); };
+      const refreshNow = (e) => { const b = e && e.currentTarget; if (b) b.classList.add('pending'); load({ force: true }).finally(() => { if (b) b.classList.remove('pending'); toast('Game data refreshed', true); }); };
+      const barPicker = (e) => {
         const btn = e && e.currentTarget;
-        if (document.querySelector('.menu-pop')) { closeMenu(); return; }
-        const item = (title, note, fn) => h('button', { type: 'button', class: 'menu-item', onclick: () => { closeMenu(); fn(); } }, h('b', {}, title), h('span', {}, note));
-        const group = (title, ...items) => (items.filter(Boolean).length ? h('div', { class: 'menu-group' }, h('h3', {}, title), h('div', { class: 'menu-items' }, items)) : null);
-        const g = ms.game;
-        const unreadN = ms.inbox.filter((i) => !i.is_read).length + battlesUnread();
-        const chatUnreadN = chatUnread() + [...ms.threads.values()].filter(threadUnread).length;
-        const pop = h('div', { class: 'menu-pop', role: 'menu', 'aria-label': 'Menu' },
-          group('Mail',
-            item('Inbox', `reports and battles${unreadN ? ` · ${unreadN} new` : ''}`, () => openTab('inbox')),
-            item('Chat', `the game channel${chatUnreadN ? ` · ${chatUnreadN} new` : ''}`, () => openTab('chat')),
-            item('News', 'what happened across the realm', () => openTab('news'))),
-          group('Your realm',
-            item('Research', 'areas, progress and ETAs', researchDialog),
-            item('Castles', 'every castle in one table', castlesDialog),
-            item('Ledger', 'gold given and received', ledgerDialog)),
-          group('The war',
-            item('Intel', 'charts and groups', intelDialog),
-            item('Recorder', 'history of the war', recorderDialog),
-            item('Battle calculator', 'predict a fight', battleCalcDialog),
-            g.status === 'finished' ? item('Replay', 'watch the castles change hands', startReplay) : null),
-          group('This game',
-            item('Game rules', 'the articles of war', () => screen(`${g.name}: rules`, articlesOfWar(g, ms.players.size), { wide: true, help: 'hosting' })),
-            g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', 'pause or jump ticks', hostDialog) : null,
-            item('Options', 'default order, panel side, map text, sound', optionsDialog),
-            item('How to play', 'the field manual', () => helpDialog())));
+        if (document.querySelector('.menu-pop.picker')) { closeMenu(); return; }
+        const sels = PREFS.bar.map((k) => selectOf(BAR_TILES, k));
+        sels.forEach((sel, i) => { sel.onchange = () => { PREFS.bar[i] = sel.value; PREFS.save(); drawHud(); }; });
+        const pop = h('div', { class: 'menu-pop picker', role: 'dialog', 'aria-label': 'Top bar tiles' },
+          h('h3', {}, 'Top bar'), h('div', { class: 'tip' }, 'Production stays in the centre. Pick the four tiles around it.'),
+          ...sels.map((sel, i) => h('label', { class: 'slot' }, `Slot ${i + 1}`, sel)));
+        openPop(pop, btn);
+      };
+      const ZOOM_STEP = 0.7;
+      const zoomBy = (k) => {
+        const v = ms.view;
+        if (!v || ms.view3d) return;
+        const nw = Math.min(ms.full.w * 1.04, Math.max(ms.full.w / 40, v.w * k));
+        const f = nw / v.w;
+        const cx = v.x + v.w / 2, cy = v.y + v.h / 2;
+        ms.view = clampView({ x: cx - (v.w * f) / 2, y: cy - (v.h * f) / 2, w: nw, h: v.h * f });
+        applyView();
+      };
+      const KEYS = [
+        ['L', 'Leaderboard'], ['R', 'Research'], ['S', 'Castles'], ['D', 'Ledger'], ['G', 'Intel'], ['I', 'Inbox'], ['N', 'New message'], ['C', 'Battle calculator'], ['O', 'Options'], ['?', 'Help'],
+        ['V', 'Ruler'], ['B', 'Spend'], ['Z', 'Scan rings'], ['H', 'Centre on your realm'], ['+ −', 'Zoom'], ['Esc', 'Back, close or cancel']];
+      const toggleScreen = (title, open) => { if (ms.scr && ms.scr.title === title) goBack(); else open(); };
+      const onShortcut = (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (document.querySelector('.overlay')) return;
+        const k = e.key;
+        const map = {
+          l: () => (atHome() ? null : goRoot()), r: () => toggleScreen('Research', researchDialog), s: () => toggleScreen('All castles', castlesDialog), d: () => toggleScreen('Ledger', ledgerDialog),
+          g: () => toggleScreen('Intel', intelDialog), i: () => (ms.tab === 'inbox' && !ms.scr ? goBack() : openTab('inbox')), n: () => { openTab('chat').then(() => { ms.chatTab = 'messages'; ms.compose = { ids: new Set() }; drawSide(); }); },
+          c: () => toggleScreen('Battle calculator', battleCalcDialog), o: optionsDialog, '?': () => helpDialog('screen'), v: toggleRuler, b: () => toggleScreen('Spend', spendDialog), z: toggleRings,
+          h: () => ms.goHome && ms.goHome(), '+': () => zoomBy(ZOOM_STEP), '=': () => zoomBy(ZOOM_STEP), '-': () => zoomBy(1 / ZOOM_STEP),
+        };
+        const fn = map[k.length === 1 ? k.toLowerCase() : k];
+        if (!fn) return;
+        e.preventDefault();
+        if (document.querySelector('.menu-pop')) closeMenu();
+        fn();
+      };
+      window.addEventListener('keydown', onShortcut);
+      state.cleanup.push(() => window.removeEventListener('keydown', onShortcut));
+      const openPop = (pop, btn) => {
         const r = btn ? btn.getBoundingClientRect() : { bottom: 56, right: window.innerWidth - 12 };
         pop.style.top = `${Math.round(r.bottom + 8)}px`;
         pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
@@ -4643,7 +4682,54 @@
         document.body.append(pop);
         requestAnimationFrame(() => pop.classList.add('in'));
       };
-
+      const menuContent = (after) => {
+        const g = ms.game;
+        const unreadN = ms.inbox.filter((i) => !i.is_read).length + battlesUnread();
+        const chatUnreadN = chatUnread() + [...ms.threads.values()].filter(threadUnread).length;
+        const key = (k) => h('kbd', {}, k);
+        const item = (title, k, fn, note) => h('button', { type: 'button', class: 'mi', onclick: () => { after(); fn(); } }, h('span', {}, title, note ? h('small', {}, note) : null), k ? key(k) : null);
+        const tool = (name, label, k, fn, on, disabled, title) => h('button', { type: 'button', class: on ? 'on' : '', disabled: disabled || null, title: title || label, 'aria-pressed': on === undefined ? null : (on ? 'true' : 'false'), onclick: (e) => { fn(e); if (!on && on !== false) after(); } }, icon(name), label, k ? key(k) : null);
+        return [
+          h('div', { class: 'tools' },
+            tool('ruler', 'Ruler', 'V', () => { toggleRuler(); after(); }, !!ms.ruler),
+            tool('coins', 'Spend', 'B', () => { after(); spendDialog(); }),
+            tool('list', 'Legend', null, toggleLegend, !!ms.legendOpen),
+            tool('eye', 'Rings', 'Z', toggleRings, !!ms.rings, !g.fog_of_war, g.fog_of_war ? 'Show the sight radius of every castle and commander' : 'Scan rings apply only in fog of war games'),
+            tool(Sfx.on ? 'sound' : 'mute', 'Sound', null, toggleSound, Sfx.on),
+            tool('refresh', 'Refresh', null, refreshNow)),
+          item('Leaderboard', 'L', goRoot),
+          item('Research', 'R', researchDialog),
+          item('Castles', 'S', castlesDialog),
+          item('Ledger', 'D', ledgerDialog),
+          item('Intel', 'G', intelDialog),
+          item('Recorder', null, recorderDialog),
+          item('Battle calculator', 'C', battleCalcDialog),
+          item('Inbox', 'I', () => openTab('inbox'), unreadN ? `${unreadN} new` : null),
+          item('Chat', null, () => openTab('chat'), chatUnreadN ? `${chatUnreadN} new` : null),
+          item('News', null, () => openTab('news')),
+          g.status === 'finished' ? item('Replay', null, startReplay) : null,
+          h('div', { class: 'mi-sep' }),
+          item('Game rules', null, () => screen(`${g.name}: rules`, articlesOfWar(g, ms.players.size), { wide: true, help: 'hosting' })),
+          g.status === 'active' && g.created_by === state.session.user.id ? item('Host tools', null, hostDialog) : null,
+          item('Options', 'O', optionsDialog),
+          item('Help', '?', () => helpDialog()),
+          h('div', { class: 'mi-sep' }),
+          item('Main menu', 'Esc', showHome, 'back to your games'),
+        ];
+      };
+      const drawRail = () => {
+        const old = wrap.querySelector('.rail');
+        if (PREFS.menu !== 'docked') { if (old) old.remove(); mapBody.classList.remove('railed'); return; }
+        const rail = h('div', { class: 'rail' }, h('div', { class: 'rail-in' }, ...menuContent(() => {})));
+        if (old) old.replaceWith(rail); else wrap.append(rail);
+        mapBody.classList.add('railed');
+      };
+      const menuDialog = (e) => {
+        const btn = e && e.currentTarget;
+        if (document.querySelector('.menu-pop')) { closeMenu(); return; }
+        const pop = h('div', { class: 'menu-pop drawer', role: 'menu', 'aria-label': 'Menu' }, ...menuContent(() => closeMenu()));
+        openPop(pop, btn);
+      };
       const drawHud = () => {
         const g = ms.game;
         const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
@@ -4657,6 +4743,45 @@
         const left = cyc - (g.current_tick % cyc);
         const kpi = (cls, k, v, title, onclick) => h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `kpi ${cls}${onclick ? ' link ghost' : ''}`, title, onclick }, h('span', { class: 'k' }, Array.isArray(k) ? [h('span', { class: 'long' }, k[0]), h('span', { class: 'short' }, k[1])] : k), v);
         const props = pendingProposals();
+        const mailN = ms.inbox.filter((i) => !i.is_read).length + battlesUnread() + chatUnread() + [...ms.threads.values()].filter(threadUnread).length;
+        const tile = (cls, label, value, small, title, onclick, extra) => h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `tile ${cls}${onclick ? ' go' : ''}`, title, onclick }, h('span', { class: 'k' }, label), h('span', { class: 'v' }, value), small ? h('small', {}, small) : null, extra || null);
+        const barTiles = () => {
+          const marching = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'moving');
+          const arrivals = marching.map((c) => ({ c, m: ms.mov.get(c.id) })).filter((x) => x.m).sort((a, b) => a.m.arrival_tick - b.m.arrival_tick);
+          const nextA = arrivals[0];
+          const nextTxt = nextA ? `${nextA.c.name} at ${(ms.t.get(nextA.m.to_territory_id) || {}).name || 'a castle'} in ${Math.max(0, nextA.m.arrival_tick - g.current_tick)}t` : null;
+          const active = ms.areas.find((a) => a.is_active);
+          const per = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id && !t.is_junction).reduce((n, t) => n + (t.prestige_level || 0), 0);
+          const need = active ? Math.ceil(144 * active.level * g.area_cost_mult * ((g.area_cost_mults || {})[active.area] ?? 1)) : 0;
+          const cycles = active && per > 0 ? Math.max(1, Math.ceil(Math.max(0, need - active.prestige_accumulated) / per)) : null;
+          const ticksLeft = cycles === null ? null : cyc - (g.current_tick % cyc) + (cycles - 1) * cyc;
+          const inCastles = [...ms.t.values()].filter((t) => t.owner_player_id === ms.me.id).reduce((n, t) => n + (t.troops || 0), 0);
+          const inField = ms.cmd.filter((c) => c.owner_player_id === ms.me.id).reduce((n, c) => n + (c.troops || 0), 0);
+          const day = Math.floor(g.current_tick / 24) + 1;
+          const make = {
+            victory: () => tile('victory', 'Road to victory', `${mineN} of ${winAt}`, `leader ${rival}`, `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game. Opens the leaderboard.`, goRoot, h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))),
+            treasury: () => tile('treasury', 'Treasury', `${ms.me.gold} gold`, `+${inc} at production`, 'Opens Spend: upgrade everywhere, cheapest first.', spendDialog),
+            research: () => tile('research', 'Research', active ? `${AREA_NAMES[active.area] || active.area} ${active.level + 1}` : 'none active', active ? (cycles === null ? 'no prestige income' : `in ${pluralN(cycles, 'cycle')} · ${ticksLeft}t`) : 'choose an area', 'Opens Research.', researchDialog),
+            armies: () => tile('armies', 'Armies', `${marching.length} marching`, nextTxt ? `next: ${nextTxt}` : `${ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'idle').length} waiting`, 'Opens every castle and army.', castlesDialog),
+            arrival: () => tile('arrival', 'Next arrival', nextA ? `${Math.max(0, nextA.m.arrival_tick - g.current_tick)}t` : 'none', nextA ? `${nextA.c.name} at ${(ms.t.get(nextA.m.to_territory_id) || {}).name || 'a castle'}` : 'no army marching', 'Opens every castle and army.', castlesDialog),
+            troops: () => tile('troops', 'Troops', String(inCastles + inField), `${inCastles} in castles · ${inField} in the field`, 'Opens every castle and army.', castlesDialog),
+            threats: () => tile('threat', 'Under threat', ms.threats && ms.threats.length ? `${ms.threats.length} castle${ms.threats.length === 1 ? '' : 's'}` : 'none', ms.threats && ms.threats.length ? 'click to look' : 'no hostile army seen', 'Hostile armies heading for your castles. Click to look at the first one.', () => { if (!ms.threats || !ms.threats.length) return; const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); }),
+            proposals: () => tile('proposals', 'Proposals', props ? String(props) : 'none', props ? 'to answer' : 'nothing waiting', 'Open the proposals', () => { goRoot(); setTimeout(() => flashSection(sideEl.querySelector('[data-sec="offers"]') ? 'offers' : 'standings'), 50); }),
+            season: () => tile('season', g.seasons_enabled ? 'Season' : 'Day', g.seasons_enabled ? seasonLabel(g) : `Day ${day}`, `tick ${g.current_tick}`, 'The calendar.', null),
+          };
+          const chosen = [...PREFS.bar];
+          const forced = [];
+          if (g.status === 'active' && ms.threats && ms.threats.length && !chosen.includes('threats')) forced.push('threats');
+          if (g.status === 'active' && props && !chosen.includes('proposals')) forced.push('proposals');
+          forced.forEach((k, i) => { chosen[3 - i] = k; });
+          const out = chosen.slice(0, 2).map((k, i) => { const n = make[k](); n.classList.add(`s${i + 1}`); if (forced.includes(k)) n.classList.add('forced'); return n; });
+          const prodLeft = productionLeft();
+          const prodTile = tile('prod', 'Production in', prodLeft === null ? (g.status === 'active' ? 'paused' : 'over') : fmtDuration(prodLeft), `tick ${g.current_tick} · cycle ${(g.current_tick % cyc) + 1} of ${cyc}`, `Production pays every ${cyc} ticks. About +${inc} gold at the next one, in ${left} tick${left === 1 ? '' : 's'}.`, null, h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(((g.current_tick % cyc) / cyc) * 100)}%` })));
+          prodTile.append(icon('lock'));
+          out.push(prodTile);
+          chosen.slice(2).forEach((k, i) => { const n = make[k](); n.classList.add(`s${i + 3}`); if (forced.includes(k)) n.classList.add('forced'); out.push(n); });
+          return out;
+        };
         if (!ms.hudL) {
           ms.hudName = h('b', {});
           ms.hudTick = h('span', {});
@@ -4671,29 +4796,25 @@
         ms.hudParts = ms.hudParts || {};
         const keep = (key, node) => { const prev = ms.hudParts[key]; if (prev && prev.outerHTML === node.outerHTML) return prev; ms.hudParts[key] = node; return node; };
         const place = (host, nodes) => { const cur = [...host.children]; if (cur.length === nodes.length && cur.every((n, i) => n === nodes[i])) return; host.replaceChildren(...nodes); };
+        const tiles = barTiles();
         place(hud, [ms.hudL, keep('c', h('div', { class: 'hud-c' },
-            g.status === 'finished' ? null : kpi('victory', ['Road to victory', 'Victory'], h('span', { class: 'v' }, `${mineN} of ${winAt}`, h('div', { class: 'meter-track' }, h('i', { class: 'rival', style: `width:${pct(rival)}` }), h('i', { class: 'mine', style: `width:${pct(mineN)}` }))), `You hold ${mineN} castles. The leading rival holds ${rival}. ${winAt} wins the game.`),
-            kpi('treasury', 'Treasury', h('span', { class: 'v' }, String(ms.me.gold), h('small', {}, `+${inc} in ${left}t`, h('span', { class: 'prod' }, productionText()))), `Production pays every ${cyc} ticks. About +${inc} gold at the next one, in ${left} tick${left === 1 ? '' : 's'}${productionLeft() === null ? '' : ` (${fmtDuration(productionLeft())})`}.`),
-            props ? kpi('proposals', 'Proposals', h('span', { class: 'v' }, h('span', { class: 'pill' }, String(props)), h('small', {}, 'to answer')), 'Open the proposals', () => { goRoot(); setTimeout(() => flashSection(sideEl.querySelector('[data-sec="offers"]') ? 'offers' : 'standings'), 50); }) : null,
-            g.status === 'active' && ms.threats && ms.threats.length ? kpi('threat', 'Under threat', h('span', { class: 'v' }, `${ms.threats.length} castle${ms.threats.length === 1 ? '' : 's'}`), 'Hostile armies are heading for your castles. Click to look at the first one.', () => { const id = ms.threats[0]; select('t', id); if (ms.focusOn) ms.focusOn(id); }) : null,
-            g.paused_at && g.status === 'active' ? h('span', { class: 'tag gold' }, 'Paused') : null,
-            g.seasons_enabled && g.status === 'active' ? h('span', { class: 'tag gold' }, seasonLabel(g)) : null,
-            g.time_limit_ticks && g.status === 'active' ? h('span', { class: 'tag' }, `Ends at tick ${g.time_limit_ticks}`) : null,
-            ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { class: 'tag', style: 'color:var(--gules-hi);border-color:var(--gules)' }, 'Eliminated') : null,
-            turnControl(),
-            g.status === 'finished' ? h('button', { class: 'primary', onclick: () => storyDialog(gameId) }, 'The story') : null,
-            g.status === 'finished' ? h('button', { onclick: () => summaryDialog(gameId) }, 'Final standings') : null)),
+            ...tiles,
+            h('div', { class: 'hud-tags' },
+              g.paused_at && g.status === 'active' ? h('span', { class: 'tag gold' }, 'Paused') : null,
+              g.time_limit_ticks && g.status === 'active' ? h('span', { class: 'tag' }, `Ends at tick ${g.time_limit_ticks}`) : null,
+              ms.me.eliminated_at_tick != null && g.status === 'active' ? h('span', { class: 'tag', style: 'color:var(--gules-hi);border-color:var(--gules)' }, 'Eliminated') : null,
+              turnControl(),
+              g.status === 'finished' ? h('button', { class: 'primary', onclick: () => storyDialog(gameId) }, 'The story') : null,
+              g.status === 'finished' ? h('button', { onclick: () => summaryDialog(gameId) }, 'Final standings') : null),
+            g.status === 'active' ? h('button', { type: 'button', class: 'ib gear', title: 'Choose what the bar shows', 'aria-label': 'Choose what the bar shows', onclick: barPicker }, icon('gear')) : null)),
           keep('r', h('div', { class: 'hud-r' },
-            h('button', { type: 'button', class: 'ghost', onclick: castlesDialog, title: 'Every castle in one table' }, 'Castles'),
-            h('button', { type: 'button', class: ms.ruler ? 'primary' : 'ghost', 'aria-pressed': ms.ruler ? 'true' : 'false', onclick: toggleRuler, title: 'Measure the distance between two castles' }, 'Ruler'),
-            h('button', { type: 'button', class: 'primary hud-menu', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: menuDialog }, 'Menu'),
-            h('button', { type: 'button', class: 'ghost', onclick: () => helpDialog(), title: 'How to play' }, 'Help')))]);
+            h('button', { type: 'button', class: 'ib mail', title: mailN ? `Mail: ${mailN} unread` : 'Mail', 'aria-label': 'Mail', onclick: () => openTab('inbox') }, icon('mail'), mailN ? h('span', { class: 'badge' }, String(mailN)) : null),
+            PREFS.menu === 'docked' ? null : h('button', { type: 'button', class: 'primary hud-menu', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: menuDialog }, 'Menu')))]);
         place(mapCtl, [keep('m', h('div', { class: 'mapctl-in' },
-          h('button', { type: 'button', class: 'ib', title: 'Back to your castles', 'aria-label': 'Back to your castles', onclick: () => ms.goHome && ms.goHome() }, icon('home')),
-          TOUCH_DEVICE ? null : h('button', { type: 'button', class: ms.view3d ? 'on' : '', 'aria-pressed': ms.view3d ? 'true' : 'false', onclick: toggle3D, title: ms.view3d ? 'Switch to the 2D map' : 'Switch to the 3D map' }, ms.view3d ? '2D' : '3D'),
-          g.fog_of_war ? h('button', { type: 'button', class: ms.rings ? 'on' : '', 'aria-pressed': ms.rings ? 'true' : 'false', onclick: () => { ms.rings = !ms.rings; render(); }, title: 'Show scan rings' }, 'Rings') : null,
-          h('button', { type: 'button', class: 'legend-btn' + (ms.legendOpen ? ' on' : ''), 'aria-pressed': ms.legendOpen ? 'true' : 'false', onclick: () => { ms.legendOpen = !ms.legendOpen; wrap.classList.toggle('legend-open', ms.legendOpen); drawHud(); }, title: 'Show the legend' }, 'Legend'),
-          h('button', { type: 'button', class: 'ib', title: Sfx.on ? 'Sound on' : 'Sound off', 'aria-label': 'Toggle sound', onclick: (e) => { const on = Sfx.toggle(); e.currentTarget.replaceChildren(icon(on ? 'sound' : 'mute')); e.currentTarget.title = on ? 'Sound on' : 'Sound off'; } }, icon(Sfx.on ? 'sound' : 'mute'))))]);
+          h('button', { type: 'button', class: 'ib', title: 'Centre on your realm', 'aria-label': 'Centre on your realm', onclick: () => ms.goHome && ms.goHome() }, icon('home')),
+          TOUCH_DEVICE ? null : h('button', { type: 'button', class: ms.view3d ? 'on' : '', 'aria-pressed': ms.view3d ? 'true' : 'false', onclick: toggle3D, title: ms.view3d ? 'Switch to the 2D map' : 'Switch to the 3D map' }, ms.view3d ? '2D' : '3D')))]);
+        wrap.classList.toggle('legend-open', !!ms.legendOpen);
+        drawRail();
         updateCountdown();
       };
 
@@ -6081,7 +6202,7 @@
           if (pr && pr.bio) parts.push(pfold('bio', 'About', null, h('p', { class: 'cbio' }, pr.bio)));
         } else {
           const pl = [...ms.players.values()].map((p) => ({ p, n: castlesOf(p.id) })).sort((a, b) => b.n - a.n);
-          const [areas, upgrade, surrender] = realmSection();
+          const [areas, , surrender] = realmSection();
           const winAtH = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
           const mineN = castlesOf(ms.me.id);
           const rivalN = Math.max(0, ...pl.filter(({ p }) => p.id !== ms.me.id).map(({ n }) => n));
@@ -6111,7 +6232,6 @@
           parts.push(offers);
           parts.push(eventsSection());
           parts.push(prisonersSection());
-          parts.push(upgrade);
           parts.push(areas);
           parts.push(h('div', { class: 'sec row wrap2' }, canAct() && ms.players.size > 2 ? h('button', { onclick: mediationDialog }, 'Offer mediation') : null, h('button', { onclick: fallenHall }, 'Hall of the Fallen')));
           parts.push(surrender ? pfold('surrender', 'Surrender', null, surrender) : null);
