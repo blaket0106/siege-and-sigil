@@ -1941,3 +1941,10 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - **Top bar: no gear, no lock (October 2026).** The gear button that opened a tile picker and the lock icon on the Production tile are removed. The four tiles around Production are chosen only in Menu, Options, under Top bar (the same slot pickers that were already there). Production still sits in the centre.
 - **Reload keeps you in the game (October 2026).** On sign-in, `onSession` reads the `#g<id>` part of the address and calls `openGame` for it instead of always showing the home screen, so a refresh lands back in the same game with the selected castle or army (`#g<id>/t<id>` or `/c<id>`) restored and the data reloaded. A game that no longer exists, or that you are not in, falls back to the home screen. Open screens (Research, Mail and so on) and the lobby are not part of the address and do not come back after a reload.
 
+## 53. Move Troops And March On Commander Rows (October 2026)
+
+- **Two buttons per commander.** On a castle page each of your idle commanders has Move troops and March; the old Troops and View buttons are gone. The commander's name is the link to the commander page.
+- **Move troops** opens a slider under the row: castle count on the left, commander count on the right, All to commander, Half and All to castle presets, and one button that reads Take N or Leave N. It calls `transfer_troops` with a positive (take) or negative (leave) amount and updates the numbers at once (rolled back on error). The castle keeps at least 1 troop. The same control replaces the number box with separate Take and Leave buttons on the commander page.
+- **March** is greyed out with the hint "Move troops to this commander first" while the commander has no troops; otherwise it opens the commander and arms the march destination picker.
+- **Reference point:** NP's carrier is not auto-filled either; the player chooses how many ships go with it.
+

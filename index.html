@@ -864,7 +864,7 @@
         ['list', [
           'Click your starting castle and look at its three [[economy|upgrade tracks]].',
           'Spend your first gold on [[economy|Treasury]] at your richest castle, then on Recruitment. Income first, army second.',
-          'Hire a [[commanders|commander]] from one of the three [[commanders#hiring|schools]] and move troops onto them.',
+          'Hire a [[commanders|commander]] and move troops onto them.',
           '[[marching|Capture]] a neutral castle next to you. Neutral castles hold no troops and never grow any, so a single trooper takes one, and you can see how far each is by its trail.',
           'Open Standings and meet your neighbours ([[diplomacy|Diplomacy]]). A quiet border is worth more than one more army.',
         ]],
@@ -1074,7 +1074,8 @@
       { id: 'marching', group: 'Your forces', title: 'Marching and routes', blocks: [
         ['h', 'Giving a march order'],
         ['list', [
-          'Open a commander and press March, or press the March shortcut beside a commander in a castle panel. A bar across the top of the map says what to click; Escape or Cancel ends it.',
+          'Open a commander and press March, or press March beside a commander in a castle panel (it is greyed out until the commander has troops). A bar across the top of the map says what to click; Escape or Cancel ends it.',
+          'To put troops under a commander, press Move troops beside them in the castle panel, or open the commander. A slider shows how many stay in the castle and how many go with the commander, with All to commander, Half and All to castle shortcuts. The castle always keeps 1 troop. Press the button (Take or Leave) to make the move.',
           'Click the destination. The panel shows whether it is in range of one order, the route, the arrival tick and the predicted result of an assault.',
           'If the castle is out of range in one order but a path runs through castles you or an ally hold, the panel offers March in N legs, which sends the army stop by stop, and Edit route, which opens the same stops in the route editor so you can change them. If no such path exists, the panel says so: raise Stables or take a closer castle first.',
         ]],
@@ -5118,6 +5119,44 @@
           h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { class: 'small', onclick: call('set_route_loop', { p_commander_id: c.id, p_loop: !route.looping }, route.looping ? 'Loop turned off' : 'Looping from the last stop') }, route.looping ? 'Stop looping' : 'Loop route')));
       };
 
+      const troopMover = (c, t) => {
+        const maxC = c.troops + Math.max(0, t.troops - 1);
+        let want = ms.mv && ms.mv.id === c.id ? Math.min(ms.mv.v, maxC) : c.troops;
+        const slider = h('input', { type: 'range', min: '0', max: String(maxC), value: String(want), 'aria-label': `Troops with ${c.name}` });
+        const castleN = h('b', {});
+        const cmdN = h('b', {});
+        const go = h('button', { type: 'button', class: 'small primary' });
+        const sync = () => {
+          want = Number(slider.value);
+          ms.mv = { id: c.id, v: want };
+          castleN.textContent = String(t.troops + c.troops - want);
+          cmdN.textContent = String(want);
+          const d = want - c.troops;
+          go.textContent = d === 0 ? 'Move' : d > 0 ? `Take ${d}` : `Leave ${-d}`;
+          go.disabled = d === 0;
+        };
+        const preset = (label, v) => h('button', { type: 'button', class: 'small', onclick: () => { slider.value = String(v); sync(); } }, label);
+        go.onclick = (e) => {
+          const d = want - c.troops;
+          if (!d) return;
+          ms.mv = null;
+          act(e.currentTarget, async () => {
+            const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: c.id, p_amount: d });
+            if (error) throw error;
+          }, () => {
+            const prev = [c.troops, t.troops];
+            c.troops += d; t.troops -= d;
+            return () => { c.troops = prev[0]; t.troops = prev[1]; };
+          });
+        };
+        slider.addEventListener('input', sync);
+        sync();
+        return h('div', { class: 'mover' },
+          h('div', { class: 'mv-nums' }, h('span', {}, `${t.name} `, castleN), h('span', {}, `${c.name} `, cmdN)),
+          slider,
+          h('div', { class: 'row wrap2' }, preset('All to commander', maxC), preset('Half', Math.round(maxC / 2)), preset('All to castle', 0), go));
+      };
+
       const commanderActions = (c) => {
         if (c.owner_player_id !== ms.me.id || !canAct()) return null;
         const call = (fn, args, message) => (e) => act(e.currentTarget, async () => {
@@ -5159,28 +5198,7 @@
         }
 
         if (t.owner_player_id === ms.me.id) {
-          const amount = h('input', { type: 'number', min: '1', value: ms.xfer, style: 'width:90px', oninput: (e) => { ms.xfer = Math.max(1, Number(e.target.value) || 1); } });
-          out.push(h('div', { class: 'row wrap2', style: 'margin-bottom:10px' },
-            amount,
-            h('button', { onclick: (e) => act(e.currentTarget, async () => {
-              const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: c.id, p_amount: Number(amount.value) || 1 });
-              if (error) throw error;
-            }, () => {
-              const n = Math.min(Number(amount.value) || 1, Math.max(0, t.troops - 1));
-              const prev = [c.troops, t.troops];
-              c.troops += n; t.troops -= n;
-              return () => { c.troops = prev[0]; t.troops = prev[1]; };
-            }) }, 'Take'),
-            h('button', { onclick: (e) => act(e.currentTarget, async () => {
-              const { error } = await sb.rpc('transfer_troops', { p_game_id: gameId, p_commander_id: c.id, p_amount: -(Number(amount.value) || 1) });
-              if (error) throw error;
-            }, () => {
-              const n = Math.min(Number(amount.value) || 1, c.troops);
-              const prev = [c.troops, t.troops];
-              c.troops -= n; t.troops += n;
-              return () => { c.troops = prev[0]; t.troops = prev[1]; };
-            }) }, 'Leave'),
-            h('span', { style: 'color:var(--dim);font-size:.8rem' }, `Garrison ${t.troops}`)));
+          out.push(troopMover(c, t));
         }
 
         const extras = [];
@@ -6191,10 +6209,16 @@
           if (here.length) parts.push(h('div', { class: 'sec cmds' }, here.map((c) => {
             const own = c.owner_player_id === ms.me.id && canAct() && c.status === 'idle' && t.garrison_commander_id !== c.id;
             const what = t.garrison_commander_id === c.id ? 'leads the garrison' : c.status === 'sieging' ? 'besieging' : c.status === 'idle' ? 'waiting here' : c.status;
-            return h('div', { class: 'cmdline2' },
-              h('div', { class: 'nm' }, h('b', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`), h('span', {}, `${c.owner_player_id === ms.me.id ? '' : pname(c.owner_player_id) + ' · '}R${rankOf(c)} · ${typeof c.troops === 'number' ? pluralN(c.troops, 'troop') : '? troops'} · ${what}`)),
-              own ? h('button', { type: 'button', class: 'small', title: c.troops ? 'Give a march order' : 'Give this commander troops', onclick: () => { select('c', c.id); if (c.troops) { ms.marching = true; ms.preview = null; render(); drawSide(); } } }, c.troops ? 'March' : 'Troops') : null,
-              h('button', { type: 'button', class: 'small', onclick: () => select('c', c.id) }, 'View'));
+            const canMove = own && t.owner_player_id === ms.me.id;
+            const open = canMove && ms.moveOpen === c.id;
+            return h('div', { class: 'cmdwrap' },
+              h('div', { class: `cmdline2${open ? ' open' : ''}` },
+                h('button', { type: 'button', class: 'nm', title: 'Open this commander', onclick: () => select('c', c.id) },
+                  h('b', {}, `${c.role === 'king' ? '♛ ' : ''}${c.name}`),
+                  h('span', {}, `${c.owner_player_id === ms.me.id ? '' : pname(c.owner_player_id) + ' · '}R${rankOf(c)} · ${typeof c.troops === 'number' ? pluralN(c.troops, 'troop') : '? troops'} · ${what}`)),
+                canMove ? h('button', { type: 'button', class: 'small', 'aria-expanded': open ? 'true' : 'false', title: 'Move troops between the castle and this commander', onclick: () => { ms.moveOpen = open ? null : c.id; ms.mv = null; drawSide(); } }, 'Move troops') : null,
+                own ? h('button', { type: 'button', class: 'small', disabled: !c.troops, title: c.troops ? 'Start a march' : 'Move troops to this commander first', onclick: () => { select('c', c.id); ms.marching = true; ms.preview = null; render(); drawSide(); } }, 'March') : null),
+              open ? troopMover(c, t) : null);
           })));
           const fought = ms.battles.filter((b) => b.territory_id === t.id);
           const reachRange = ms.game.free_travel ? rangeOf(myStables()) : Infinity;
