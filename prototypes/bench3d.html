@@ -62,10 +62,11 @@ window.__view = (name) => {
 window.__measure = async () => {
   const r = dbg.renderer, c = dbg.composer, gl = r.getContext(), px = new Uint8Array(4);
   const t = [];
-  for (let i = 0; i < 4; i++) { const a = performance.now(); c.render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); t.push(performance.now() - a); }
+  for (let i = 0; i < 3; i++) { c.render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+  for (let i = 0; i < 5; i++) { const a = performance.now(); c.render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); t.push(performance.now() - a); }
   r.info.autoReset = false; r.info.reset(); c.render(); const info = { ...r.info.render }; r.info.autoReset = true;
   let meshes = 0, inst = 0, tris = 0;
   dbg.scene.traverse((o) => { if (o.isMesh || o.isPoints) { meshes++; const g = o.geometry; const idx = g.index ? g.index.count : g.attributes.position.count; const n = o.isInstancedMesh ? o.count : 1; if (o.isInstancedMesh) inst += o.count; tris += idx / 3 * n; } });
-  return { gpuMsMin: Math.round(Math.min(...t)), gpuMsMed: Math.round(t.sort((a, b) => a - b)[2]), drawCalls: info.calls, trisPerFrameM: +(info.triangles / 1e6).toFixed(2), meshes, instances: inst, residentTrisM: +(tris / 1e6).toFixed(1), size: r.getSize(new dbg.THREE.Vector2()).toArray(), loadMs: Math.round(tLoad), genMs: Math.round(tGen), stages };
+  return { gpuMsMin: Math.round(Math.min(...t)), gpuMsMed: Math.round(t.sort((a, b) => a - b)[2]), drawCalls: info.calls, trisPerFrameM: +(info.triangles / 1e6).toFixed(2), meshes, instances: inst, residentTrisM: +(tris / 1e6).toFixed(1), size: r.getSize(new dbg.THREE.Vector2()).toArray(), loadMs: Math.round(tLoad), genMs: Math.round(tGen), marks: dbg.marks.map(([n, t]) => [n, Math.round(t - dbg.marks[0][1])]) };
 };
 </script></body></html>

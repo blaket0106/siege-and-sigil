@@ -15,7 +15,7 @@ const mergeGeometries = (a) => mg0(a.map((g) => (g.index ? g.toNonIndexed() : g)
 export async function createMap3D(host, spec) {
 const $ = (id) => host.querySelector('#' + id);
 host.classList.add('map3d');
-host.innerHTML = '<div id="wrap"></div><div id="labels"></div><div id="ui"><button id="b3d" class="on">Tilted</button><button id="bflat">Top-down</button><button id="bshadow" class="on">Shadows</button><button id="bao" class="on">Occlusion</button></div><div id="load">Raising the realm...</div>';
+host.innerHTML = '<div id="wrap"></div><div id="labels"></div><div id="ui"><button id="b3d" class="on">Tilted</button><button id="bflat">Top-down</button><button id="bshadow" class="on">Shadows</button><button id="bao">Occlusion</button></div><div id="load">Raising the realm...</div>';
 let running = true;
 const PROFILE = spec.profile || 'all';
 const PF = ({ all: { desert: 1, swamp: 1, snow: 1, lakes: 1, forest: 1, frost: 0 }, temperate: { desert: 0, swamp: 0, snow: 0, lakes: 1, forest: 1, frost: 0 }, arid: { desert: 1, swamp: 0, snow: 0, lakes: 1, forest: .25, frost: 0 }, frozen: { desert: 0, swamp: 0, snow: 1, lakes: 1, forest: .7, frost: 1 }, swampy: { desert: 0, swamp: 1, snow: 0, lakes: 1, forest: 1, frost: 0 } })[PROFILE] || { desert: 1, swamp: 1, snow: 1, lakes: 1, forest: 1, frost: 0 };
@@ -65,6 +65,7 @@ const rawY = (x, z) => {
 };
 sites.forEach((s, i) => { s.gy = Math.max(7, rawY(s.x, s.y)); const tier = s.tier || 1, v = s.riv ? 'riverTwins' : s.crossing_kind === 'pass' ? 'passGate' : pickVariant(tier, s.terrain, i), S = (tier >= 3 ? 1.35 : tier === 2 ? 1.05 : .72) * 1.25 * (s.riv ? 1 : tier >= 3 ? 1.7 : tier === 2 ? 2.1 : 2.7); s.v = v; s.pl = (v === 'citadel' ? 170 : v === 'passGate' ? 120 : 110) * (s.riv ? 1 : tier >= 3 ? 1.7 : tier === 2 ? 2.1 : 2.7); s.moat = null; if (tier >= 2 && (v === 'keepBailey' || v === 'concentric' || v === 'roundShell')) { const r0 = (v === 'keepBailey' ? 56 * S * 1.5 : v === 'concentric' ? 75 * S * 1.5 : (tier >= 3 ? 82 : 60) * S * 1.18) * CK, wd = 17 * S * CK; s.moat = { r0, wd }; s.pl = r0 + wd + 22; } });
 const ssf = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+const gk = (a, b) => (a + 8) * 4096 + (b + 8);
 const RVX = [], RVZ = [], RVB = [], RVW = [], rgrid = new Map(), RIVERS = [];
 (art.rivers || []).forEach((r) => {
   let p = r.p.map((q) => [q[0], q[1]]); const n = p.length; if (n < 6) return;
@@ -84,8 +85,8 @@ RIVERS.forEach((path, i) => { const e = path[path.length - 1]; if (H(e.x, e.z) <
   RIVERS.forEach((p, i) => { const f = F(i), n = p.length; p.forEach((q, m) => { const grow = .5 + .5 * Math.min(1, m / Math.max(1, n - 1)), spring = .45 + .55 * Math.min(1, m / 10); q.hw = (28 + 20 * Math.sqrt(f[m])) * grow * spring * (.92 + .16 * fbm(q.x / 260 + 3, q.z / 260, 2)); }); });
   RIVERS.forEach((p) => { if (p.merge) p[p.length - 1].hw = RIVERS[p.merge.j][p.merge.k].hw * .95; }); }
 const RVPI = [];
-RIVERS.forEach((path, pi) => path.forEach((q, qi) => { const k = RVX.length; RVPI.push([pi, qi]); RVX.push(q.x); RVZ.push(q.z); RVB.push(q.y - 11); RVW.push(q.hw); const key = Math.floor(q.x / 200) + ',' + Math.floor(q.z / 200); (rgrid.get(key) || rgrid.set(key, []).get(key)).push(k); }));
-const rvq = (x, z) => { let best = 1e9, bi = -1; const cx = Math.floor(x / 200), cz = Math.floor(z / 200); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = rgrid.get((cx + a) + ',' + (cz + b)); if (!l) continue; for (const k of l) { const d = Math.hypot(x - RVX[k], z - RVZ[k]); if (d < best) { best = d; bi = k; } } } return [best, bi]; };
+RIVERS.forEach((path, pi) => path.forEach((q, qi) => { const k = RVX.length; RVPI.push([pi, qi]); RVX.push(q.x); RVZ.push(q.z); RVB.push(q.y - 11); RVW.push(q.hw); const key = gk(Math.floor(q.x / 200), Math.floor(q.z / 200)); (rgrid.get(key) || rgrid.set(key, []).get(key)).push(k); }));
+const rvq = (x, z) => { let best = 1e9, bi = -1; const cx = Math.floor(x / 200), cz = Math.floor(z / 200); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = rgrid.get(gk(cx + a, cz + b)); if (!l) continue; for (const k of l) { const d = Math.hypot(x - RVX[k], z - RVZ[k]); if (d < best) { best = d; bi = k; } } } return [best, bi]; };
 const LAKES = [];
 if (PF.lakes) RIVERS.forEach((path, ri) => { const q = path[path.length - 1]; if (path.merge || path.extended || q.y <= 6 || H(q.x, q.z) < SEA) return; const free = Math.min(...sites.map((s) => Math.hypot(s.x - q.x, s.y - q.z) - s.pl)); LAKES.push({ x: q.x, z: q.z, y: q.y + .3, r: Math.max(48, Math.min(q.y > 100 ? 70 : 90 + q.hw * 2, (free - 30) / 1.3)), s: ri * 1.7 }); });
 const nearLake = (x, z, k = 1.25) => LAKES.some((l) => Math.hypot(x - l.x, z - l.z) < l.r * k);
@@ -100,16 +101,16 @@ const PLATS = [], RIVCAST = [];
     PLATS.push({ x: B1.x, y: B1.z, gy: H0, pl: 88, moat: null }, { x: B2.x, y: B2.z, gy: H0, pl: 88, moat: null }); RIVCAST.push({ x: q.x, z: q.z, i }); }); }
 const FLATS = sites.concat(PLATS);
 const PASS = (art.passes || []).map(([x, z]) => ({ x, z, y: rawY(x, z) })), pgrid = new Map();
-PASS.forEach((p, i) => { const key = Math.floor(p.x / 200) + ',' + Math.floor(p.z / 200); (pgrid.get(key) || pgrid.set(key, []).get(key)).push(i); });
-const hAt = (x, z) => { let y = rawY(x, z); { const cx0 = Math.floor(x / 200), cz0 = Math.floor(z / 200); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = pgrid.get((cx0 + a) + ',' + (cz0 + b)); if (!l) continue; for (const i of l) { const p = PASS[i], d = Math.hypot(x - p.x, z - p.z); if (d < 150) { const w = 1 - ssf(35, 150, d), tg = p.y * .8 - 6; if (tg < y) y += (tg - y) * w; } } } } { const [d, k] = rvq(x, z); if (k >= 0 && d < RVW[k] * 2.8) { const w = 1 - ssf(RVW[k] * .7, RVW[k] * 2.8, d), tg = RVB[k] - 3 * (1 - ssf(0, RVW[k] * .6, d)); if (tg < y) y += (tg - y) * w; } } for (const l of LAKES) { const dx = x - l.x, dz = z - l.z, d0 = Math.hypot(dx, dz); if (d0 > l.r * 2) continue; const tt = d0 / lakeR(l, Math.atan2(dz, dx)); if (tt < 1.6) { const wc = 1 - ssf(.7, 1.5, tt), bed = l.y - 10 * (1 - ssf(0, .9, tt)); if (bed < y) y += (bed - y) * wc; const berm = l.y + 2.4, wb = ssf(.95, 1.08, tt) * (1 - ssf(1.15, 1.6, tt)); if (y < berm) y += (berm - y) * wb; } }
-  for (const s of FLATS) { if (s.noflat) continue; const d = Math.hypot(x - s.x, z - s.y); if (d < s.pl + 170) { let w = Math.pow(Math.min(1, Math.max(0, (s.pl + 170 - d) / 170)), 1.5); { const [dr, kr] = rvq(x, z); if (kr >= 0) w *= ssf(RVW[kr] * 1.1, RVW[kr] * 1.7, dr); } y = y + (s.gy - y) * w; if (s.moat && d > s.moat.r0 - 4 && d < s.moat.r0 + s.moat.wd + 4) { const c = d - s.moat.r0 - s.moat.wd / 2, wm = 1 - ssf(s.moat.wd * .3, s.moat.wd * .5 + 5, Math.abs(c)); y += (s.gy - 7 - y) * wm; } } } return y; };
+PASS.forEach((p, i) => { const key = gk(Math.floor(p.x / 200), Math.floor(p.z / 200)); (pgrid.get(key) || pgrid.set(key, []).get(key)).push(i); });
+const hAt = (x, z) => { let y = rawY(x, z); { const cx0 = Math.floor(x / 200), cz0 = Math.floor(z / 200); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = pgrid.get(gk(cx0 + a, cz0 + b)); if (!l) continue; for (const i of l) { const p = PASS[i], d = Math.hypot(x - p.x, z - p.z); if (d < 150) { const w = 1 - ssf(35, 150, d), tg = p.y * .8 - 6; if (tg < y) y += (tg - y) * w; } } } } const rq = rvq(x, z); { const [d, k] = rq; if (k >= 0 && d < RVW[k] * 2.8) { const w = 1 - ssf(RVW[k] * .7, RVW[k] * 2.8, d), tg = RVB[k] - 3 * (1 - ssf(0, RVW[k] * .6, d)); if (tg < y) y += (tg - y) * w; } } for (const l of LAKES) { const dx = x - l.x, dz = z - l.z, d0 = Math.hypot(dx, dz); if (d0 > l.r * 2) continue; const tt = d0 / lakeR(l, Math.atan2(dz, dx)); if (tt < 1.6) { const wc = 1 - ssf(.7, 1.5, tt), bed = l.y - 10 * (1 - ssf(0, .9, tt)); if (bed < y) y += (bed - y) * wc; const berm = l.y + 2.4, wb = ssf(.95, 1.08, tt) * (1 - ssf(1.15, 1.6, tt)); if (y < berm) y += (berm - y) * wb; } }
+  for (const s of FLATS) { if (s.noflat) continue; const ddx = x - s.x, ddz = z - s.y, lim2 = (s.pl + 170) * (s.pl + 170); if (ddx * ddx + ddz * ddz >= lim2) continue; const d = Math.hypot(ddx, ddz); if (d < s.pl + 170) { let w = Math.pow(Math.min(1, Math.max(0, (s.pl + 170 - d) / 170)), 1.5); { const [dr, kr] = rq; if (kr >= 0) w *= ssf(RVW[kr] * 1.1, RVW[kr] * 1.7, dr); } y = y + (s.gy - y) * w; if (s.moat && d > s.moat.r0 - 4 && d < s.moat.r0 + s.moat.wd + 4) { const c = d - s.moat.r0 - s.moat.wd / 2, wm = 1 - ssf(s.moat.wd * .3, s.moat.wd * .5 + 5, Math.abs(c)); y += (s.gy - 7 - y) * wm; } } } return y; };
 const LO = !!spec.lowQuality;
 const marks = [['start', performance.now()]];
 const stage = async (m) => { const el = $('load'); if (el) el.textContent = m; if (spec.onProgress) spec.onProgress(m); marks.push([m, performance.now()]); await new Promise((r) => requestAnimationFrame(() => setTimeout(r))); };
 
 const wrap = $('wrap');
 const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, LO ? 1 : 1.5));
+renderer.setPixelRatio(Math.min(devicePixelRatio, LO ? 1 : 1.25));
 renderer.setSize(host.clientWidth, host.clientHeight);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = spec.exposure != null ? spec.exposure : .95;
@@ -129,7 +130,7 @@ const pm = new THREE.PMREMGenerator(renderer); const envScene = new THREE.Scene(
 scene.environment = pm.fromScene(envScene, 0, 1, 100000).texture;
 
 await stage('Painting the land');
-const TEX = LO ? 1024 : Math.min(2816, Math.round(1792 * Math.max(1, Math.sqrt(WS)) / 16) * 16);
+const TEX = LO ? 768 : Math.min(1152, Math.round(1024 * Math.max(1, Math.sqrt(WS)) / 16) * 16);
 const cv = document.createElement('canvas'); cv.width = cv.height = TEX;
 const cx = cv.getContext('2d'); const img = cx.createImageData(TEX, TEX);
 const mix = (a, b, t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
@@ -151,7 +152,7 @@ cx.putImageData(img, 0, 0);
 const toPx = (v) => v / W * TEX;
 sites.forEach((s) => { const g = cx.createRadialGradient(toPx(s.x), toPx(s.y), 0, toPx(s.x), toPx(s.y), toPx(s.pl + 20)); g.addColorStop(0, 'rgba(126,104,70,.7)'); g.addColorStop(.6, 'rgba(126,104,70,.42)'); g.addColorStop(1, 'rgba(126,104,70,0)'); cx.fillStyle = g; cx.fillRect(toPx(s.x - 240), toPx(s.y - 240), toPx(480), toPx(480)); });
 const FIELDS = [];
-sites.forEach((s, i) => { const tier = s.tier || 1; if (tier < 2) return; const nF = tier >= 3 ? 9 : 5; for (let k = 0; k < nF; k++) { const a = (k / nF) * 6.28 + hash(i, k * 3 + 1) * .6, r = (tier >= 3 ? 520 : 440) + hash(i, k * 3 + 2) * (tier >= 3 ? 560 : 420), x = s.x + Math.cos(a) * r, z = s.y + Math.sin(a) * r, hh = H(x, z); if (hh < SEA + .03 || (hh - SEA) / (1 - SEA) > .36 || Mo(x, z) < .15 || biome(x, z)[0] > .3) continue; if (sites.some((o) => o !== s && Math.hypot(o.x - x, o.y - z) < 250)) continue; const wU = (tier >= 3 ? 150 : 120) + hash(i, k) * 110, dU = (tier >= 3 ? 110 : 90) + hash(k, i) * 90, w = toPx(wU), d = toPx(dU), kind = Math.floor(hash(i + 3, k) * 4), rot = a + hash(i, k) * .6; FIELDS.push([x, z, wU, dU, rot, tier >= 3 && k % 3 === 0]); cx.save(); cx.translate(toPx(x), toPx(z)); cx.rotate(rot); cx.fillStyle = ['#c4aa4a', '#5f9a3c', '#7a5530', '#a3b84e'][kind]; cx.globalAlpha = .82; cx.fillRect(-w / 2, -d / 2, w, d); cx.globalAlpha = .38; cx.strokeStyle = ['#8a7430', '#4f7a30', '#4d371c', '#6c8238'][kind]; cx.lineWidth = Math.max(1, toPx(2.6)); for (let y = -d / 2; y < d / 2; y += toPx(9)) { cx.beginPath(); cx.moveTo(-w / 2, y); cx.lineTo(w / 2, y); cx.stroke(); } cx.globalAlpha = .55; cx.strokeStyle = '#3e5a26'; cx.lineWidth = toPx(3.4); cx.strokeRect(-w / 2, -d / 2, w, d); cx.restore(); } });
+sites.forEach((s, i) => { const tier = s.tier || 1; if (s.junction) return; const nF = tier >= 3 ? 9 : tier === 2 ? 6 : 3; for (let k = 0; k < nF; k++) { const a = (k / nF) * 6.28 + hash(i, k * 3 + 1) * .6, r = (tier >= 3 ? 520 : 440) + hash(i, k * 3 + 2) * (tier >= 3 ? 560 : 420), x = s.x + Math.cos(a) * r, z = s.y + Math.sin(a) * r, hh = H(x, z); if (hh < SEA + .03 || (hh - SEA) / (1 - SEA) > .36 || Mo(x, z) < .15 || biome(x, z)[0] > .3) continue; if (sites.some((o) => o !== s && Math.hypot(o.x - x, o.y - z) < 250)) continue; const wU = (tier >= 3 ? 150 : 120) + hash(i, k) * 110, dU = (tier >= 3 ? 110 : 90) + hash(k, i) * 90, w = toPx(wU), d = toPx(dU), kind = Math.floor(hash(i + 3, k) * 4), rot = a + hash(i, k) * .6; FIELDS.push([x, z, wU, dU, rot, tier >= 3 && k % 3 === 0, kind]); } });
 cx.lineCap = 'round'; cx.lineJoin = 'round';
 const EDG = spec.edges, ROADS = [], ROADMAP = new Map(), EMAP = new Map();
 const KIND = { land: 0, river: 1, pass: 2 };
@@ -160,7 +161,7 @@ cx.lineCap = 'round'; cx.lineJoin = 'round';
 EDG.forEach((e) => { const A = sites[e.a], B = sites[e.b]; const raw = e.path && e.path.length > 1 ? e.path.map(([x, z]) => ({ x, z })) : [{ x: A.x, z: A.y }, { x: B.x, z: B.y }]; raw[0] = { x: A.x, z: A.y }; raw[raw.length - 1] = { x: B.x, z: B.y };
   const pts = []; raw.forEach((q, k) => { if (!k) { pts.push(q); return; } const q0 = raw[k - 1], L = Math.hypot(q.x - q0.x, q.z - q0.z), n = Math.max(1, Math.ceil(L / 45)); for (let s = 1; s <= n; s++) pts.push({ x: q0.x + (q.x - q0.x) * s / n, z: q0.z + (q.z - q0.z) * s / n }); });
   const road = { a: e.a, b: e.b, k: KIND[e.kind] ?? 0, len: e.length, m: e.mult, pts }; ROADS.push(road); ROADMAP.set(Math.min(e.a, e.b) + '-' + Math.max(e.a, e.b), road);
-  cx.beginPath(); pts.forEach((q, i) => { i ? cx.lineTo(toPx(q.x), toPx(q.z)) : cx.moveTo(toPx(q.x), toPx(q.z)); }); cx.strokeStyle = 'rgba(70,54,32,.5)'; cx.lineWidth = toPx(15); cx.stroke(); cx.strokeStyle = 'rgba(176,150,104,.82)'; cx.lineWidth = toPx(9); cx.stroke(); });
+  });
 const ROADGRID = new Map(), RGC = 100;
 ROADS.forEach((r) => r.pts.forEach((q) => { const k = Math.floor(q.x / RGC) + ',' + Math.floor(q.z / RGC); (ROADGRID.get(k) || ROADGRID.set(k, []).get(k)).push(q); }));
 const roadDist = (x, z) => { const cx0 = Math.floor(x / RGC), cz0 = Math.floor(z / RGC); let d = 1e9; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = ROADGRID.get((cx0 + a) + ',' + (cz0 + b)); if (l) for (const q of l) { const e = Math.hypot(x - q.x, z - q.z); if (e < d) d = e; } } return d; };
@@ -260,6 +261,49 @@ function buildTile(tx, tz, lod) {
 }
 const getTileGeo = (ti, lod) => { const key = ti * 4 + lod; let g = tcache.get(key); if (!g) { g = buildTile(ti % NT, Math.floor(ti / NT), lod); tcache.set(key, g); } return g; };
 for (let ti = 0; ti < NT * NT; ti++) { const m = new THREE.Mesh(getTileGeo(ti, 3), tmat); m.receiveShadow = true; m.castShadow = false; m.userData.lod = 3; m.userData.ti = ti; tileGroup.add(m); tiles.push(m); }
+{
+  const pos = [], col = [], ind = [], HW = 16;
+  ROADS.forEach((r) => {
+    const A = sites[r.a], B = sites[r.b], keep = r.pts.filter((q) => Math.hypot(q.x - A.x, q.z - A.y) > (A.pl || 90) * .8 && Math.hypot(q.x - B.x, q.z - B.y) > (B.pl || 90) * .8);
+    if (keep.length < 2) return;
+    const base = pos.length / 3, rocky = r.k === 2;
+    keep.forEach((q, i) => {
+      const a = keep[Math.max(0, i - 1)], b = keep[Math.min(keep.length - 1, i + 1)]; let tx = b.x - a.x, tz = b.z - a.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      const nx = -tz, nz = tx, w = HW * (.88 + .3 * hash(i + 3, r.a * 31 + r.b)), edge = Math.min(1, i / 2, (keep.length - 1 - i) / 2);
+      [[-1, 0], [-.45, .85], [0, 1], [.45, .85], [1, 0]].forEach(([sd, al]) => { const x = q.x + nx * w * sd, z = q.z + nz * w * sd; pos.push(x, hAt(x, z) + 1.2, z); const c = rocky ? [.2, .18, .16] : [.3 - Math.abs(sd) * .06, .22 - Math.abs(sd) * .05, .14 - Math.abs(sd) * .03]; col.push(c[0], c[1], c[2], al * .9 * edge); });
+    });
+    for (let i = 0; i < keep.length - 1; i++) { const a = base + i * 5, b = a + 5; for (let k = 0; k < 4; k++) ind.push(a + k, a + k + 1, b + k, a + k + 1, b + k + 1, b + k); }
+  });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4)); g.setIndex(ind); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, roughness: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })); m.renderOrder = 1; m.receiveShadow = true; scene.add(m); scene.userData.roads = m;
+}
+{
+  const TS2 = 256, atlas = document.createElement('canvas'); atlas.width = TS2 * 4; atlas.height = TS2; const ax = atlas.getContext('2d');
+  const crops = [['#cdb454', '#a58f36', 1], ['#6aa543', '#4b8030', 1], ['#7d5a36', '#5a3f24', 0], ['#b0c25a', '#7f9a3c', 1]];
+  crops.forEach(([c1, c2, lines], k) => {
+    const tc = document.createElement('canvas'); tc.width = tc.height = TS2; const tx = tc.getContext('2d');
+    tx.fillStyle = c1; tx.fillRect(0, 0, TS2, TS2);
+    for (let y = 0; y < TS2; y += 10) { tx.fillStyle = c2; tx.globalAlpha = .5 + hash(k, y) * .3; tx.fillRect(0, y, TS2, lines ? 4 : 3); if (!lines) { tx.globalAlpha = .25; tx.fillStyle = '#c9a56e'; tx.fillRect(0, y + 5, TS2, 2); } }
+    for (let n = 0; n < 700; n++) { tx.globalAlpha = .12 + hash(n, k) * .12; tx.fillStyle = hash(n, k + 9) > .5 ? '#fff6c8' : '#2d3f1a'; tx.fillRect(hash(n, 1) * TS2, hash(n, 2) * TS2, 3, 2); }
+    tx.globalAlpha = 1; tx.strokeStyle = 'rgba(40,60,22,.6)'; tx.lineWidth = 9; tx.strokeRect(10, 10, TS2 - 20, TS2 - 20);
+    tx.globalCompositeOperation = 'destination-in'; const rg = tx.createRadialGradient(TS2 / 2, TS2 / 2, TS2 * .34, TS2 / 2, TS2 / 2, TS2 * .74); rg.addColorStop(0, '#000'); rg.addColorStop(.72, '#000'); rg.addColorStop(1, 'rgba(0,0,0,0)'); tx.fillStyle = rg; tx.fillRect(0, 0, TS2, TS2);
+    ax.drawImage(tc, k * TS2, 0);
+  });
+  const ftex = new THREE.CanvasTexture(atlas); ftex.colorSpace = THREE.SRGBColorSpace; ftex.anisotropy = 8;
+  const pos = [], uv = [], ind = [], NU = 8, NV = 5;
+  FIELDS.forEach(([fx, fz, fw, fd, ang, , kind], fi) => {
+    const ca = Math.cos(ang), sa = Math.sin(ang), j = (u, v) => [hash(fi, u * 7 + v * 13) - .5, hash(fi + 5, u * 11 + v * 3) - .5], base = pos.length / 3;
+    for (let v = 0; v <= NV; v++) for (let u = 0; u <= NU; u++) {
+      const fu = u / NU - .5, fv = v / NV - .5, [jx, jz] = (u % NU && v % NV) ? [0, 0] : j(u, v), lu = (fu + jx * .06) * fw, lv = (fv + jz * .08) * fd, x = fx + lu * ca - lv * sa, z = fz + lu * sa + lv * ca;
+      pos.push(x, hAt(x, z) + 1.0, z); uv.push((kind + u / NU) / 4, v / NV);
+    }
+    for (let v = 0; v < NV; v++) for (let u = 0; u < NU; u++) { const a = base + v * (NU + 1) + u, b = a + 1, c = a + NU + 1, d2 = c + 1; ind.push(a, c, b, b, c, d2); }
+  });
+  if (pos.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(ind); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: ftex, roughness: 1, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.renderOrder = 1; m.receiveShadow = true; scene.add(m); scene.userData.fields = m;
+  }
+}
 const lodFor = (ti, cp) => { const tx = ti % NT, tz = Math.floor(ti / NT), cxx = (tx + .5) * TS, czz = (tz + .5) * TS, d = Math.hypot(cxx - cp.x, czz - cp.z, cp.y * .85); return d < 2300 ? 0 : d < 5200 ? 1 : d < 10500 ? 2 : 3; };
 let tileBudget = 10; const updateTiles = (force) => { const cp = cam.position, order = tiles.map((m) => [m, lodFor(m.userData.ti, cp)]).filter(([m, l]) => m.userData.lod !== l).sort((a, b) => { const da = Math.hypot(((a[0].userData.ti % NT) + .5) * TS - cp.x, (Math.floor(a[0].userData.ti / NT) + .5) * TS - cp.z), db = Math.hypot(((b[0].userData.ti % NT) + .5) * TS - cp.x, (Math.floor(b[0].userData.ti / NT) + .5) * TS - cp.z); return da - db; }); let used = 0; for (const [m, l] of order) { if (used >= (force ? 9999 : tileBudget)) break; if (!tcache.has(m.userData.ti * 4 + l)) used++; m.geometry = getTileGeo(m.userData.ti, l); m.userData.lod = l; m.castShadow = l <= 1; } if (used) renderer.shadowMap.needsUpdate = true; };
 const terrain = tiles[0];
@@ -315,7 +359,7 @@ const windify = (mat) => { mat.onBeforeCompile = (sh) => { sh.uniforms.uTime = u
 function paint(geom, fn) { const p = geom.attributes.position, c = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) { const col = fn(p.getX(i), p.getY(i), p.getZ(i)); c[i*3] = col[0]; c[i*3+1] = col[1]; c[i*3+2] = col[2]; } geom.setAttribute('color', new THREE.BufferAttribute(c, 3)); return geom; }
 const jitter = (geom, a, seed) => { const p = geom.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = (hash(Math.round(x * 7) + seed, Math.round(z * 7) + Math.round(y * 5)) - .5) * a; p.setXYZ(i, x + n, y + n * .6, z + n); } geom.computeVertexNormals(); return geom; };
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const TD = W > 20000 ? 1 : 2;
+const TD = 0;
 function spruce() {
   const parts = [], tr = new THREE.CylinderGeometry(1.4, 2.2, 14, 6); tr.translate(0, 7, 0); parts.push(paint(tr, () => [.2, .13, .08]));
   for (let i = 0; i < 6; i++) { const r = 13 - i * 1.9, h = 15 - i * .9, c = new THREE.ConeGeometry(r, h, 11, 1, true); c.translate(0, 9 + i * 7.6 + h / 2, 0); jitter(c, 2.6, i * 13); parts.push(paint(c, (x, y) => { const tt = clamp01((y - 9) / 52); return [.05 + tt * .1, .14 + tt * .16, .07 + tt * .06]; })); }
@@ -376,20 +420,25 @@ function poplar() {
   return mergeGeometries(parts);
 }
 const treeMat = windify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .92, side: THREE.DoubleSide }));
-const TK = .72, CSZ = Math.min(W / 8, 1600), FARSTRIDE = Math.max(3, Math.round(W / 3700)); const CHUNKS = []; const snowCol = new THREE.Color(2.3, 2.5, 2.8);
+const TK = .86, CSZ = Math.min(W / 8, 2800), FARSTRIDE = Math.max(3, Math.round(W / 3700)); const CHUNKS = []; const snowCol = new THREE.Color(2.3, 2.5, 2.8);
 function mkChunked(geom, mat, arr, place, grid = 8, shadows = true, far = false) {
   const cs = grid === 8 ? CSZ : W / grid, buckets = new Map(); arr.forEach((a) => { const k = Math.floor(a[0] / cs) + ',' + Math.floor(a[2] / cs); (buckets.get(k) || buckets.set(k, []).get(k)).push(a); });
   buckets.forEach((list, key) => { const im = new THREE.InstancedMesh(geom, mat, list.length); im.userData.tree = grid === 8; im.userData.far = far; im.castShadow = shadows; im.receiveShadow = true; list.forEach((a, i) => place(im, a, i)); im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.computeBoundingSphere(); scene.add(im); CHUNKS.push(im); });
 }
-const SP = { spruce: [], fir: [], pine: [], oak: [], birch: [], poplar: [], cactus: [], palm: [], acacia: [], dead: [], willow: [] }, STEP = LO ? 40 : 27;
+const BCELL = 64, BN = Math.ceil(W / BCELL) + 1, BLK = new Uint8Array(BN * BN);
+const stamp = (x, z, r, bit) => { const r2 = (r + BCELL * .55) ** 2; for (let gz = Math.max(0, Math.floor((z - r) / BCELL)); gz <= Math.min(BN - 1, Math.floor((z + r) / BCELL)); gz++) for (let gx = Math.max(0, Math.floor((x - r) / BCELL)); gx <= Math.min(BN - 1, Math.floor((x + r) / BCELL)); gx++) { const dx = (gx + .5) * BCELL - x, dz = (gz + .5) * BCELL - z; if (dx * dx + dz * dz <= r2) BLK[gz * BN + gx] |= bit; } };
+const blockedAt = (x, z, mask) => (BLK[Math.min(BN - 1, Math.max(0, Math.floor(z / BCELL))) * BN + Math.min(BN - 1, Math.max(0, Math.floor(x / BCELL)))] & mask) !== 0;
+sites.forEach((s) => { stamp(s.x, s.y, s.riv ? 210 : 210 * CF, 1); stamp(s.x, s.y, 175, 32); stamp(s.x, s.y, 130, 64); });
+ROADS.forEach((r) => r.pts.forEach((q) => stamp(q.x, q.z, 56, 2)));
+for (let k = 0; k < RVX.length; k++) { stamp(RVX[k], RVZ[k], Math.max(40, RVW[k] * 1.5), 4); stamp(RVX[k], RVZ[k], Math.max(60, RVW[k] * 4.6), 128); }
+LAKES.forEach((l) => stamp(l.x, l.z, l.r * 1.3, 8));
+FIELDS.forEach(([fx, fz, fw, fd]) => stamp(fx, fz, Math.hypot(fw, fd) * .55, 16));
+const SP = { spruce: [], fir: [], pine: [], oak: [], birch: [], poplar: [], cactus: [], palm: [], acacia: [], dead: [], willow: [] }, STEP = LO ? 64 : 54;
 for (let z = 20; z < W; z += STEP) for (let x = 20; x < W; x += STEP) {
-  const px = x + (rnd() - .5) * STEP, pz = z + (rnd() - .5) * STEP, h = H(px, pz); if (h < SEA + .018) continue;
+  const px = x + (rnd() - .5) * STEP, pz = z + (rnd() - .5) * STEP; if (blockedAt(px, pz, 31)) continue; const h = H(px, pz); if (h < SEA + .018) continue;
   const el = (h - SEA) / (1 - SEA), m = Mo(px, pz); if (el > .62) continue;
   const [bd, bf, bm, bsw, bsn] = biome(px, pz);
-  if (sites.some((s) => Math.hypot(px - s.x, pz - s.y) < (s.riv ? 210 : 210 * CF))) continue;
-  const [dr, kr] = rvq(px, pz); if (kr >= 0 && dr < RVW[kr] * 1.5) continue;
-  if (nearLake(px, pz, 1.3)) continue;
-  { const rd = roadDist(px, pz); if (rd < 30 || (rd < 66 && hash(Math.round(px * 3), Math.round(pz * 3)) < (66 - rd) / 36)) continue; }
+  const [dr, kr] = blockedAt(px, pz, 128) ? rvq(px, pz) : [1e9, -1];
   if (bsw > .3) { if (rnd() < .3 + bsw * .15) SP[rnd() < .5 ? 'dead' : 'willow'].push([px, hAt(px, pz), pz, .7 + rnd() * .7, rnd()]); continue; }
   if (bd > .12 && bd <= .45 && rnd() < .05) { SP.acacia.push([px, hAt(px, pz), pz, .7 + rnd() * .8, rnd()]); continue; }
   if (bd > .45) { const oasis = kr >= 0 && dr < RVW[kr] * 4.5; if (rnd() < (oasis ? .5 : .045 * (bd - .4)) ) SP[oasis ? 'palm' : 'cactus'].push([px, hAt(px, pz), pz, .7 + rnd() * .7, rnd()]); continue; }
@@ -404,11 +453,13 @@ for (let z = 20; z < W; z += STEP) for (let x = 20; x < W; x += STEP) {
   if (bsn > .4 && sp !== 'cactus' && sp !== 'palm') sp = r < .55 ? 'spruce' : r < .88 ? 'fir' : 'pine';
   SP[sp].push([px, hAt(px, pz), pz, .6 + rnd() * .9, rnd()]);
 }
+marks.push(['  trees placed', performance.now()]);
 const farCone = (() => { const g = new THREE.ConeGeometry(11, 54, 6); g.translate(0, 27, 0); return paint(g, (x, y) => [.05 + y * .0012, .16 + y * .0018, .08]); })(), farBlob = (() => { const g = new THREE.IcosahedronGeometry(15, 0); g.scale(1, .85, 1); g.translate(0, 32, 0); return paint(g, (x, y) => [.12 + y * .002, .26 + y * .003, .08]); })(), farTrunk = null;
 const FARCONE = new Set(['spruce', 'fir', 'pine']);
 const mkFar = (geom, arr, tint) => { const d = new THREE.Object3D(), col = new THREE.Color(); mkChunked(geom, treeMat, arr.filter((_, i) => i % FARSTRIDE === 0), (im, a, i) => { const fk = 1.5 * Math.sqrt(FARSTRIDE / 3); d.position.set(a[0], a[1] - 1, a[2]); d.rotation.y = a[4] * 6.28; d.scale.set(a[3] * fk * TK, a[3] * fk * TK * (.85 + a[4] * .5), a[3] * fk * TK); d.updateMatrix(); im.setMatrixAt(i, d.matrix); const k = (tint[2] ?? .34) + a[4] * .2; col.setRGB(k * (.9 + hash(i, 1) * .25), k * (.95 + hash(i, 5) * .1), k * (.75 + hash(i, 2) * .25)); const sn = biome(a[0], a[2])[4]; if (sn > .3) col.lerp(snowCol, Math.min(1, sn * .85)); im.setColorAt(i, col); }, 8, false, true); };
 const mkTrees = (g, arr, tint) => { const d = new THREE.Object3D(), col = new THREE.Color(); mkChunked(g, treeMat, arr, (im, a, i) => { d.position.set(a[0], a[1] - 1.5, a[2]); d.rotation.y = a[4] * 6.28; d.scale.set(a[3] * TK, a[3] * TK * (.85 + a[4] * .5), a[3] * TK); d.updateMatrix(); im.setMatrixAt(i, d.matrix); const k = (tint[2] ?? .34) + a[4] * .22, au = tint[1] > 0 && hash(Math.round(a[0]), Math.round(a[2])) < .14 ? 1 : 0; col.setRGB(k * (.88 + hash(i, 1) * .3) * (1 + au * .9), k * (.95 + hash(i, 5) * .12) * (1 - au * .18), k * (.7 + hash(i, 2) * .3) * (1 - au * .55)); { const sn = biome(a[0], a[2])[4]; if (sn > .3) col.lerp(snowCol, Math.min(1, sn * .85)); } im.setColorAt(i, col); }); };
 mkTrees(spruce(), SP.spruce, [.5, 0]); for (const [k, arr] of Object.entries(SP)) mkFar(FARCONE.has(k) || k === 'poplar' ? farCone : farBlob, arr, [.5, 0, k === 'fir' ? .32 : k === 'pine' ? .36 : .36]); mkTrees(fir(), SP.fir, [.5, 0, .32]); mkTrees(pine(), SP.pine, [.5, 0, .36]); mkTrees(broadleaf(), SP.oak, [.5, 1]); mkTrees(birch(), SP.birch, [.5, 1, .5]); mkTrees(poplar(), SP.poplar, [.5, 1, .4]); mkTrees(acacia(), SP.acacia, [.5, 0, .5]); mkTrees(deadTree(), SP.dead, [.5, 0, .45]); mkTrees(willow(), SP.willow, [.5, 0, .45]); mkTrees(cactus(), SP.cactus, [.5, 0, .7]); mkTrees(palm(), SP.palm, [.5, 0, .55]);
+marks.push(['  trees built', performance.now()]);
 const rockG = jitter(new THREE.IcosahedronGeometry(1, 2), .5, 77); const rocks = [];
 for (let i = 0; i < 5000; i++) { const px = rnd() * W, pz = rnd() * W, h = H(px, pz); if (h < SEA + .01) continue; const el = (h - SEA) / (1 - SEA); if ((el < .28 && biome(px, pz)[0] < .4) || sites.some((s) => Math.hypot(px - s.x, pz - s.y) < 180 * CF)) continue; if (!nearLake(px, pz, 1.25)) rocks.push([px, hAt(px, pz), pz, 5 + rnd() * rnd() * 34, rnd()]); }
 const rockMesh = new THREE.InstancedMesh(rockG, new THREE.MeshStandardMaterial({ color: 0x8a8278, roughness: 1 }), rocks.length); rockMesh.castShadow = true; rockMesh.receiveShadow = true;
@@ -642,6 +693,7 @@ const labels = $('labels');
 const shield = (c, c2) => `<svg class="sh" viewBox="0 0 64 72"><path d="M4 4H60V38C60 56 46 66 32 70C18 66 4 56 4 38Z" fill="${c}" stroke="#1a1008" stroke-width="3"/><path d="M4 22H60V32H4Z" fill="${c2}" opacity=".9"/><circle cx="32" cy="27" r="8" fill="${c2}" stroke="#1a1008" stroke-width="2"/><path d="M4 4H60V38C60 56 46 66 32 70C18 66 4 56 4 38Z" fill="none" stroke="#f5dc94" stroke-width="2.4"/></svg>`;
 const fillRb = (rb, name, n) => { rb.replaceChildren(); if (name) { const sp = document.createElement('span'); sp.textContent = name; rb.appendChild(sp); } const b = document.createElement('b'); b.textContent = String(n); rb.appendChild(b); };
 const setLabel = (el, c1, c2, name, n) => { el.innerHTML = shield(c1, c2); const rb = document.createElement('div'); rb.className = 'rb'; fillRb(rb, name, n); el.appendChild(rb); };
+marks.push(['  rocks+passes built', performance.now()]);
 await stage('Raising castles');
 const castles = [], DOCKS = [];
 sites.forEach((s, i) => {
@@ -675,18 +727,22 @@ sites.forEach((s, i) => {
   [pm, rm].forEach((m) => { m.castShadow = true; m.receiveShadow = true; scene.add(m); });
 }
 {
+  marks.push(['  castles+fields posts', performance.now()]);
   await stage('Sowing the meadows');
   const gc = document.createElement('canvas'); gc.width = 128; gc.height = 128; const g2 = gc.getContext('2d');
   for (let i = 0; i < 26; i++) { const x = 8 + hash(i, 1) * 112, h = 50 + hash(i, 2) * 70, lean = (hash(i, 3) - .5) * 40, w = 3 + hash(i, 4) * 4; const gr = g2.createLinearGradient(0, 128, 0, 128 - h); gr.addColorStop(0, '#3a5a22'); gr.addColorStop(.6, '#7aa23c'); gr.addColorStop(1, '#c4d27a'); g2.fillStyle = gr; g2.beginPath(); g2.moveTo(x - w, 128); g2.quadraticCurveTo(x + lean * .3, 128 - h * .6, x + lean, 128 - h); g2.quadraticCurveTo(x + lean * .3 + 2, 128 - h * .55, x + w, 128); g2.fill(); }
   const gtex = new THREE.CanvasTexture(gc); gtex.colorSpace = THREE.SRGBColorSpace;
   const gp = new THREE.PlaneGeometry(15, 12); gp.translate(0, 6, 0); const g90 = gp.clone(); g90.rotateY(Math.PI / 2); const g45 = gp.clone(); g45.rotateY(Math.PI / 4); const grassG = mergeGeometries([gp, g90, g45]);
   const gmat = windify(new THREE.MeshStandardMaterial({ map: gtex, alphaTest: .45, side: THREE.DoubleSide, roughness: 1 }));
-  const pts = []; const GN = LO ? 20000 : Math.round(80000 * Math.min(2, Math.max(1, WS)));
-  for (let i = 0; i < GN * 2 && pts.length < GN; i++) { const px = rnd() * W, pz = rnd() * W, h = H(px, pz); if (h < SEA + .02) continue; const el = (h - SEA) / (1 - SEA), m = Mo(px, pz); if (el > .45 || m < .22 || m > .78) continue; { const [gd, gf, , gsw, gsn] = biome(px, pz); if (gsn > .5 || gd > .6 || (gd > .3 && rnd() < .5) || (gf > .4 && rnd() < .55) || nearLake(px, pz, 1.3)) continue; } if (sites.some((s) => Math.hypot(px - s.x, pz - s.y) < 130)) continue; const [dr, kr] = rvq(px, pz); if (kr >= 0 && dr < RVW[kr] * 1.25) continue; const y = hAt(px, pz), sl = Math.abs(hAt(px + 8, pz) - y) + Math.abs(hAt(px, pz + 8) - y); if (sl > 7) continue; pts.push([px, y, pz, .7 + rnd() * .9, rnd()]); }
+  const pts = []; const GN = LO ? 12000 : Math.round(36000 * Math.min(2, Math.max(1, WS)));
+  for (let i = 0; i < GN * 2 && pts.length < GN; i++) { const px = rnd() * W, pz = rnd() * W, h = H(px, pz); if (h < SEA + .02) continue; const el = (h - SEA) / (1 - SEA), m = Mo(px, pz); if (el > .45 || m < .22 || m > .78) continue; { const [gd, gf, , gsw, gsn] = biome(px, pz); if (gsn > .5 || gd > .6 || (gd > .3 && rnd() < .5) || (gf > .4 && rnd() < .55) || nearLake(px, pz, 1.3)) continue; } if (blockedAt(px, pz, 64)) continue; const [dr, kr] = rvq(px, pz); if (kr >= 0 && dr < RVW[kr] * 1.25) continue; const y = hAt(px, pz), sl = Math.abs(hAt(px + 8, pz) - y) + Math.abs(hAt(px, pz + 8) - y); if (sl > 7) continue; pts.push([px, y, pz, .7 + rnd() * .9, rnd()]); }
+  marks.push(['    grass sampled', performance.now()]);
   const d = new THREE.Object3D(), col = new THREE.Color(); mkChunked(grassG, gmat, pts, (im, p, i) => { d.position.set(p[0], p[1] - .5, p[2]); d.rotation.y = p[4] * 6.28; d.scale.set(p[3], p[3] * (.7 + p[4] * .6), p[3]); d.updateMatrix(); im.setMatrixAt(i, d.matrix); { const gdd = biome(p[0], p[2])[0], k = .75 + p[4] * .3; col.setRGB(k * (1 + gdd * 1.1), k * (.95 + hash(i, 2) * .1) * (1 + gdd * .45), k * (.8 - gdd * .4)); im.setColorAt(i, col); } }, 10, false); const grassChunks = CHUNKS.slice(-100); scene.userData.grass = grassChunks;
+  marks.push(['    grass meshed', performance.now()]);
   const cm = new THREE.Mesh(new THREE.PlaneGeometry(90000, 90000), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, uniforms: { uTime }, vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }', fragmentShader: `uniform float uTime; varying vec2 vP; ${NOISE_GLSL}
     void main(){ vec2 p = vP*.00022 + vec2(uTime*.0016, uTime*.0008); float n = fb2(p*1.7)*.62 + fb2(p*4.1+7.)*.38; float c = smoothstep(.5, .74, n); float edge = length(vP)/45000.; gl_FragColor = vec4(vec3(1.), c * .8 * (1. - smoothstep(.45, .98, edge))); }` }));
   cm.rotation.x = -Math.PI / 2; cm.position.set(W / 2, 4200, W / 2); cm.renderOrder = -1; scene.add(cm); scene.userData.clouds = cm;
+  marks.push(['    clouds', performance.now()]);
   const ships = []; for (let i = 0; i < 5; i++) { const b = (() => { const boat = new THREE.Group(); const hull = new THREE.Shape(); hull.moveTo(-34, 6); hull.lineTo(34, 6); hull.lineTo(26, -4); hull.lineTo(-24, -4); hull.closePath(); const hg3 = new THREE.ExtrudeGeometry(hull, { depth: 14, bevelEnabled: false }); hg3.translate(0, 0, -7); const hm = new THREE.Mesh(hg3, mWood); hm.castShadow = true; boat.add(hm); const mast = new THREE.Mesh(new THREE.CylinderGeometry(.8, .8, 54, 5), mWood); mast.position.y = 32; boat.add(mast); const sail = new THREE.Mesh(new THREE.PlaneGeometry(32, 36), mSail); sail.position.set(0, 38, 0); sail.rotation.y = Math.PI / 2; sail.castShadow = true; boat.add(sail); boat.scale.setScalar(1.1); return boat; })(); let x, z, tries = 0; do { x = rnd() * W; z = rnd() * W; tries++; } while (H(x, z) > SEA * .6 && tries < 400); b.position.set(x, 1.2, z); scene.add(b); ships.push({ b, a: rnd() * 6.28, sp: .35 + rnd() * .3 }); }
   scene.userData.ships = ships;
 }
@@ -697,7 +753,8 @@ sites.forEach((s, i) => {
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(base, 3)); sg.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
   const sc = document.createElement('canvas'); sc.width = sc.height = 64; const sx2 = sc.getContext('2d'), sgr = sx2.createRadialGradient(32, 32, 0, 32, 32, 32); sgr.addColorStop(0, 'rgba(255,255,255,.9)'); sgr.addColorStop(1, 'rgba(255,255,255,0)'); sx2.fillStyle = sgr; sx2.fillRect(0, 0, 64, 64);
   const smoke = new THREE.Points(sg, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime, map: { value: new THREE.CanvasTexture(sc) } }, vertexShader: `uniform float uTime; attribute float aPh; varying float vA; void main(){ float t = fract(uTime*.05 + aPh); vec3 p = position + vec3(sin(aPh*40.+uTime*.4)*10.*t + t*t*40., t*95., cos(aPh*31.)*7.*t); vec4 mv = modelViewMatrix * vec4(p,1.); gl_Position = projectionMatrix * mv; gl_PointSize = (10. + t*46.) * 520. / -mv.z; vA = (1.-t) * smoothstep(0.,.12,t) * .42; }`, fragmentShader: `uniform sampler2D map; varying float vA; void main(){ vec4 c = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vec3(.78,.76,.72), c.a * vA); }` })); smoke.frustumCulled = false; scene.add(smoke); scene.userData.smoke = smoke;
-  const shr = [], SG = new THREE.IcosahedronGeometry(1, 1); for (let i = 0; i < 16000; i++) { const px = rnd() * W, pz = rnd() * W, h = H(px, pz); if (h < SEA + .02) continue; const el = (h - SEA) / (1 - SEA); if (el > .5 || Mo(px, pz) < .25) continue; if (sites.some((s) => Math.hypot(px - s.x, pz - s.y) < 170)) continue; const [dr, kr] = rvq(px, pz); if ((kr >= 0 && dr < RVW[kr] * 1.4) || nearLake(px, pz, 1.25)) continue; shr.push([px, hAt(px, pz), pz, 4 + rnd() * 6, rnd()]); }
+  marks.push(['  grass built', performance.now()]);
+  const shr = [], SG = new THREE.IcosahedronGeometry(1, 1); for (let i = 0; i < 16000; i++) { const px = rnd() * W, pz = rnd() * W, h = H(px, pz); if (h < SEA + .02) continue; const el = (h - SEA) / (1 - SEA); if (el > .5 || Mo(px, pz) < .25) continue; if (blockedAt(px, pz, 32)) continue; const [dr, kr] = rvq(px, pz); if ((kr >= 0 && dr < RVW[kr] * 1.4) || nearLake(px, pz, 1.25)) continue; shr.push([px, hAt(px, pz), pz, 4 + rnd() * 6, rnd()]); }
   const sm = new THREE.InstancedMesh(SG, windify(new THREE.MeshStandardMaterial({ roughness: 1 })), shr.length); sm.castShadow = false; sm.receiveShadow = true; const d = new THREE.Object3D(), col = new THREE.Color(); shr.forEach((a, i) => { d.position.set(a[0], a[1] + a[3] * .3, a[2]); d.rotation.y = a[4] * 6; d.scale.set(a[3], a[3] * .65, a[3] * (.8 + a[4] * .4)); d.updateMatrix(); sm.setMatrixAt(i, d.matrix); { const bdr = biome(a[0], a[2])[0]; col.setRGB(.07 + a[4] * .07 + bdr * .2, .13 + a[4] * .1 - (hash(i, 3) > .8 ? .04 : 0) + bdr * .05, .045 + a[4] * .04 + bdr * .02); } sm.setColorAt(i, col); }); scene.add(sm);
 }
 {
@@ -840,7 +897,7 @@ renderer.domElement.addEventListener('pointerup', (e) => { if (!down || Math.hyp
 
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(host.clientWidth, host.clientHeight, { samples: LO ? 0 : 2, type: THREE.HalfFloatType }));
 composer.addPass(new RenderPass(scene, cam));
-const sao = new SAOPass(scene, cam); sao.params.saoBias = .45; sao.params.saoIntensity = .012; sao.params.saoScale = 700; sao.params.saoKernelRadius = 28; sao.params.saoBlurRadius = 6; sao.resolution.set(Math.round(host.clientWidth / 3), Math.round(host.clientHeight / 3)); sao.enabled = !LO; composer.addPass(sao);
+const sao = new SAOPass(scene, cam); sao.params.saoBias = .45; sao.params.saoIntensity = .012; sao.params.saoScale = 700; sao.params.saoKernelRadius = 28; sao.params.saoBlurRadius = 6; sao.resolution.set(Math.round(host.clientWidth / 3), Math.round(host.clientHeight / 3)); sao.enabled = false; composer.addPass(sao);
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(host.clientWidth, host.clientHeight), .28, .7, .88));
 composer.addPass(new ShaderPass({ uniforms: { tDiffuse: { value: null } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }', fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
   void main(){ vec4 c = texture2D(tDiffuse, vUv); vec2 d = vUv - .5; float v = smoothstep(.95, .25, length(d * vec2(1.15, 1.0)));
@@ -864,7 +921,7 @@ function frame() {
   if (ring.visible) ring.scale.setScalar(castles[sel].g.userData.radius * (1.2 + Math.sin(t * 3) * .03));
   if (frameNo % 4 === 0) updateTiles(false);
   dashTex.offset.x -= dt * .5;
-  { const dd2 = cam.position.distanceTo(controls.target), near = dd2 < 7800; castles.forEach((c) => { c.g.visible = near; }); DOCKS.forEach((d) => { d.visible = near; }); if (scene.userData.pass) scene.userData.pass.visible = dd2 < 7000; if (scene.userData.smoke) scene.userData.smoke.visible = near; }
+  { const dd2 = cam.position.distanceTo(controls.target), near = dd2 < 7800, ck = Math.max(1, Math.min(4.2, dd2 / 5600)); castles.forEach((c) => { if (c.junction) { c.g.visible = near; return; } c.g.visible = true; c.g.scale.setScalar(ck); c.top.y = c.s.gy + (c.g.userData.hgt + 14) * ck; }); DOCKS.forEach((d) => { d.visible = near; }); if (scene.userData.pass) scene.userData.pass.visible = dd2 < 7000; if (scene.userData.smoke) scene.userData.smoke.visible = near; }
   { const sf = scene.userData.snowfall; if (sf) { const sn = biome(controls.target.x, controls.target.z)[4], a = Math.min(1, Math.max(0, (sn - .2) * 1.6)) * (cam.position.distanceTo(controls.target) < 4200 ? .9 : 0); sf.material.uniforms.uA.value = a; sf.material.uniforms.uC.value.copy(controls.target); sf.visible = a > .02; } }
   { const dd1 = cam.position.distanceTo(controls.target), op = Math.min(.9, Math.max(0, (dd1 - 5000) / 3500)); stratMat.opacity = op; STRAT.forEach((m) => { m.visible = op > .01; }); }
   { const dd0 = cam.position.distanceTo(controls.target), gx = controls.target.x, gz = controls.target.z, cs = CSZ, lim = 3000 + dd0 * .5, nl = 1000 + dd0 * .3; CHUNKS.forEach((im) => { const c = im.boundingSphere && im.boundingSphere.center; if (!c) return; const d = Math.hypot(c.x - gx, c.z - gz); im.visible = im.userData.tree ? (im.userData.far ? (dd0 >= 8500 || (d > nl - cs * .6 && d < lim * 1.9 + cs)) : (dd0 < 8500 && d < nl + cs)) : d < 4200 + cs; }); }
