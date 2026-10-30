@@ -62,7 +62,10 @@ const rawY = (x, z) => {
   const [bd, bf, bm, bsw] = biome(x, z); { const ro = sstep(.15, .45, el); y += ((ridge(wx / 70, wz / 70) - .5) * 30 + (fbm(wx / 38, wz / 38) - .5) * 10) * ro * (.35 + bm); } y *= 1 + .12 * bm; if (bsw > 0) y = y + (4 + (fbm(wx / 120, wz / 120) - .5) * 5 - y) * bsw * .85; if (bd > 0) y = y * (1 - .42 * bd) + bd * ((ridge(wx / 260, wz / 260) - .5) * 30 + (fbm(wx / 90, wz / 90) - .5) * 9) + Math.min(1, bd * 3) * (fbm(wx / 330, wz / 330) - .5) * 44;
   return Math.max(y, 3.5);
 };
-sites.forEach((s, i) => { s.gy = Math.max(7, rawY(s.x, s.y)); const tier = s.tier || 1, v = s.riv ? 'riverTwins' : s.crossing_kind === 'pass' ? 'passGate' : pickVariant(tier, s.terrain, i), S = (tier >= 3 ? 1.35 : tier === 2 ? 1.05 : .72) * 1.25 * (s.riv ? 1 : tier >= 3 ? 1.7 : tier === 2 ? 2.1 : 2.7); s.v = v; s.pl = (v === 'citadel' ? 170 : v === 'passGate' ? 120 : 110) * (s.riv ? 1 : tier >= 3 ? 1.7 : tier === 2 ? 2.1 : 2.7); s.moat = null; if (tier >= 2 && (v === 'keepBailey' || v === 'concentric' || v === 'roundShell')) { const r0 = (v === 'keepBailey' ? 56 * S * 1.5 : v === 'concentric' ? 75 * S * 1.5 : (tier >= 3 ? 82 : 60) * S * 1.18) * CK, wd = 17 * S * CK; s.moat = { r0, wd }; s.pl = r0 + wd + 22; } });
+sites.forEach((s, i) => { s.gy = Math.max(7, rawY(s.x, s.y)); const tier = s.tier || 1, v = s.riv ? 'riverTwins' : s.crossing_kind === 'pass' ? 'passGate' : pickVariant(tier, s.terrain, i), S0 = (tier >= 3 ? 1.35 : tier === 2 ? 1.05 : .72) * 1.25, mult = s.riv ? 1 : tier >= 3 ? 1.7 : tier === 2 ? 2.1 : 2.7; s.v = v; s.pl = (v === 'citadel' ? 170 : v === 'passGate' ? 120 : 110) * mult; s.moat = null; const near = sites.filter((o) => o !== s).sort((p, q) => Math.hypot(p.x - s.x, p.y - s.y) - Math.hypot(q.x - s.x, q.y - s.y))[0]; s.face = near ? Math.atan2(near.x - s.x, near.y - s.y) : 0;
+  const ml = s.riv ? null : moatLocal(v, tier, i, S0);
+  if (ml) { const M = CK * mult, wd = ml.wd * M; if (ml.r) { const r0 = ml.r * M; s.moat = { r0, wd }; s.pl = r0 + wd + 22; } else { const cf = Math.cos(s.face), sf = Math.sin(s.face), pl = ml.pl.map(([nx, nz, o]) => [nx * cf + nz * sf, -nx * sf + nz * cf, o * M]), vo = planeVerts(pl, wd), vi = planeVerts(pl, 0); s.moat = { pl, wd, vo, vi }; s.pl = Math.max(...vo.map(([x, z]) => Math.hypot(x, z))) + 10; } }
+});
 const ssf = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 const gk = (a, b) => (a + 8) * 4096 + (b + 8);
 const RVX = [], RVZ = [], RVB = [], RVW = [], rgrid = new Map(), RIVERS = [];
@@ -100,7 +103,7 @@ const FLATS = sites.concat(PLATS);
 const PASS = (art.passes || []).map(([x, z]) => ({ x, z, y: rawY(x, z) })), pgrid = new Map();
 PASS.forEach((p, i) => { const key = gk(Math.floor(p.x / 200), Math.floor(p.z / 200)); (pgrid.get(key) || pgrid.set(key, []).get(key)).push(i); });
 const hAt = (x, z) => { let y = rawY(x, z); { const cx0 = Math.floor(x / 200), cz0 = Math.floor(z / 200); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = pgrid.get(gk(cx0 + a, cz0 + b)); if (!l) continue; for (const i of l) { const p = PASS[i], d = Math.hypot(x - p.x, z - p.z); if (d < 150) { const w = 1 - ssf(35, 150, d), tg = p.y * .8 - 6; if (tg < y) y += (tg - y) * w; } } } } const rq = rvq(x, z); { const [d, k] = rq; if (k >= 0) { const hw = RVW[k], reach = hw * 3.6; if (d < reach) { const surf = RVB[k] + RV_DEPTH(hw); if (d < hw) { const bowl = surf - RV_DEPTH(hw) * (1 - (d / hw) * (d / hw)); if (y > bowl) y = bowl; } else { const t = ssf(hw, reach, d), ramp = surf + 1.4 + (d - hw) * .2, cut = Math.min(y, ramp); y = cut + (y - cut) * t; } if (d < hw * 1.9) { const floorY = surf + 1.4 * (1 - ssf(hw, hw * 1.9, d)); if (y < floorY) y = floorY; } } } } for (const l of LAKES) { const dx = x - l.x, dz = z - l.z, d0 = Math.hypot(dx, dz); if (d0 > l.r * 2) continue; const tt = d0 / lakeR(l, Math.atan2(dz, dx)); if (tt < 1.6) { const wc = 1 - ssf(.7, 1.5, tt), bed = l.y - 10 * (1 - ssf(0, .9, tt)); if (bed < y) y += (bed - y) * wc; const berm = l.y + 2.4, wb = ssf(.95, 1.08, tt) * (1 - ssf(1.15, 1.6, tt)); if (y < berm) y += (berm - y) * wb; } }
-  for (const s of FLATS) { if (s.noflat) continue; const ddx = x - s.x, ddz = z - s.y, lim2 = (s.pl + 170) * (s.pl + 170); if (ddx * ddx + ddz * ddz >= lim2) continue; const d = Math.hypot(ddx, ddz); if (d < s.pl + 170) { let w = Math.pow(Math.min(1, Math.max(0, (s.pl + 170 - d) / 170)), 1.5); { const [dr, kr] = rq; if (kr >= 0) w *= ssf(RVW[kr] * 1.1, RVW[kr] * 1.7, dr); } y = y + (s.gy - y) * w; if (s.moat && d > s.moat.r0 - 4 && d < s.moat.r0 + s.moat.wd + 4) { const c = d - s.moat.r0 - s.moat.wd / 2, wm = 1 - ssf(s.moat.wd * .3, s.moat.wd * .5 + 5, Math.abs(c)); y += (s.gy - 7 - y) * wm; } } } return y; };
+  for (const s of FLATS) { if (s.noflat) continue; const ddx = x - s.x, ddz = z - s.y, lim2 = (s.pl + 170) * (s.pl + 170); if (ddx * ddx + ddz * ddz >= lim2) continue; const d = Math.hypot(ddx, ddz); if (d < s.pl + 170) { let w = Math.pow(Math.min(1, Math.max(0, (s.pl + 170 - d) / 170)), 1.5); { const [dr, kr] = rq; if (kr >= 0) w *= ssf(RVW[kr] * 1.1, RVW[kr] * 1.7, dr); } y = y + (s.gy - y) * w; if (s.moat) { let sd = d - (s.moat.r0 || 0); if (s.moat.pl) { sd = -1e9; for (const p of s.moat.pl) { const t = ddx * p[0] + ddz * p[1] - p[2]; if (t > sd) sd = t; } } if (sd > -4 && sd < s.moat.wd + 4) { const c = sd - s.moat.wd / 2, wm = 1 - ssf(s.moat.wd * .42, s.moat.wd * .5 + 7, Math.abs(c)); y += (s.gy - 7 - y) * wm; } } } } return y; };
 const LO = !!spec.lowQuality;
 const marks = [['start', performance.now()]];
 const stage = async (m) => { const el = $('load'); if (el) el.textContent = m; if (spec.onProgress) spec.onProgress(m); marks.push([m, performance.now()]); await new Promise((r) => requestAnimationFrame(() => setTimeout(r))); };
@@ -568,12 +571,31 @@ const flags = [];
 const mEarth = new THREE.MeshStandardMaterial({ color: 0xb08c5c, roughness: 1, map: thatchTex, bumpMap: thatchTex, bumpScale: 1 });
 const mCobble = new THREE.MeshStandardMaterial({ map: stoneTex, bumpMap: stoneTex, bumpScale: 2.5, color: 0x7e776a, roughness: 1 });
 const mSail = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, side: THREE.DoubleSide, roughness: .9 });
-const VARIANTS = ['keepBailey', 'roundShell', 'motte', 'towerHouse', 'concentric', 'citadel'];
+const VARIANTS = ['keepBailey', 'roundShell', 'motte', 'towerHouse', 'concentric', 'citadel', 'starFort', 'polyKeep'];
+function rectPlanes(hx, hz) { return [[0, 1, hz], [1, 0, hx], [0, -1, hz], [-1, 0, hx]]; }
+function polyPlanes(n, ap) { return Array.from({ length: n }, (_, k) => { const a = Math.PI / 2 + k * 2 * Math.PI / n; return [Math.cos(a), Math.sin(a), ap]; }); }
+function keepAsp(seed) { return hash(seed, 71) < .45 ? 1 : 1.25 + .5 * hash(seed, 72); }
+function polySides(seed) { return hash(seed, 73) < .5 ? 6 : 8; }
+function moatLocal(v, tier, seed, S) {
+  if (tier < 2) return null;
+  const wd = 17 * S;
+  if (v === 'keepBailey') return { pl: rectPlanes(56 * S * keepAsp(seed) + 22 * S, 78 * S), wd };
+  if (v === 'concentric') return { pl: rectPlanes(99 * S, 99 * S), wd };
+  if (v === 'roundShell') return { r: (tier >= 3 ? 82 : 60) * S * 1.18, wd };
+  if (v === 'polyKeep') { const n = polySides(seed); return { pl: polyPlanes(n, (tier >= 3 ? 84 : 66) * S * Math.cos(Math.PI / n) + 24 * S), wd }; }
+  if (v === 'starFort') return { pl: polyPlanes(5, .906 * 74 * S + 20 * S), wd };
+  return null;
+}
+function planeVerts(pl, grow) {
+  const o = pl.map((p, i) => ({ a: Math.atan2(p[1], p[0]), p })).sort((x, y) => x.a - y.a).map((q) => q.p), out = [];
+  for (let i = 0; i < o.length; i++) { const a = o[i], b = o[(i + 1) % o.length], d = a[0] * b[1] - a[1] * b[0], c1 = a[2] + grow, c2 = b[2] + grow; out.push([(c1 * b[1] - c2 * a[1]) / d, (a[0] * c2 - b[0] * c1) / d]); }
+  return out;
+}
 function pickVariant(tier, terrain, seed) {
   const r = hash(seed, 41), rocky = terrain === 'mountain' || terrain === 'hills';
   if (tier === 1) return rocky && r < .5 ? 'citadel' : (terrain === 'forest' ? (r < .7 ? 'motte' : 'towerHouse') : (r < .4 ? 'motte' : 'towerHouse'));
-  if (tier === 2) return rocky && r < .4 ? 'citadel' : (r < .34 ? 'keepBailey' : r < .62 ? 'roundShell' : r < .82 ? 'starFort' : 'keepBailey');
-  return r < .38 ? 'concentric' : (rocky && r < .6 ? 'citadel' : (r < .75 ? 'roundShell' : (r < .9 ? 'starFort' : 'keepBailey')));
+  if (tier === 2) return rocky && r < .4 ? 'citadel' : (r < .28 ? 'keepBailey' : r < .46 ? 'roundShell' : r < .64 ? 'starFort' : r < .84 ? 'polyKeep' : 'keepBailey');
+  return r < .3 ? 'concentric' : (rocky && r < .5 ? 'citadel' : (r < .62 ? 'polyKeep' : (r < .78 ? 'roundShell' : (r < .9 ? 'starFort' : 'keepBailey'))));
 }
 const flagTexCache = new Map();
 function flagTex(c1, c2) {
@@ -622,18 +644,19 @@ function makeCastle(tier, col, col2, seed, variant, desert, snowy, opts) {
   const hall = (x, z, w, d, h, ry, mat = wood) => { box(w, h, d, x, 0, z, wood, ry); gable(d * 1.05, w * 1.08, h * .55, x, h, z, ry + Math.PI / 2, thatch); };
   let top = 0, rad = 70 * S;
   const v = variant;
+  const ml = moatLocal(v, tier, seed, S), gateEnd = ml ? (ml.pl ? ml.pl[0][2] : ml.r) + ml.wd + 8 : 0;
   if (v === 'keepBailey') {
-    const w = 112 * S, wh = 34 * S, hw = w / 2, th = 8 * S;
-    [[0, -hw, w, th], [0, hw, w, th], [-hw, 0, th, w], [hw, 0, th, w]].forEach(([x, z, ww, dd]) => { box(ww, wh, dd, x, 0, z); box(ww, 3, dd + 3 * S, x, wh, z); });
-    merlonsLine(-hw, -hw, hw, -hw, wh + 3, 14); merlonsLine(-hw, hw, hw, hw, wh + 3, 14); merlonsLine(-hw, -hw, -hw, hw, wh + 3, 14); merlonsLine(hw, -hw, hw, hw, wh + 3, 14);
-    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => tower(a * hw, b * hw, 13.5 * S, wh + 24 * S));
+    const wh = 34 * S, hw = 56 * S, hx = hw * keepAsp(seed), nx = Math.round(14 * hx / hw), nd = Math.round(6 * hx / hw), th = 8 * S;
+    [[0, -hw, 2 * hx, th], [0, hw, 2 * hx, th], [-hx, 0, th, 2 * hw], [hx, 0, th, 2 * hw]].forEach(([x, z, ww, dd]) => { box(ww, wh, dd, x, 0, z); box(ww, 3, dd + 3 * S, x, wh, z); });
+    merlonsLine(-hx, -hw, hx, -hw, wh + 3, nx); merlonsLine(-hx, hw, hx, hw, wh + 3, nx); merlonsLine(-hx, -hw, -hx, hw, wh + 3, 14); merlonsLine(hx, -hw, hx, hw, wh + 3, 14);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => tower(a * hx, b * hw, 13.5 * S, wh + 24 * S));
     gatehouse(0, hw + 3 * S, 24 * S, wh);
-    wallDetail(-hw, -hw, hw, -hw, wh, 6, 0, -1, th); wallDetail(-hw, hw, hw, hw, wh, 6, 0, 1, th); wallDetail(-hw, -hw, -hw, hw, wh, 6, -1, 0, th); wallDetail(hw, -hw, hw, hw, wh, 6, 1, 0, th);
-    floor(w - 2 * th, w - 2 * th, 0, 0); bridge(hw + 13 * S, hw * 1.5 + 17 * S + 8);
-    if (hash(seed, 60) > .5) [[0, -1], [-1, 0], [1, 0]].forEach(([a, b]) => tower(a * hw, b * hw, 9 * S, wh + 12 * S, false));
+    wallDetail(-hx, -hw, hx, -hw, wh, nd, 0, -1, th); wallDetail(-hx, hw, hx, hw, wh, nd, 0, 1, th); wallDetail(-hx, -hw, -hx, hw, wh, 6, -1, 0, th); wallDetail(hx, -hw, hx, hw, wh, 6, 1, 0, th);
+    floor(2 * hx - 2 * th, 2 * hw - 2 * th, 0, 0); bridge(hw + 13 * S, gateEnd);
+    if (hash(seed, 60) > .5) [[0, -1], [-1, 0], [1, 0]].forEach(([a, b]) => tower(a * hx, b * hw, 9 * S, wh + 12 * S, false));
     if (hash(seed, 55) < .55) chapel(-hw * .5, hw * .35, 0.2);
     const kw = 40 * S + 6, kh = (tier >= 3 ? 96 : 66) * S; box(kw, kh, kw, 0, 0, -6 * S); windows(0, -6 * S, kw, kw, kh, tier >= 3 ? 4 : 3); box(kw + 6, 5, kw + 6, 0, kh, -6 * S); cone(kw * .85, kw * .95, 0, kh + 5, -6 * S, roof, 4, 0, 3);
-    top = kh + 5 + kw * .95; rad = hw * 1.25;
+    top = kh + 5 + kw * .95; rad = hx * 1.25;
     for (let i = 0; i < 3; i++) { const a = i / 3 * 6.28 + seed, x = Math.cos(a) * hw * .55, z = Math.sin(a) * hw * .55 - 12 * S; if (Math.abs(x) < kw * .7 && Math.abs(z + 6 * S) < kw * .7) continue; hall(x, z, (14 + hash(i, seed) * 6) * S, (11 + hash(seed, i) * 6) * S, (11 + hash(i, 9) * 4) * S, a); }
   } else if (v === 'passGate') {
     const w = 96 * S, wh = 30 * S, th = 9 * S;
@@ -648,7 +671,7 @@ function makeCastle(tier, col, col2, seed, variant, desert, snowy, opts) {
     for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832 + .3; if (Math.abs(a - 1.5708) < .5) continue; tower(Math.cos(a) * R, Math.sin(a) * R, 11 * S, wh + 20 * S, i % 2 === 0); }
     gatehouse(0, R, 22 * S, wh);
     { const cg = new THREE.CylinderGeometry(R * .97, R * .97, 1.2, 32); scaleUV(cg, 8, 1); place(cg, 0, .6, 0); cobble.push(cg); }
-    bridge(R + 12 * S, R * 1.18 + 17 * S + 8);
+    bridge(R + 12 * S, gateEnd);
     if (hash(seed, 56) < .5) chapel(-R * .42, R * .22, -0.3);
     const kr = (tier >= 3 ? 24 : 19) * S, kh = (tier >= 3 ? 104 : 80) * S; top = tower(0, -4 * S, kr, kh, true); rad = R * 1.25;
     [[-1, 1], [1, 1], [0, -1]].forEach(([a, b], i) => { if (tier >= 3) tower(Math.cos(i * 2.1) * kr * 1.7, -4 * S + Math.sin(i * 2.1) * kr * 1.7, 8 * S, kh * .6, true); });
@@ -663,7 +686,19 @@ function makeCastle(tier, col, col2, seed, variant, desert, snowy, opts) {
     const hh = 26 * S; box(60 * S, hh, 22 * S, 0, 0, -6 * S); gable(22 * S * 1.06, 60 * S * 1.06, 14 * S, 0, hh, -6 * S, Math.PI / 2, roof); box(22 * S, hh, 56 * S, 0, 0, -6 * S); gable(22 * S * 1.06, 56 * S * 1.06, 14 * S, 0, hh, -6 * S, 0, roof);
     windows(0, -6 * S, 60 * S, 22 * S, hh, 2);
     top = tower(0, -6 * S, 12 * S, 66 * S, true); rad = Rv * 1.35;
+    gatehouse(0, Rv * .809 + 2 * S, 22 * S, wh); bridge(Rv * .809 + 13 * S, gateEnd);
     if (hash(seed, 58) < .6) chapel(-Rv * .45, Rv * .4, .4);
+  } else if (v === 'polyKeep') {
+    const n = polySides(seed), R = (tier >= 3 ? 84 : 66) * S, wh = 32 * S, ap = R * Math.cos(Math.PI / n), th = 8 * S, vs = [];
+    for (let k = 0; k < n; k++) { const a = Math.PI / 2 + (k + .5) * 2 * Math.PI / n; vs.push([Math.cos(a) * R, Math.sin(a) * R]); }
+    { const cg = new THREE.CylinderGeometry(R * .96, R * .96, 1.2, n); cg.rotateY(Math.PI / n); scaleUV(cg, 8, 1); place(cg, 0, .6, 0); cobble.push(cg); }
+    for (let k = 0; k < n; k++) { const A = vs[k], B = vs[(k + 1) % n], dx = B[0] - A[0], dz = B[1] - A[1], L = Math.hypot(dx, dz), ry = -Math.atan2(dz, dx), mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2, ln = Math.hypot(mx, mz); box(L, wh, th, mx, 0, mz, stone, ry); box(L, 3, th + 3 * S, mx, wh, mz, stone, ry); merlonsLine(A[0], A[1], B[0], B[1], wh + 3, Math.round(L / (8 * S))); wallDetail(A[0], A[1], B[0], B[1], wh, Math.max(3, Math.round(L / (24 * S))), mx / ln, mz / ln, th); }
+    vs.forEach(([x, z], k) => tower(x, z, 13 * S, wh + 22 * S, k % 2 === 0));
+    gatehouse(0, ap + 2 * S, 24 * S, wh); bridge(ap + 13 * S, gateEnd);
+    const kw = (tier >= 3 ? 44 : 38) * S, kh = (tier >= 3 ? 98 : 68) * S; box(kw, kh, kw, 0, 0, -6 * S); windows(0, -6 * S, kw, kw, kh, tier >= 3 ? 4 : 3); box(kw + 6, 5, kw + 6, 0, kh, -6 * S); cone(kw * .85, kw * .95, 0, kh + 5, -6 * S, roof, 4, 0, 3);
+    top = kh + 5 + kw * .95; rad = R * 1.25;
+    for (let i = 0; i < n; i++) { const a = i / n * 6.2832 + .3; hall(Math.cos(a) * R * .62, Math.sin(a) * R * .62 - 8 * S, (13 + hash(i, seed) * 5) * S, 10 * S, 10 * S, a); }
+    if (hash(seed, 56) < .5) chapel(-R * .45, R * .3, -0.3);
   } else if (v === 'riverTwins') {
     const KR = CK * 1.7, off = opts.off / KR, wardW = 64 * S, hw2 = wardW / 2, wh = 34 * S, th = 8 * S, depth = opts.depth / KR;
     const bankWard = (b) => { const cx0 = b * off, inner = -b;
@@ -707,7 +742,7 @@ function makeCastle(tier, col, col2, seed, variant, desert, snowy, opts) {
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => tower(a * hw, b * hw, 14 * S, h1 + 22 * S, false)); [[0, -1], [-1, 0], [1, 0]].forEach(([a, b]) => tower(a * hw, b * hw, 10 * S, h1 + 14 * S, false));
     gatehouse(0, hw, 26 * S, h1);
     wallDetail(-hw, -hw, hw, -hw, h1, 8, 0, -1, th); wallDetail(-hw, hw, hw, hw, h1, 8, 0, 1, th); wallDetail(-hw, -hw, -hw, hw, h1, 8, -1, 0, th); wallDetail(hw, -hw, hw, hw, h1, 8, 1, 0, th);
-    floor(w1 - 2 * th, w1 - 2 * th, 0, 0); bridge(hw + 13 * S, hw * 1.5 + 17 * S + 8);
+    floor(w1 - 2 * th, w1 - 2 * th, 0, 0); bridge(hw + 13 * S, gateEnd);
     if (hash(seed, 57) < .6) chapel(hw * .56, hw * .5, -0.5);
     const w2 = 74 * S, h2 = 48 * S, hw2 = w2 / 2;
     [[0, -hw2, w2, th], [0, hw2, w2, th], [-hw2, 0, th, w2], [hw2, 0, th, w2]].forEach(([x, z, ww, dd]) => { box(ww, h2, dd, x, 0, z); box(ww, 3, dd + 3 * S, x, h2, z); });
@@ -761,8 +796,7 @@ sites.forEach((s, i) => {
     return;
   }
   const c = s.owner == null ? ['#8a8478', '#5a574f'] : spec.colors(s.owner);
-  const near = sites.filter((o) => o !== s).sort((p, q) => Math.hypot(p.x - s.x, p.y - s.y) - Math.hypot(q.x - s.x, q.y - s.y))[0];
-  const face = Math.atan2(near.x - s.x, near.y - s.y);
+  const face = s.face;
   const g = makeCastle(s.tier || 1, c[0], c[1], i, s.riv ? 'riverTwins' : s.crossing_kind === 'pass' ? 'passGate' : pickVariant(s.tier || 1, s.terrain, i), biome(s.x, s.y)[0] > .4, biome(s.x, s.y)[4] > .4, s.riv); g.position.set(s.x, s.gy, s.y); g.rotation.y = s.riv ? -Math.atan2(s.riv.nz, s.riv.nx) : face; scene.add(g);
   let sea = -1; for (let k = 0; k < 16 && sea < 0; k++) { const a = k / 16 * 6.2832; for (let d = 160; d <= 520; d += 60) if (H(s.x + Math.sin(a) * d, s.y + Math.cos(a) * d) < SEA) { sea = a; break; } }
   if (sea >= 0 && !s.riv) { const dk = makeDock(s, sea); scene.add(dk); DOCKS.push(dk); }
@@ -773,7 +807,7 @@ sites.forEach((s, i) => {
 });
 {
   const moatMat = new THREE.MeshStandardMaterial({ color: 0x1a5a74, roughness: .08, metalness: .1, transparent: true, opacity: .94, envMapIntensity: 1.6 });
-  sites.forEach((s) => { if (!s.moat) return; const m = new THREE.Mesh(new THREE.RingGeometry(s.moat.r0 - 1, s.moat.r0 + s.moat.wd + 1, 64, 1), moatMat); m.rotation.x = -Math.PI / 2; m.position.set(s.x, s.gy - 2.4, s.y); m.receiveShadow = true; scene.add(m); });
+  sites.forEach((s) => { if (!s.moat) return; const mo = s.moat; let geo; if (mo.pl) { const vo = planeVerts(mo.pl, mo.wd * .92), vi = planeVerts(mo.pl, mo.wd * .08), sh = new THREE.Shape(vo.map(([x, z]) => new THREE.Vector2(x, -z))); sh.holes.push(new THREE.Path(vi.map(([x, z]) => new THREE.Vector2(x, -z)))); geo = new THREE.ShapeGeometry(sh); } else geo = new THREE.RingGeometry(mo.r0 + mo.wd * .08, mo.r0 + mo.wd * .92, 64, 1); const m = new THREE.Mesh(geo, moatMat); m.rotation.x = -Math.PI / 2; m.position.set(s.x, s.gy - 1.4, s.y); m.receiveShadow = true; scene.add(m); });
   const posts = [], rails = [], hay = [];
   FIELDS.forEach(([fx0, fz0, fw, fd, ang, fenced]) => { const ca = Math.cos(ang), sa = Math.sin(ang), pt = (u, v) => [fx0 + u * ca - v * sa, fz0 + u * sa + v * ca]; const edges = [[-fw / 2, -fd / 2, fw / 2, -fd / 2], [fw / 2, -fd / 2, fw / 2, fd / 2], [fw / 2, fd / 2, -fw / 2, fd / 2], [-fw / 2, fd / 2, -fw / 2, -fd / 2]]; (fenced ? edges : []).forEach(([u0, v0, u1, v1], ei) => { const L = Math.hypot(u1 - u0, v1 - v0), n = Math.max(1, Math.round(L / 30)); for (let k = 0; k < n; k++) { const a0 = pt(u0 + (u1 - u0) * k / n, v0 + (v1 - v0) * k / n), a1 = pt(u0 + (u1 - u0) * (k + 1) / n, v0 + (v1 - v0) * (k + 1) / n), mx = (a0[0] + a1[0]) / 2, mz = (a0[1] + a1[1]) / 2, hh = hAt(mx, mz); if (hh < 3 || Math.hypot(mx - fx0, mz - fz0) < 0) continue; posts.push([a0[0], hAt(a0[0], a0[1]), a0[1]]); rails.push([mx, hh + 4.4, mz, Math.atan2(a1[1] - a0[1], a1[0] - a0[0]), Math.hypot(a1[0] - a0[0], a1[1] - a0[1])]); } }); for (let k = 0; k < (fenced ? 0 : 2); k++) { const p = pt((hash(k, 5) - .5) * fw * .7, (hash(k, 9) - .5) * fd * .7); hay.push([p[0], hAt(p[0], p[1]), p[1], hash(k, ang * 99)]); } });
   const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(1.3, 6.5, 1.3), mWood, posts.length), rm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .8, .8), mWood, rails.length), d = new THREE.Object3D();
@@ -1179,7 +1213,7 @@ const api = {
   groundAt: (x, z) => hAt(x, z),
   capture(w, h, q) { composer.render(); const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(renderer.domElement, 0, 0, w, h); return c.toDataURL('image/jpeg', q || 0.8); },
   scene,
-  sites: () => sites.map((q) => ({ id: q.id, x: q.x, z: q.y, y: q.gy, tier: q.tier, name: q.name })),
+  sites: () => sites.map((q) => ({ id: q.id, x: q.x, z: q.y, y: q.gy, tier: q.tier, name: q.name, v: q.v, moat: !!q.moat })),
   dispose() { running = false; ro.disconnect(); renderer.dispose(); try { renderer.forceContextLoss(); } catch {} host.innerHTML = ''; host.classList.remove('map3d'); },
 };
 scene.traverse((o) => { if (o.isInstancedMesh) o.layers.set(1); }); cam.layers.enable(1);

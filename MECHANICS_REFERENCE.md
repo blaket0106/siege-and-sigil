@@ -2012,3 +2012,9 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - Crossing castles are named by class: Ford (stream), Crossing (river), Bridge (great). Measured effect: crossings per world on continental seeds fell from about 9 to about 5, the connectivity guarantee still passes in 100 percent of worlds, and the range multiplier it adds rose from about 1.04 to about 1.12.
 - 3D map: widths come from `ws` (half width `22 + 38 x (w - 1.4)` map units, so a stream is 50 wide and a great river up to 600). Wide rivers get a smoothed centreline, a flat-bottomed valley carved by distance to the river line with banks that rise gently (slope 0.2) and are never below the water, a darker shore band, finer terrain next to wide rivers, and a straight run to the sea if the path ends short. Generated rivers no longer end in lakes. The 2D map draws each river in runs of six points at that run's width.
 - Older games have no `ws`; they fall back to the single width `w`.
+
+## 62. Castle footprints and moats (3D, cosmetic)
+
+- Tier 2 and 3 castles pick a footprint by seeded roll: keepBailey (square or rectangle, aspect 1 to 1.75), roundShell, polyKeep (hexagon or octagon), starFort (pentagon with gate and bridge), concentric, or citadel on rocky ground. Tier 1 and river castles have no moat.
+- A moat is a set of half-planes (rectangle, regular polygon) or a radius, built in castle-local units by `moatLocal` and rotated by the castle's face toward its nearest neighbour. Terrain carving uses the signed distance to the moat's inner edge, so the carved bed and the water mesh match the footprint.
+- `s.pl` (platform radius) is the farthest moat corner plus 10, so rectangular and polygon castles flatten a larger area than circular ones.
