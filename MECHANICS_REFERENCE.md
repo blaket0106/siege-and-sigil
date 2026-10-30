@@ -2030,3 +2030,8 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - Tier 3 castles are scaled by `T3M` (2.3, was 1.7) and their footprints enlarged (polyKeep circumradius 126, roundShell 120, starFort 104, keepBailey 78, concentric outer wall 220, all in castle-local units). Moats are derived from the same numbers.
 - Inside the walls, `town()` fills the courtyard with a street grid of houses (up to 120), a cobbled market square in front of the keep, a lane kept clear from the gate, and crop plots in the rear. Tier 3 castles get no outside farm block.
 - The zoom-scale loop now keeps each castle's base scale (`userData.k0`) instead of overwriting it, so tier 1 and 2 castles fit their moats; far zoom size is unchanged.
+
+## 65. Tier 2 villages (3D, cosmetic)
+
+- Each tier 2 castle (not junction, river or pass) tries to build a village starting at its platform edge, running 420 to 520 units along the gate axis, which faces the nearest neighbouring castle. If fewer than 6 lane segments or 4 houses fit, it gets none.
+- Layout: a lane of earth segments, up to three rows of houses each side at 34-unit spacing (rows 2 and 3 thinned randomly), a cobbled 76-unit square with a well at the midpoint, and a chapel with a tower beside it if there is room. Houses skip wet, steep, river, trail and neighbouring-castle ground. Villages claim their area before the farm block is placed, so the two never overlap, and trees are cleared under them.
