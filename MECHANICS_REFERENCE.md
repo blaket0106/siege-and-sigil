@@ -2035,3 +2035,8 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 
 - Each tier 2 castle (not junction, river or pass) tries to build a village starting at its platform edge, running 420 to 520 units along the gate axis, which faces the nearest neighbouring castle. If fewer than 6 lane segments or 4 houses fit, it gets none.
 - Layout: a lane of earth segments, up to three rows of houses each side at 34-unit spacing (rows 2 and 3 thinned randomly), a cobbled 76-unit square with a well at the midpoint, and a chapel with a tower beside it if there is room. Houses skip wet, steep, river, trail and neighbouring-castle ground. Villages claim their area before the farm block is placed, so the two never overlap, and trees are cleared under them.
+
+## 66. River water edges (3D, cosmetic)
+
+- The river ribbon now sits at water level (`q.y`) over a bed 1.2 below it, with a steep bank (`ssf(.88 hw, 1.04 hw)`). Before, the terrain floor was 1.4 above the ribbon, so the ribbon only showed where depth offset won, which made patchy dark shards and ragged edges.
+- River extensions to the sea taper from the river's width to 30 percent instead of widening, and sink to -14 so the sea plane crosses a straight bank, not a flat floor sitting exactly at sea level. The mouth no longer widens the ribbon beyond the carved valley.
