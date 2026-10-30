@@ -33,6 +33,7 @@ const { createMap3D } = await import('../map3d.js');
 const m3 = await createMap3D(document.getElementById('host'), {
   map_w: layout.map_w, art: layout.art, sites, edges,
   lowQuality: q.get('low') === '1',
+  quality: q.get('quality') || 'rich',
   colors: (pid) => [cols[(pid - 1) % cols.length], '#222'],
   onProgress: (m) => stages.push([Math.round(performance.now() - t1), m]),
   onSelect: () => {},

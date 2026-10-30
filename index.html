@@ -685,7 +685,7 @@
         let label = '';
         const giveUp = () => { stopped = true; host.classList.remove('on'); setTimeout(() => { if (api) { try { api.dispose(); } catch {} api = null; } }, 2400); };
         const made = await createMap3D(host, {
-          map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: false,
+          map_w: layout.map_w, art: layout.art, sites, edges, lowQuality: false, quality: quality3d(),
           colors: (pid) => { const f = factionOf(seats[pid]); return [f.color, f.color2]; },
           sun: FLIGHT.sun, horizon: FLIGHT.horizon, fogMul: FLIGHT.fog, exposure: FLIGHT.exposure,
           onFrame: (t, dt, cam, controls) => {
@@ -893,6 +893,7 @@
           ['7', 'A route in progress ([[marching#routes|routes]]).'],
           ['8', 'The side panel is one slot with three states. With nothing selected it shows the leaderboard: the road to victory, then one row per house with its relation to you, castles held, regard, and its diplomacy actions folded underneath; below that, offers, events and the realm areas. Selecting a castle opens it on one page: the name with its state chips, the castle\'s own portrait with troops, tier and levels beside it, then for your own castles three columns, Treasury, Recruitment and Prestige, each with its level, what it adds each cycle and a Buy button with the price; then Hire a commander, Hire mercenaries and Build roads; the commanders standing there with March and View; and everything else folded: defence and production, trails and supply lines, threats, battles here, your note and history. A commander opens with the portrait, troops, rank and what they are doing now (a pencil beside the name renames your own), then Orders, where a route is a table of stops with the order at each and the ETA of the next, with abilities and the chronicle folded. Every header has a back arrow, a ? for the manual page about that screen, and a close that returns to the leaderboard; the browser back button and Escape also step back. Reloading the page returns you to the same game and the same castle or army, with fresh data.'],
           ['9', 'The legend: yours, other players, unclaimed and unknown ([[fog|fog of war]]). It also explains the markers. The map controls beside it recentre the map on your castles, switch between the 2D and 3D map, show scan rings and toggle sound.'],
+          ['10', '3D map detail, in Menu, Options. Automatic starts Rich on a strong machine, with shadows, reflective water and full forests, and switches to Lean if the map runs below about 22 frames a second. Lean keeps the same terrain, castles, trails, fields and overlays with fewer effects, so it loads and runs much faster on older machines. Choose Rich or Lean to fix it either way; the change applies at once.'],
         ] }],
         ['note', 'Click any castle or army to select it and see its actions. The address bar follows your selection, so a link to a castle or commander can be shared or bookmarked.'],
         ['h', 'On a phone'],
@@ -3307,10 +3308,31 @@
       const when = (x, d) => (['always', 'zoomed', 'close', 'never'].includes(x) ? x : d);
       const BAR_DEFAULT = ['victory', 'treasury', 'research', 'armies'];
       const bar = Array.isArray(v.bar) && v.bar.length === 4 && v.bar.every((k) => BAR_TILES[k]) ? v.bar : BAR_DEFAULT;
-      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right', plates: when(v.plates, 'always'), armies: when(v.armies, 'always'), infra: when(v.infra, 'zoomed'), bar, menu: v.menu === 'docked' ? 'docked' : 'drop' };
-      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side, plates: prefs.plates, armies: prefs.armies, infra: prefs.infra, bar: prefs.bar, menu: prefs.menu })); } catch {} window.dispatchEvent(new Event('ss-prefs')); };
+      const prefs = { action: ACTION_NAMES[v.action] ? v.action : 'nothing', side: v.side === 'left' ? 'left' : 'right', plates: when(v.plates, 'always'), armies: when(v.armies, 'always'), infra: when(v.infra, 'zoomed'), bar, menu: v.menu === 'docked' ? 'docked' : 'drop', detail3d: ['auto', 'rich', 'lean'].includes(v.detail3d) ? v.detail3d : 'auto' };
+      prefs.save = () => { try { localStorage.setItem('ss-prefs', JSON.stringify({ action: prefs.action, side: prefs.side, plates: prefs.plates, armies: prefs.armies, infra: prefs.infra, bar: prefs.bar, menu: prefs.menu, detail3d: prefs.detail3d })); } catch {} window.dispatchEvent(new Event('ss-prefs')); };
       return prefs;
     })();
+    const detail3dAuto = (() => {
+      let q = null;
+      return () => {
+        if (q) return q;
+        let weak = window.innerWidth < 900 || window.matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) < 6 || (navigator.deviceMemory || 8) < 4;
+        try { if (localStorage.getItem('ss-3d-lean') === '1') weak = true; } catch {}
+        try {
+          const gl = document.createElement('canvas').getContext('webgl2');
+          const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+          const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+          if (!gl || /swiftshader|llvmpipe|software|mali|adreno|powervr|intel\(r\) (hd|uhd)|hd graphics|uhd graphics/i.test(name)) weak = true;
+        } catch { weak = true; }
+        q = weak ? 'lean' : 'rich';
+        return q;
+      };
+    })();
+    const quality3d = () => {
+      if (PREFS.detail3d !== 'auto') return PREFS.detail3d;
+      try { if (localStorage.getItem('ss-3d-lean') === '1') return 'lean'; } catch {}
+      return detail3dAuto();
+    };
 
     function articlesOfWar(game, seats) {
       const art = (title, ...rows) => h('div', { class: 'article' }, h('h4', {}, title), h('div', {}, rows.filter(Boolean).map(([k, v]) => h('div', {}, h('b', {}, k + ': '), String(v)))));
@@ -3393,6 +3415,7 @@
       const plates = selectOf(WHEN, PREFS.plates);
       const armiesSel = selectOf(WHEN, PREFS.armies);
       const infra = selectOf(WHEN, PREFS.infra);
+      const detail3d = selectOf({ auto: 'Automatic (recommended)', rich: 'Rich: shadows, reflections, full forests', lean: 'Lean: smoother on older machines' }, PREFS.detail3d);
       modal('Options', h('div', {},
         h('label', {}, 'Default order at new route stops'), action,
         h('div', { class: 'tip' }, 'Do nothing is the safe choice. Collect all empties a castle\'s garrison into the commander.'),
@@ -3403,6 +3426,8 @@
         h('label', {}, 'Map text: castle names and troops'), plates,
         h('label', {}, 'Map text: army troop counts'), armiesSel,
         h('label', {}, 'Map text: castle upgrade levels'), infra,
+        h('label', {}, '3D map detail'), detail3d,
+        h('div', { class: 'tip' }, 'Automatic starts Rich on a strong machine and switches to Lean if the map runs below about 22 frames a second.'),
         h('label', { class: 'check', style: 'margin-top:10px' }, sound, 'Sound effects'),
         extras.length ? h('div', { class: 'row wrap2', style: 'margin-top:14px;padding-top:12px;border-top:1px solid var(--rule-soft)' }, h('span', { class: 'dim', style: 'width:100%;font-family:var(--font-sc);font-size:.72rem;letter-spacing:.1em;color:var(--faint)' }, 'This game'), ...extras) : null,
         h('div', { class: 'row wrap2', style: 'margin-top:6px' }, h('button', { type: 'button', class: 'small', onclick: () => { Sfx.fanfare(); setTimeout(Sfx.lost, 1100); setTimeout(Sfx.alarm, 2200); setTimeout(Sfx.bell, 3200); } }, 'Play sample sounds'), h('span', { class: 'tip', style: 'margin:0' }, 'Castle gained, castle lost, a threat, then a new tick.'))), (close) => [
@@ -3417,6 +3442,7 @@
             PREFS.infra = infra.value;
             PREFS.bar = slots.map((sel) => sel.value);
             PREFS.menu = menuStyle.value;
+            if (detail3d.value !== PREFS.detail3d) { PREFS.detail3d = detail3d.value; try { localStorage.removeItem('ss-3d-lean'); } catch {} }
             PREFS.save();
             if (sound.checked !== Sfx.on) Sfx.toggle();
             const body = document.querySelector('.mapbody');
@@ -4363,7 +4389,25 @@
         const { createMap3D } = await import('./map3d.js');
         const list = [...ms.t.values()];
         const idx = new Map(list.map((t, i) => [t.id, i]));
+        ms.q3 = quality3d();
+        const fps = { t0: 0, n: 0, done: false };
         ms.m3 = await createMap3D(stage3d, {
+          quality: ms.q3,
+          onFrame: () => {
+            if (fps.done || PREFS.detail3d !== 'auto' || ms.q3 !== 'rich' || !ms.view3d) return;
+            if (document.visibilityState !== 'visible') { fps.t0 = 0; fps.n = 0; return; }
+            const now = performance.now();
+            if (!fps.t0) { fps.t0 = now + 2500; fps.n = 0; return; }
+            if (now < fps.t0) return;
+            fps.n += 1;
+            if (now - fps.t0 < 8000) return;
+            fps.done = true;
+            if ((fps.n * 1000) / (now - fps.t0) < 22) {
+              try { localStorage.setItem('ss-3d-lean', '1'); } catch {}
+              toast('The 3D map was slow, so it switched to Lean detail. You can change this in Options.', true);
+              rebuild3d();
+            }
+          },
           map_w: ms.game.map_w,
           art: ms.art,
           sites: list.map((t) => ({ id: t.id, x: t.x, y: t.y, tier: t.tier, name: t.name, terrain: t.terrain, crossing_kind: t.crossing_kind || null, junction: !!t.is_junction, owner: null, troops: null, mine: false })),
@@ -4377,6 +4421,18 @@
             select('t', id);
           },
         });
+      };
+
+      const rebuild3d = async () => {
+        if (!ms.m3 || !ms.view3d || quality3d() === ms.q3) return;
+        ms.m3.dispose();
+        ms.m3 = null;
+        stage3d.replaceChildren();
+        try { await build3d(); } catch (e) { console.error(e); toast(`The 3D map could not restart: ${e.message}`); return; }
+        ms.m3.resize();
+        sync3d();
+        sync3dArmies(viewTick());
+        if (ms.goHome) ms.goHome();
       };
 
       const toggle3D = async () => {
@@ -6440,7 +6496,7 @@
         const y = h >= f.h ? f.y + (f.h - h) / 2 : Math.min(f.y + f.h - h, Math.max(f.y, v.y));
         return { x, y, w, h };
       };
-      const onPrefs = () => applyView();
+      const onPrefs = () => { applyView(); rebuild3d(); };
       window.addEventListener('ss-prefs', onPrefs);
       const roMap = new ResizeObserver(() => { if (ms.view && !ms.view3d) applyView(); });
       roMap.observe(svg);
