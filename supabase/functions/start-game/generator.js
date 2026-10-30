@@ -943,8 +943,8 @@ export function generateWorld({ seed, players, mapSize, startingTerritories, sty
         const natural = 4 + Math.floor(crng() * 7);
         territories.push({
           idx: c.idx,
-          name: c.pass ? `${cnames[k]} Pass` : `${cnames[k]} Crossing`,
-          slug: `${cnames[k]}-${c.pass ? 'pass' : 'crossing'}`.toLowerCase(),
+          name: `${cnames[k]} ${c.pass ? 'Pass' : c.cls === 2 ? 'Bridge' : c.cls === 0 ? 'Ford' : 'Crossing'}`,
+          slug: `${cnames[k]}-${c.pass ? 'pass' : c.cls === 2 ? 'bridge' : c.cls === 0 ? 'ford' : 'crossing'}`.toLowerCase(),
           tier: 1,
           natural_resources: natural,
           x: round4(c.x),

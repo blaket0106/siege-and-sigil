@@ -11,6 +11,9 @@ export const PRESETS = {
   plains: { rivers: 0, mountain: 0, wet: 0 },
 };
 
+export const riverClass = (w) => (w >= GREAT_W ? 2 : w >= RIVER_W ? 1 : 0);
+const CROSS_SEP = [0.7, 1.7, 3.4];
+
 function smoothstep(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -150,6 +153,10 @@ const TRAIL_CAP = 1.9;
 const SPAN = 2.0;
 const CROSS_SPAN = 2.4;
 const SHARE = 0.2;
+const RIVER_SHARE = 0.011;
+const RIVER_MAX_W = 8;
+const RIVER_W = 3;
+const GREAT_W = 4.8;
 
 function planTrails(c, lenient = 0) {
   const wet = (sc) => (lenient ? sc.oceanFrac > lenient : sc.ocean);
@@ -185,7 +192,7 @@ function planTrails(c, lenient = 0) {
           seen.add(seg);
           if (seg.x1 < lx0 || seg.x0 > lx1 || seg.y1 < ly0 || seg.y0 > ly1) continue;
           const q = segIntersect(A, B, seg.a, seg.b);
-          if (q) out.push({ x: q.x, y: q.y, ri: seg.ri });
+          if (q) out.push({ x: q.x, y: q.y, ri: seg.ri, w: seg.w });
         }
       }
     }
@@ -221,7 +228,7 @@ function planTrails(c, lenient = 0) {
         const d = Math.hypot(q.x - hits[0].x, q.y - hits[0].y);
         if (d < bd) {
           bd = d;
-          best = { x: q.x, y: q.y, ri: seg.ri };
+          best = { x: q.x, y: q.y, ri: seg.ri, w: seg.w };
         }
       }
       if (!best || sample(height, best.x, best.y) < sea + 0.02) continue;
@@ -231,7 +238,7 @@ function planTrails(c, lenient = 0) {
       if (d1 < spacing * 0.2 || d2 < spacing * 0.2) continue;
       const bad = (S, T) => wet(scanLine(S, T)) || riverCross(S, T).some((h) => Math.hypot(h.x - P.x, h.y - P.y) > spacing * 0.07);
       if (bad(A, P) || bad(P, B)) continue;
-      cross1.push({ a: cd.a, b: cd.b, pts: [{ x: P.x, y: P.y, ri: best.ri }], len: d1 + d2, direct: cd.len });
+      cross1.push({ a: cd.a, b: cd.b, pts: [{ x: P.x, y: P.y, ri: best.ri, w: best.w }], len: d1 + d2, direct: cd.len });
     }
   }
 
@@ -244,7 +251,7 @@ function planTrails(c, lenient = 0) {
       const d = Math.hypot(q.x - h.x, q.y - h.y);
       if (d < bd) {
         bd = d;
-        best = { x: q.x, y: q.y, ri: seg.ri };
+        best = { x: q.x, y: q.y, ri: seg.ri, w: seg.w };
       }
     }
     return best;
@@ -373,7 +380,7 @@ function planTrails(c, lenient = 0) {
     for (const pt of cd.pts) {
       const idx = N0 + crossings.length;
       nodes.push({ x: pt.x, y: pt.y });
-      crossings.push({ idx, x: pt.x, y: pt.y, ri: pt.ri, pass: !!pt.pass, a: cd.a, b: cd.b });
+      crossings.push({ idx, x: pt.x, y: pt.y, ri: pt.ri, pass: !!pt.pass, cls: pt.pass ? 0 : riverClass(pt.w || 0), a: cd.a, b: cd.b });
       link(prev, idx, dist(prevPt, pt), pt.pass ? 'pass' : 'river');
       prev = idx;
       prevPt = pt;
@@ -386,6 +393,10 @@ function planTrails(c, lenient = 0) {
     ...free.map((e) => ({ kind: 'free', a: e.a, b: e.b, len: e.len, direct: e.len })),
     ...cross1.filter((cd) => !pickedKeys.has(key(cd.a, cd.b))).map((cd) => ({ kind: 'cross', ...cd })),
   ].sort((x, y) => x.direct - y.direct || x.a - y.a || x.b - y.b);
+  const tooClose = (pt) => {
+    const c = pt.pass ? 0 : riverClass(pt.w || 0);
+    return crossings.some((q) => Math.hypot(q.x - pt.x, q.y - pt.y) < spacing * CROSS_SEP[Math.max(c, q.cls)]);
+  };
   const consider = (cd) => {
     const limit = cd.kind === 'free' ? SPAN : CROSS_SPAN;
     if (sp(cd.a, cd.b, cd.direct * limit * 1.01) <= cd.direct * limit) return false;
@@ -394,7 +405,7 @@ function planTrails(c, lenient = 0) {
       return true;
     }
     if (cd.len > cd.direct * 1.4) return false;
-    if (crossings.some((q) => Math.hypot(q.x - cd.pts[0].x, q.y - cd.pts[0].y) < spacing * 0.7)) return false;
+    if (tooClose(cd.pts[0])) return false;
     addCrossing(cd);
     return true;
   };
@@ -417,7 +428,7 @@ function planTrails(c, lenient = 0) {
         break;
       }
       if (cd.len > cd.direct * 1.4) continue;
-      if (crossings.some((q) => Math.hypot(q.x - cd.pts[0].x, q.y - cd.pts[0].y) < spacing * 0.7)) continue;
+      if (tooClose(cd.pts[0])) continue;
       addCrossing(cd);
       break;
     }
@@ -891,26 +902,32 @@ export function buildTerrain(o) {
   }
 
   const rivers = [];
-  const riverCount = new Uint16Array(G * G);
-  const wanted = preset.rivers ? Math.max(3, Math.round((points.length / 5.5) * preset.rivers)) : 0;
-  const candidates = [];
+  const landCells = [];
+  const acc = new Float32Array(G * G);
   for (let i = 0; i < G * G; i++) {
-    if (isLand[i] && height[i] > SEA + 0.2) {
-      const x = cx(i % G);
-      const y = cx((i / G) | 0);
-      candidates.push({ i, h: height[i] + 0.03 * noiseD(x / 90, y / 90) });
+    if (isLand[i]) {
+      landCells.push(i);
+      acc[i] = 0.6 + moist[i];
     }
   }
-  candidates.sort((a, b) => b.h - a.h || a.i - b.i);
-  const sources = [];
-  for (const c of candidates) {
-    if (sources.length >= wanted) break;
-    const gx = c.i % G;
-    const gy = (c.i / G) | 0;
-    if (sources.some((s) => Math.hypot((s % G) - gx, ((s / G) | 0) - gy) < 9)) continue;
-    sources.push(c.i);
+  landCells.sort((a, b) => filled[b] - filled[a] || a - b);
+  for (const c of landCells) {
+    const p = parent[c];
+    if (p >= 0 && isLand[p]) acc[p] += acc[c];
   }
-  for (const s of sources) {
+  const sortedAcc = landCells.map((c) => acc[c]).sort((a, b) => a - b);
+  const cut = preset.rivers ? Math.max(40, sortedAcc[Math.floor(sortedAcc.length * (1 - Math.min(0.2, RIVER_SHARE * preset.rivers)))] || 0) : Infinity;
+  const hasUp = new Uint8Array(G * G);
+  const riverId = new Int16Array(G * G).fill(-1);
+  const heads = [];
+  for (const c of landCells) {
+    if (acc[c] < cut) continue;
+    const p = parent[c];
+    if (p >= 0 && isLand[p] && acc[p] >= cut) hasUp[p] = 1;
+  }
+  for (const c of landCells) if (acc[c] >= cut && !hasUp[c]) heads.push(c);
+  heads.sort((a, b) => filled[b] - filled[a] || a - b);
+  for (const s of heads) {
     const path = [];
     let c = s;
     let merged = false;
@@ -918,30 +935,38 @@ export function buildTerrain(o) {
     while (c >= 0 && guard++ < 2000) {
       path.push(c);
       if (!isLand[c]) break;
-      if (riverCount[c] > 0 && path.length > 1) {
+      if (riverId[c] >= 0 && path.length > 1) {
         merged = true;
         break;
       }
       c = parent[c];
     }
-    if (path.length < 10 && !merged) continue;
-    for (const c2 of path) riverCount[c2] += 1;
+    if (path.length < 12 && !merged) continue;
+    for (const c2 of path) if (riverId[c2] < 0) riverId[c2] = rivers.length;
     rivers.push(path);
   }
 
+  const accMax = Math.max(1, ...landCells.map((c) => acc[c]));
+  const widthAt = (c) => 1.4 + (RIVER_MAX_W - 1.4) * Math.pow(Math.max(0, Math.min(1, (acc[c] - cut) / Math.max(1, accMax - cut))), 0.62);
   const riverPolys = rivers.map((path) => {
+    const wc = path.map((c) => (isLand[c] ? widthAt(c) : widthAt(path[path.length - 2] ?? c)));
     const raw = path.map((c) => [cx(c % G), cx((c / G) | 0)]);
     const pts = chaikin(raw, 2);
-    let share = 1;
-    for (const c of path) share = Math.max(share, riverCount[c]);
-    return { w: Math.round((1.6 + 0.7 * (share - 1)) * 10) / 10, p: pts.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]) };
+    const ws = pts.map((_, j) => {
+      const t = (j / (pts.length - 1)) * (path.length - 1);
+      const a = Math.floor(t);
+      const b = Math.min(path.length - 1, a + 1);
+      return Math.round((wc[a] + (wc[b] - wc[a]) * (t - a)) * 10) / 10;
+    });
+    const w = Math.max(...ws);
+    return { w, cls: riverClass(w), ws, p: pts.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]) };
   });
   const riverSegs = [];
   for (const [ri, r] of riverPolys.entries()) {
     for (let k = 0; k < r.p.length - 1; k++) {
       const sa = { x: r.p[k][0], y: r.p[k][1] };
       const sb = { x: r.p[k + 1][0], y: r.p[k + 1][1] };
-      riverSegs.push({ ri, a: sa, b: sb, x0: Math.min(sa.x, sb.x), x1: Math.max(sa.x, sb.x), y0: Math.min(sa.y, sb.y), y1: Math.max(sa.y, sb.y) });
+      riverSegs.push({ ri, w: Math.max(r.ws[k], r.ws[k + 1]), a: sa, b: sb, x0: Math.min(sa.x, sb.x), x1: Math.max(sa.x, sb.x), y0: Math.min(sa.y, sb.y), y1: Math.max(sa.y, sb.y) });
     }
   }
 
