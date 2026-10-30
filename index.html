@@ -1215,6 +1215,7 @@
         ['list', [
           'The table shows every seat: players, AI houses with their strength and style, and open seats. The host can seat an AI in any open seat, change an AI, or remove a player.',
           'Begin holds the start button and tells you what is still needed. A game needs at least two houses; seat an AI to play alone. Cancel game and Leave sit below it.',
+          'If you host a game, Delete game appears on its page once it has begun or finished. It removes the game for everyone, asks first, and cannot be undone.',
           'Invite players shows the game code and link with copy buttons, and Invite friends. Starting schools lets each player choose where their king and commanders trained before the game begins.',
           'The articles of war fold open to show every rule of the game. Chat is the lobby channel.',
         ]],
@@ -2716,7 +2717,9 @@
         const danger = [];
         if (lobby && isHost) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog('Cancel this game for everyone?', 'Cancel game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('cancel_game', { p_game_id: gameId }); if (error) throw error; toast('Game cancelled', true); await showHome(); }); } }, 'Cancel game'));
         if (lobby && me) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog('Leave this game?', 'Leave game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('leave_game', { p_game_id: gameId }); if (error) throw error; await showHome(); }); } }, 'Leave'));
-        if (game.status === 'finished' && isHost) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog('Delete this finished game and all its data?', 'Delete game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('delete_game', { p_game_id: gameId }); if (error) throw error; await showHome(); }); } }, 'Delete game'));
+        const others = players.filter((p) => !p.is_ai && !p.is_me).length;
+        const delText = game.status === 'finished' ? 'Delete this finished game and all its data?' : others ? `Delete this game for everyone? ${others} other ${others === 1 ? 'player is' : 'players are'} still in it. The game and all its data are removed and this cannot be undone.` : 'Delete this game and all its data? This cannot be undone.';
+        if (game.status !== 'lobby' && isHost) danger.push(h('button', { type: 'button', class: 'danger', onclick: async (e) => { if (await confirmDialog(delText, 'Delete game')) run(e.currentTarget, async () => { const { error } = await sb.rpc('delete_game', { p_game_id: gameId }); if (error) throw error; await showHome(); }); } }, 'Delete game'));
 
         if (lobby && isHost && !inviteInfo) sb.rpc('game_invite_info', { p_game_id: gameId }).then((r) => { if (r.data) { inviteInfo = r.data; draw(); } });
         const link = inviteInfo ? `${location.origin}${location.pathname}#join=${inviteInfo.code}` : '';
