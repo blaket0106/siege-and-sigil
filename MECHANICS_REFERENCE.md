@@ -2057,5 +2057,5 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 
 ## 69. 2D view on large maps
 
-- Above scale 20 the 2D map no longer scales what it draws with the map. The opening view is a fixed 18,000 units wide (about 3 castle spacings at 1.8x, 1.7 at 3.6x), centred on your castles; sprites are drawn at the scale-20 size (`M()` capped at the square root of 20); and screen markers are about 25 percent smaller (`mkScale` factor 0.38, cap 0.95). Castles therefore look small and far apart, and armies cross the screen faster, while hop times stay the same.
+- Above scale 20 the 2D map no longer scales what it draws with the map. The opening view is a fixed 18,000 units wide (about 3.3 castle spacings at 1.8x, 1.7 at 3.6x), centred on your capital regardless of how far your other castles are; sprites are drawn at the scale-20 size (`M()` capped at the square root of 20); and screen markers shrink with the map (`mkScale` base 0.5 x sqrt(20 / scale), floor 0.3: about 0.37 at 1.8x and 0.26 at 3.6x). Castles therefore look small and far apart, and armies cross the screen faster, while hop times stay the same.
 - Games at scale 20 or below behave as before.

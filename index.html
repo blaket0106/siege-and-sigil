@@ -6521,7 +6521,8 @@
         svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
         const pxu = Math.min(svg.clientWidth / ms.view.w, svg.clientHeight / ms.view.h) || 1;
         const fit = ms.full ? Math.min(svg.clientWidth / ms.full.w, svg.clientHeight / ms.full.h) || pxu : pxu;
-        ms.mkScale = Math.min(S() > 20 ? 0.95 : 1.3, Math.max(0.5, (S() > 20 ? 0.38 : 0.5) * Math.sqrt(pxu / fit)));
+        const mkBase = S() > 20 ? 0.5 * Math.sqrt(20 / S()) : 0.5;
+        ms.mkScale = Math.min(S() > 20 ? 1.9 * mkBase : 1.3, Math.max(S() > 20 ? 0.3 : 0.5, mkBase * Math.sqrt(pxu / fit)));
         svg.style.setProperty('--mk', String(ms.mkScale / pxu));
         const plateW = 72 * (ms.terr ? M() * 1.3 : 1) * pxu;
         svg.classList.toggle('mk-on', plateW < 60);
@@ -6839,8 +6840,9 @@
             const viewW = 150 * 6 * Math.min(sc, 20);
             if (pts.length && ms.full.w > viewW * 1.1) {
               const px = pts.map((t) => t.x), py = pts.map((t) => t.y);
-              const cx = (Math.min(...px) + Math.max(...px)) / 2, cy = (Math.min(...py) + Math.max(...py)) / 2;
-              const w = Math.max(viewW, Math.max(Math.max(...px) - Math.min(...px), Math.max(...py) - Math.min(...py)) * (sc > 20 ? 1.2 : 1.6) + 300 * Math.min(sc, 20));
+              const big = sc > 20 && cap, cx = big ? cap.x : (Math.min(...px) + Math.max(...px)) / 2, cy = big ? cap.y : (Math.min(...py) + Math.max(...py)) / 2;
+              let w = Math.max(viewW, Math.max(Math.max(...px) - Math.min(...px), Math.max(...py) - Math.min(...py)) * 1.6 + 300 * Math.min(sc, 20));
+              if (big) w = viewW;
               ms.view = { x: cx - w / 2, y: cy - w / 2, w, h: w };
             } else ms.view = { ...ms.full };
             if (ms.view3d && ms.m3 && cap) ms.m3.focus(cap.id, 3200);
