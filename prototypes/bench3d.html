@@ -58,6 +58,7 @@ window.__view = (name) => {
     let best = null; const rs = [...(layout.art.rivers || [])].sort((a, b) => b.w - a.w); for (const r of rs) { const i = r.ws.findIndex((w, k) => { const g = m3.groundAt(r.p[k][0], r.p[k][1]); return w >= 0.6 * r.w && g > 18 && g < 90; }); if (i >= 0) { best = { w: r.ws[i], x: r.p[i][0], z: r.p[i][1] }; break; } }
     if (best) { tx = best.x; tz = best.z; dist = name === 'river' ? 1400 : 5200; polar = name === 'river' ? 0.95 : 0.7; }
   }
+  if (name.startsWith('t3')) { const cs = T.filter((t) => t.tier >= 3 && !t.junction && !t.crossing), c = cs[Number(name.slice(2) || 0) % cs.length]; tx = c.x; tz = c.y; dist = 1300; polar = 0.7; }
   if (name.startsWith('moat')) { const want = name.slice(4); const cs = T.filter((t) => t.tier >= 2 && !t.junction && !t.crossing), c = cs[Number(want || 0) % cs.length]; tx = c.x; tz = c.y; dist = 1000; polar = 0.75; }
   if (name === 'farm') { const c = T.find((t) => t.tier >= 2 && !t.junction) || cap; tx = c.x; tz = c.y; dist = 1900; polar = 0.7; }
   d.controls.target.set(tx, hAt(tx, tz) + 50, tz);

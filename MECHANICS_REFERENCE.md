@@ -2024,3 +2024,9 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - Each castle that is not a junction, river castle or pass picks the best of 16 directions by 3 distances for a block of equal-size fields: 2x1 (tier 1), 3x2 (tier 2), 4x2 (tier 3). A cell is valid on dry land, below 36 percent elevation, wet enough, clear of rivers (hw x 1.9 plus cell size), trails (55) and other castles' platforms, and flat within 26 units. Cells that fail are dropped; at least two must survive.
 - Crop kind runs in columns; one (tier 2) or two (tier 3) corner cells are pastures with sheep and cattle. Each cell is fenced; a farmstead (house, barn, haystacks) sits on the castle side of the block.
 - River paths, including their extension to the sea, are pushed away from non-crossing castles until they clear `hw x 1.4 + platform + 70`, so castles are never inside a river valley.
+
+## 64. Tier 3 citadels (3D, cosmetic)
+
+- Tier 3 castles are scaled by `T3M` (2.3, was 1.7) and their footprints enlarged (polyKeep circumradius 126, roundShell 120, starFort 104, keepBailey 78, concentric outer wall 220, all in castle-local units). Moats are derived from the same numbers.
+- Inside the walls, `town()` fills the courtyard with a street grid of houses (up to 120), a cobbled market square in front of the keep, a lane kept clear from the gate, and crop plots in the rear. Tier 3 castles get no outside farm block.
+- The zoom-scale loop now keeps each castle's base scale (`userData.k0`) instead of overwriting it, so tier 1 and 2 castles fit their moats; far zoom size is unchanged.
