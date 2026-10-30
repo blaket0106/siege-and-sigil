@@ -2016,7 +2016,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 62. Castle footprints and moats (3D, cosmetic)
 
 - Tier 2 and 3 castles pick a footprint by seeded roll: keepBailey (square or rectangle, aspect 1 to 1.75), roundShell, polyKeep (hexagon or octagon), starFort (pentagon with gate and bridge), concentric, or citadel on rocky ground. Tier 1 and river castles have no moat.
-- A moat is a set of half-planes (rectangle, regular polygon) or a radius, built in castle-local units by `moatLocal` and rotated by the castle's face toward its nearest neighbour. Terrain carving uses the signed distance to the moat's inner edge, so the carved bed and the water mesh match the footprint.
+- A moat is a set of half-planes (rectangle, regular polygon) or a radius, built in castle-local units by `moatLocal` and rotated by the castle's face toward its nearest neighbour. The terrain under a moat is left flat; the water is a flat band drawn just above the platform with a brown bank band beneath it. (Carving a bed was dropped: the terrain tiles are coarser than a moat is wide, so the water was hidden in patches.)
 - `s.pl` (platform radius) is the farthest moat corner plus 10, so rectangular and polygon castles flatten a larger area than circular ones.
 
 ## 63. Farms and river clearance (3D, cosmetic)
