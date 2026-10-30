@@ -87,7 +87,7 @@ const clearCastles = (path) => { const L = path.length, land = sites.filter((t) 
     if (!sh.some(([u, v]) => u || v)) break;
     path.forEach((q, i) => { let sx = 0, sz = 0, c = 0; for (let k = -8; k <= 8; k++) { const j = Math.min(L - 1, Math.max(0, i + k)); sx += sh[j][0]; sz += sh[j][1]; c++; } q.x += sx / c * 1.6; q.z += sz / c * 1.6; }); } };
 RIVERS.forEach((path, i) => { const e = path[path.length - 1]; if (H(e.x, e.z) < SEA || e.y < 6) return; let best = 1e9, bj = -1, bk = -1; RIVERS.forEach((o, j) => { if (j === i) return; o.forEach((q, k) => { const d = Math.hypot(q.x - e.x, q.z - e.z); if (d < best) { best = d; bj = j; bk = k; } }); }); if (best < 260 && !(RIVERS[bj].merge && RIVERS[bj].merge.j === i)) { path.merge = { j: bj, k: bk }; const P = RIVERS[bj][bk]; path.push({ x: P.x, z: P.z, y: P.y, hw: P.hw * .95 }); for (let m = path.length - 2; m >= 0; m--) path[m].y = Math.max(path[m].y, path[m + 1].y); }
-  else { let x = e.x, z = e.z, y = e.y, steps = 0, reached = false; const hw0 = e.hw; while (steps++ < 160) { let bd = 1e9, bx = 0, bz = 0; for (let a = 0; a < 16; a++) { const an = a / 16 * 6.2832, nx = x + Math.cos(an) * 36, nz = z + Math.sin(an) * 36, hh = H(nx, nz) + (rawY(nx, nz) * 1e-5); if (hh < bd) { bd = hh; bx = nx; bz = nz; } } if (bd >= H(x, z) - 1e-5) break; x = bx; z = bz; y = Math.max(-14, Math.min(y, rawY(x, z) - 1)); path.push({ x, z, y: y * .96, hw: hw0 * (1 - .55 * Math.min(1, steps / 70)) }); if (H(x, z) < SEA) { reached = true; break; } } if (!reached && path.length > 2) { const a0 = path[path.length - 3], b0 = path[path.length - 1], l = Math.hypot(b0.x - a0.x, b0.z - a0.z) || 1, ux = (b0.x - a0.x) / l, uz = (b0.z - a0.z) / l; x = b0.x; z = b0.z; for (let k = 0; k < 90 && H(x, z) >= SEA; k++) { x += ux * 24; z += uz * 24; y = Math.max(-14, y - .6); path.push({ x, z, y, hw: Math.max(hw0 * .3, b0.hw * (1 - .6 * k / 60)) }); } } path.extended = true; } });
+  else { let x = e.x, z = e.z, y = e.y, steps = 0, reached = false; const hw0 = e.hw; while (steps++ < 160) { let bd = 1e9, bx = 0, bz = 0; for (let a = 0; a < 16; a++) { const an = a / 16 * 6.2832, nx = x + Math.cos(an) * 36, nz = z + Math.sin(an) * 36, hh = H(nx, nz) + (rawY(nx, nz) * 1e-5); if (hh < bd) { bd = hh; bx = nx; bz = nz; } } if (bd >= H(x, z) - 1e-5) break; x = bx; z = bz; y = Math.max(1.6, Math.min(y, rawY(x, z) - 1)); path.push({ x, z, y: y * .96, hw: hw0 * (1 - .55 * Math.min(1, steps / 70)) }); if (H(x, z) < SEA) { reached = true; break; } } if (!reached && path.length > 2) { const a0 = path[path.length - 3], b0 = path[path.length - 1], l = Math.hypot(b0.x - a0.x, b0.z - a0.z) || 1, ux = (b0.x - a0.x) / l, uz = (b0.z - a0.z) / l; x = b0.x; z = b0.z; for (let k = 0; k < 90 && H(x, z) >= SEA; k++) { x += ux * 24; z += uz * 24; y = Math.max(1.6, y - .6); path.push({ x, z, y, hw: Math.max(hw0 * .3, b0.hw * (1 - .6 * k / 60)) }); } } path.extended = true; } });
 RIVERS.forEach(clearCastles);
 const RVPI = [];
 RIVERS.forEach((path, pi) => path.forEach((q, qi) => { const k = RVX.length; RVPI.push([pi, qi]); RVX.push(q.x); RVZ.push(q.z); RVB.push(q.y - RV_DEPTH(q.hw)); RVW.push(q.hw); const key = gk(Math.floor(q.x / 200), Math.floor(q.z / 200)); (rgrid.get(key) || rgrid.set(key, []).get(key)).push(k); }));
@@ -426,7 +426,7 @@ RIVERS.forEach((path) => {
   const build = (wmul, wmin, yoff, strat, mud) => {
     const n = path.length, pos = [], uvs = [], ind = [], cols = []; let len = 0;
     path.forEach((q, i) => { const a = path[Math.max(0, i - 3)], b = path[Math.min(n - 1, i + 3)]; let tx = b.x - a.x, tz = b.z - a.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l; if (i) len += Math.hypot(q.x - path[i - 1].x, q.z - path[i - 1].z);
-      const mouth = 1 - ssf(-1.5, 3.4, q.y), nx = -tz, nz = tx, hw = Math.max(q.hw * 1.05 * wmul * (1 + .1 * mouth), wmin), y = q.y + yoff, al = (strat ? .92 : .96) * (1 - mouth * mouth) * LAKES.reduce((m, l) => Math.min(m, ssf(l.r * .5, l.r * 1.05, Math.hypot(q.x - l.x, q.z - l.z))), 1);
+      const mouth = 0, nx = -tz, nz = tx, hw = Math.max(q.hw * 1.05 * wmul * (1 + .1 * mouth), wmin), y = q.y + yoff, al = (strat ? .92 : .96) * (1 - mouth * mouth) * (path.merge || path.extended ? ssf(0, 8, n - 1 - i) : 1) * LAKES.reduce((m, l) => Math.min(m, ssf(l.r * .5, l.r * 1.05, Math.hypot(q.x - l.x, q.z - l.z))), 1);
       const cr = .05 + mouth * -.01, cg = .27 - mouth * .04, cb = .42, sn = biome(q.x, q.z)[4] * .65, r1 = cr + (.72 - cr) * sn, g1 = cg + (.84 - cg) * sn, b1 = cb + (.92 - cb) * sn;
       pos.push(q.x + nx * hw, y, q.z + nz * hw, q.x - nx * hw, y, q.z - nz * hw); if (mud) cols.push(.2, .17, .11, al * .55, .2, .17, .11, al * .55); else if (strat) cols.push(.12 + sn * .6, .42 + sn * .4, .62 + sn * .3, al, .12 + sn * .6, .42 + sn * .4, .62 + sn * .3, al); else cols.push(r1, g1, b1, al, r1, g1, b1, al);
       uvs.push(0, len / 130, 1, len / 130); if (i < n - 1) { const k = i * 2; ind.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); } });
@@ -690,17 +690,17 @@ function makeCastle(tier, col, col2, seed, variant, desert, snowy, opts) {
   const chapel = (x, z, ry = 0) => { const sn = Math.sin(ry), cs = Math.cos(ry); box(22 * S, 18 * S, 38 * S, x, 0, z, stone, ry); gable(22 * S * 1.06, 38 * S * 1.06, 11 * S, x, 18 * S, z, ry + Math.PI / 2, roof); const tx = x + sn * 24 * S, tz = z + cs * 24 * S; box(11 * S, 36 * S, 11 * S, tx, 0, tz, stone, ry); cone(6.4 * S, 30 * S, tx, 36 * S, tz, roof, 8, 0, 3); box(1.2, 8, 1.2, tx, 66 * S, tz, dark); box(5, 1.2, 1.2, tx, 69 * S, tz, dark); };
   const hall = (x, z, w, d, h, ry, mat = wood) => { box(w, h, d, x, 0, z, wood, ry); gable(d * 1.05, w * 1.08, h * .55, x, h, z, ry + Math.PI / 2, thatch); };
 
-  const town = (inside, avoid) => {
-    const sp = 18 * S, dz = 16 * S, back = (z) => z < -34 * S, mk = [[0, 40 * S, 24 * S], ...avoid]; let n = 0;
+  const town = (inside, avoid, mk0 = [0, 40 * S], crops = true) => {
+    const sp = 18 * S, dz = 16 * S, back = (z) => z < -34 * S, mk = [[mk0[0], mk0[1], 24 * S], ...avoid]; let n = 0;
     const clear = (x, z, k = 1) => inside(x, z) && !mk.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar * k) && !(z > -6 * S && Math.abs(x) < 15 * S);
-    floor(30 * S, 26 * S, 0, 40 * S);
+    floor(30 * S, 26 * S, mk0[0], mk0[1]);
     for (let z = -170 * S; z <= 170 * S; z += dz) for (let x = -170 * S; x <= 170 * S; x += sp) {
       const k = Math.round(x / sp) * 31 + Math.round(z / dz) * 7, px = x + (hash(k, seed) - .5) * 6 * S, pz = z + (hash(seed, k) - .5) * 5 * S, w = (8 + hash(k, 3) * 4) * S, d = (7 + hash(k, 4) * 2) * S, r = Math.hypot(w, d) * .45;
       if (back(pz) || n >= 120 || ![[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([a, b]) => clear(px + a * r, pz + b * r))) continue;
       hall(px, pz, w, d, (7 + hash(k, 5) * 3) * S, hash(k, 6) < .5 ? 0 : Math.PI / 2); n++;
     }
     for (let z = -170 * S; z <= 170 * S; z += 34 * S) for (let x = -170 * S; x <= 170 * S; x += 52 * S) {
-      const w = 46 * S, d = 28 * S; if (!back(z) || ![[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([a, b]) => clear(x + a * w / 2, z + b * d / 2, .8))) continue;
+      const w = 46 * S, d = 28 * S; if (!crops || !back(z) || ![[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([a, b]) => clear(x + a * w / 2, z + b * d / 2, .8))) continue;
       const arr = hash(Math.round(x), Math.round(z) + seed) < .5 ? crop : crop2;
       for (let q = 0; q < 5; q++) box(w, 2, d / 5 - 2, x, 0, z - d / 2 + (q + .5) * d / 5, arr);
     }
@@ -825,6 +825,7 @@ function makeCastle(tier, col, col2, seed, variant, desert, snowy, opts) {
     tiers.forEach(([w, d, h, z, y], i) => { box(w * S, h * S, d * S, 0, y * S, z * S); merlonsLine(-w * S / 2, (z + d / 2) * S, w * S / 2, (z + d / 2) * S, (y + h) * S, Math.round(w / 8)); merlonsLine(-w * S / 2, (z - d / 2) * S, w * S / 2, (z - d / 2) * S, (y + h) * S, Math.round(w / 8)); [-1, 1].forEach((sx) => tower(sx * (w / 2) * S, (z + d / 2) * S, 11 * S, h * S + (i ? 8 : 14) * S, true, y * S)); });
     const kw = 34 * S, kh = 56 * S; box(kw, kh, kw, 0, 56 * S + 32 * S, -26 * S); cone(kw * .8, kw * .9, 0, 56 * S + 32 * S + kh, -26 * S, roof, 4, 0, 3);
     box(22 * S, 24 * S, 8 * S, 0, 0, 36 * S + 40 * S, dark); top = 56 * S + 32 * S + kh + kw * .9; rad = 80 * S;
+    if (tier >= 3) town((x, z) => z > 90 * S && z < 160 * S && Math.abs(x) < 150 * S, [], [0, 110 * S], false);
     const st = new THREE.BoxGeometry(14 * S, 2.5, 66 * S); st.rotateX(-.32); place(st, 0, 16 * S, 66 * S); wood.push(scaleUV(st, 1, 4));
   }
   if (v !== 'motte' && v !== 'riverTwins') { const bg = new THREE.CylinderGeometry(rad * .86, rad * .98, 90, 28); scaleUV(bg, 10, 3); place(bg, 0, -44.5, 0); cobble.push(bg); }

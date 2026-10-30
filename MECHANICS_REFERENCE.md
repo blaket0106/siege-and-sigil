@@ -2040,3 +2040,8 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 
 - The river ribbon now sits at water level (`q.y`) over a bed 1.2 below it, with a steep bank (`ssf(.88 hw, 1.04 hw)`). Before, the terrain floor was 1.4 above the ribbon, so the ribbon only showed where depth offset won, which made patchy dark shards and ragged edges.
 - River extensions to the sea taper from the river's width to 30 percent instead of widening, and sink to -14 so the sea plane crosses a straight bank, not a flat floor sitting exactly at sea level. The mouth no longer widens the ribbon beyond the carved valley.
+
+## 67. Citadel apron town, river confluences (3D, cosmetic)
+
+- The rocky tier 3 citadel (stepped terraces) gets its town in front of the gate: `town()` with a region of z 90 to 160 and |x| under 150 (castle-local units), a market square at z 110, and no crop plots.
+- Tributary ribbons and the ribbons of extended rivers fade out over their last 8 points, so confluences and river ends no longer show hard seams. Extended rivers now stay at least 1.6 above sea level and taper, so the sea plane never floods their valleys.
