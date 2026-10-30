@@ -2051,3 +2051,5 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - New games default to `world_scale` 27 and `unit_scale` 13.5 (1.35x). `create_game` sets `unit_scale = world_scale / 2` whenever a scale is chosen, so march speed, scan radius, intercept distance and trade range grow with the map. Hop time is unchanged: distance and speed both scale by the same factor (checked: a gap of about 5100 at speed 17.5 x 3 x 13.5 is 7.2 ticks, the same as 3780 at 525 on a 1x map).
 - The create form has a "Roomy 1.35x" card as the default. Existing games keep their stored scales.
 - Quick start (no scale in its settings) uses the column defaults.
+
+- Update (Oct 30 2026): the default was raised again to 1.8x (`world_scale` 36, `unit_scale` 18); the "Titanic 1.8x" card is now the default and "Roomy 1.35x" stays as an option. Generation time is unchanged (about 0.25 to 0.5 s). The art grid stays at 192 cells, which is about 500 to 700 units per cell at this size.
