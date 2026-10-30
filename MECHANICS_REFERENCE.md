@@ -2053,3 +2053,4 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - Quick start (no scale in its settings) uses the column defaults.
 
 - Update (Oct 30 2026): the default was raised again to 1.8x (`world_scale` 36, `unit_scale` 18); the "Titanic 1.8x" card is now the default and "Roomy 1.35x" stays as an option. Generation time is unchanged (about 0.25 to 0.5 s). The art grid stays at 192 cells, which is about 500 to 700 units per cell at this size.
+- Update (Oct 30 2026, later): default raised to 3.6x (`world_scale` 72, `unit_scale` 36); the `world_scale` check now allows up to 100. Generation takes 0.2 to 0.6 s for every shape and 2 to 8 players (maps up to about 410,000 units wide). The 3D build is about 5 s on Lean (tree placement is quadratic in map width).

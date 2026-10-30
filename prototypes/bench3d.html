@@ -18,7 +18,7 @@ const hud = document.getElementById('hud');
 const log = [];
 const say = (m) => { log.push(m); hud.textContent = log.join('\n'); };
 const t0 = performance.now();
-const layout = generateWorld({ seed, players, mapSize: 'standard', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: 20, trails: true, shape, preset: q.get('preset') || 'continental', homeDistance: 'medium' });
+const layout = generateWorld({ seed, players, mapSize: 'standard', startingTerritories: 4, style: 'scatter', startingGarrison: 10, scale: Number(q.get('scale') || 20), trails: true, shape, preset: q.get('preset') || 'continental', homeDistance: 'medium' });
 const tGen = performance.now() - t0;
 say(`world generated ${Math.round(tGen)} ms, ${layout.territories.length} sites`);
 const cols = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#16a085', '#e67e22', '#7f8c8d'];
