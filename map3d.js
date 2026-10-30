@@ -156,8 +156,7 @@ for (let py = 0; py < TEX; py++) for (let px = 0; px < TEX; px++) {
 cx.putImageData(img, 0, 0);
 const toPx = (v) => v / W * TEX;
 sites.forEach((s) => { const g = cx.createRadialGradient(toPx(s.x), toPx(s.y), 0, toPx(s.x), toPx(s.y), toPx(s.pl + 20)); g.addColorStop(0, 'rgba(126,104,70,.7)'); g.addColorStop(.6, 'rgba(126,104,70,.42)'); g.addColorStop(1, 'rgba(126,104,70,0)'); cx.fillStyle = g; cx.fillRect(toPx(s.x - 240), toPx(s.y - 240), toPx(480), toPx(480)); });
-const FIELDS = [];
-sites.forEach((s, i) => { const tier = s.tier || 1; if (s.junction) return; const nF = tier >= 3 ? 9 : tier === 2 ? 6 : 3; for (let k = 0; k < nF; k++) { const a = (k / nF) * 6.28 + hash(i, k * 3 + 1) * .6, r = (tier >= 3 ? 520 : 440) + hash(i, k * 3 + 2) * (tier >= 3 ? 560 : 420), x = s.x + Math.cos(a) * r, z = s.y + Math.sin(a) * r, hh = H(x, z); if (hh < SEA + .03 || (hh - SEA) / (1 - SEA) > .36 || Mo(x, z) < .15 || biome(x, z)[0] > .3) continue; if (sites.some((o) => o !== s && Math.hypot(o.x - x, o.y - z) < 250)) continue; const wU = (tier >= 3 ? 150 : 120) + hash(i, k) * 110, dU = (tier >= 3 ? 110 : 90) + hash(k, i) * 90, w = toPx(wU), d = toPx(dU), kind = Math.floor(hash(i + 3, k) * 4), rot = a + hash(i, k) * .6; { const [dr, kr] = rvq(x, z); if (kr >= 0 && dr < RVW[kr] * 1.9 + Math.max(wU, dU) * .6) continue; } FIELDS.push([x, z, wU, dU, rot, tier >= 3 && k % 3 === 0, kind]); } });
+const FIELDS = [], FENCES = [], FARMSTEADS = [], PASTURES = [];
 cx.lineCap = 'round'; cx.lineJoin = 'round';
 const EDG = spec.edges, ROADS = [], ROADMAP = new Map(), EMAP = new Map();
 const KIND = { land: 0, river: 1, pass: 2 };
@@ -170,6 +169,32 @@ EDG.forEach((e) => { const A = sites[e.a], B = sites[e.b]; const raw = e.path &&
 const ROADGRID = new Map(), RGC = 100;
 ROADS.forEach((r) => r.pts.forEach((q) => { const k = Math.floor(q.x / RGC) + ',' + Math.floor(q.z / RGC); (ROADGRID.get(k) || ROADGRID.set(k, []).get(k)).push(q); }));
 const roadDist = (x, z) => { const cx0 = Math.floor(x / RGC), cz0 = Math.floor(z / RGC); let d = 1e9; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = ROADGRID.get((cx0 + a) + ',' + (cz0 + b)); if (l) for (const q of l) { const e = Math.hypot(x - q.x, z - q.z); if (e < d) d = e; } } return d; };
+sites.forEach((s, i) => {
+  if (s.junction || s.riv || s.crossing_kind) return;
+  const tier = s.tier || 1, cols = tier >= 3 ? 4 : tier === 2 ? 3 : 2, rows = tier >= 2 ? 2 : 1, cw = (tier >= 2 ? 130 : 100) + hash(i, 1) * 30, cd = (tier >= 2 ? 105 : 80) + hash(i, 2) * 25, gp = 16, bd = rows * cd + (rows - 1) * gp, hw = Math.hypot(cw, cd) * .45;
+  const near = sites.filter((o) => o !== s && Math.hypot(o.x - s.x, o.y - s.y) < 2600);
+  const okCell = (x, z) => { const h = H(x, z); if (h < SEA + .03 || (h - SEA) / (1 - SEA) > .36 || Mo(x, z) < .15 || biome(x, z)[0] > .3) return false; const [dr, kr] = rvq(x, z); if (kr >= 0 && dr < RVW[kr] * 1.9 + hw + 40) return false; if (roadDist(x, z) < 55) return false; return !near.some((o) => Math.hypot(o.x - x, o.y - z) < (o.pl || 110) + hw); };
+  let best = null;
+  for (let t = 0; t < 16; t++) for (const extra of [0, 130, 260]) {
+    const a = t / 16 * 6.2832 + hash(i, 5) * .4, ca = Math.cos(a), sa = Math.sin(a), R = s.pl + 140 + bd / 2 + extra, C = [s.x + ca * R, s.y + sa * R], ang = a + Math.PI / 2, e1 = [-sa, ca], e2 = [-ca, -sa], cells = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const u = (c - (cols - 1) / 2) * (cw + gp), v = (r - (rows - 1) / 2) * (cd + gp), x = C[0] + e1[0] * u + e2[0] * v, z = C[1] + e1[1] * u + e2[1] * v; if (okCell(x, z)) cells.push({ x, z, c, r }); }
+    let score = cells.length * 10 - extra / 60; near.forEach((o) => { const dd = Math.hypot(o.x - s.x, o.y - s.y) || 1; score -= Math.max(0, ((o.x - s.x) * ca + (o.y - s.y) * sa) / dd) * 3; });
+    if (cells.length >= Math.min(2, cols * rows) && (!best || score > best.score)) best = { score, cells, ang, C, e1, e2, a };
+  }
+  if (!best) return;
+  const k0 = Math.floor(hash(i + 3, 7) * 4), { ang, C, e1, e2 } = best, cellsOk = best.cells.filter((q) => { const y0 = hAt(q.x, q.z); return [[hw, 0], [-hw, 0], [0, hw], [0, -hw]].every(([dx, dz]) => Math.abs(hAt(q.x + dx, q.z + dz) - y0) < 26); });
+  if (!cellsOk.length) return;
+  const pastureCells = tier >= 3 ? [[cols - 1, rows - 1], [0, rows - 1]] : tier === 2 ? [[cols - 1, rows - 1]] : [];
+  cellsOk.forEach((q) => {
+    const past = pastureCells.some(([c, r]) => c === q.c && r === q.r);
+    FIELDS.push([q.x, q.z, cw, cd, ang, false, past ? 1 : (k0 + q.c) % 4]);
+    if (past) PASTURES.push([q.x, q.z, cw, cd, ang, tier >= 3 ? 9 : 6, i]);
+    const P = (u, v) => [q.x + e1[0] * u + e2[0] * v, q.z + e1[1] * u + e2[1] * v], hx = cw / 2 + 2, hz = cd / 2 + 2;
+    [[-hx, -hz, hx, -hz], [hx, -hz, hx, hz], [hx, hz, -hx, hz], [-hx, hz, -hx, -hz]].forEach(([u0, v0, u1, v1]) => FENCES.push([...P(u0, v0), ...P(u1, v1)]));
+  });
+  const yard = [C[0] + e2[0] * (bd / 2 + 52), C[1] + e2[1] * (bd / 2 + 52)];
+  FARMSTEADS.push({ x: yard[0], z: yard[1], ry: -ang, tier, i });
+});
 const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
 
 await stage('Raising the mountains');
@@ -341,7 +366,6 @@ for (let ti = 0; ti < NT * NT; ti++) { const m = new THREE.Mesh(getTileGeo(ti, 3
     for (let y = 0; y < TS2; y += 10) { tx.fillStyle = c2; tx.globalAlpha = .5 + hash(k, y) * .3; tx.fillRect(0, y, TS2, lines ? 4 : 3); if (!lines) { tx.globalAlpha = .25; tx.fillStyle = '#c9a56e'; tx.fillRect(0, y + 5, TS2, 2); } }
     for (let n = 0; n < 700; n++) { tx.globalAlpha = .12 + hash(n, k) * .12; tx.fillStyle = hash(n, k + 9) > .5 ? '#fff6c8' : '#2d3f1a'; tx.fillRect(hash(n, 1) * TS2, hash(n, 2) * TS2, 3, 2); }
     tx.globalAlpha = 1; tx.strokeStyle = 'rgba(40,60,22,.6)'; tx.lineWidth = 9; tx.strokeRect(10, 10, TS2 - 20, TS2 - 20);
-    tx.globalCompositeOperation = 'destination-in'; const rg = tx.createRadialGradient(TS2 / 2, TS2 / 2, TS2 * .34, TS2 / 2, TS2 / 2, TS2 * .74); rg.addColorStop(0, '#000'); rg.addColorStop(.72, '#000'); rg.addColorStop(1, 'rgba(0,0,0,0)'); tx.fillStyle = rg; tx.fillRect(0, 0, TS2, TS2);
     ax.drawImage(tc, k * TS2, 0);
   });
   const ftex = new THREE.CanvasTexture(atlas); ftex.colorSpace = THREE.SRGBColorSpace; ftex.anisotropy = 8;
@@ -349,7 +373,7 @@ for (let ti = 0; ti < NT * NT; ti++) { const m = new THREE.Mesh(getTileGeo(ti, 3
   FIELDS.forEach(([fx, fz, fw, fd, ang, , kind], fi) => {
     const ca = Math.cos(ang), sa = Math.sin(ang), j = (u, v) => [hash(fi, u * 7 + v * 13) - .5, hash(fi + 5, u * 11 + v * 3) - .5], base = pos.length / 3;
     for (let v = 0; v <= NV; v++) for (let u = 0; u <= NU; u++) {
-      const fu = u / NU - .5, fv = v / NV - .5, [jx, jz] = (u % NU && v % NV) ? [0, 0] : j(u, v), lu = (fu + jx * .06) * fw, lv = (fv + jz * .08) * fd, x = fx + lu * ca - lv * sa, z = fz + lu * sa + lv * ca;
+      const fu = u / NU - .5, fv = v / NV - .5, [jx, jz] = (u % NU && v % NV) ? [0, 0] : j(u, v), lu = (fu + jx * .012) * fw, lv = (fv + jz * .016) * fd, x = fx + lu * ca - lv * sa, z = fz + lu * sa + lv * ca;
       pos.push(x, hAt(x, z) + 1.0, z); uv.push((kind + u / NU) / 4, v / NV);
     }
     for (let v = 0; v < NV; v++) for (let u = 0; u < NU; u++) { const a = base + v * (NU + 1) + u, b = a + 1, c = a + NU + 1, d2 = c + 1; ind.push(a, c, b, b, c, d2); }
@@ -496,7 +520,7 @@ sites.forEach((s) => { stamp(s.x, s.y, s.riv ? 210 : 210 * CF, 1); stamp(s.x, s.
 ROADS.forEach((r) => r.pts.forEach((q) => stamp(q.x, q.z, 56, 2)));
 for (let k = 0; k < RVX.length; k++) { stamp(RVX[k], RVZ[k], Math.max(40, RVW[k] * 1.5), 4); stamp(RVX[k], RVZ[k], Math.max(60, RVW[k] * 4.6), 128); }
 LAKES.forEach((l) => stamp(l.x, l.z, l.r * 1.3, 8));
-FIELDS.forEach(([fx, fz, fw, fd]) => stamp(fx, fz, Math.hypot(fw, fd) * .55, 16));
+FIELDS.forEach(([fx, fz, fw, fd]) => stamp(fx, fz, Math.hypot(fw, fd) * .55, 16)); FARMSTEADS.forEach((f) => stamp(f.x, f.z, 90, 16));
 const SP = { spruce: [], fir: [], pine: [], oak: [], birch: [], poplar: [], cactus: [], palm: [], acacia: [], dead: [], willow: [] }, STEP = LO ? (RICH ? 64 : 80) : (RICH ? 54 : 62);
 for (let z = 20; z < W; z += STEP) for (let x = 20; x < W; x += STEP) {
   const px = x + (rnd() - .5) * STEP, pz = z + (rnd() - .5) * STEP; if (blockedAt(px, pz, 31)) continue; const h = H(px, pz); if (h < SEA + .018) continue;
@@ -813,13 +837,24 @@ sites.forEach((s, i) => {
 {
   const moatMat = new THREE.MeshStandardMaterial({ color: 0x1a5a74, roughness: .08, metalness: .1, transparent: true, opacity: .94, envMapIntensity: 1.6 });
   sites.forEach((s) => { if (!s.moat) return; const mo = s.moat; let geo; if (mo.pl) { const vo = planeVerts(mo.pl, mo.wd * .92), vi = planeVerts(mo.pl, mo.wd * .08), sh = new THREE.Shape(vo.map(([x, z]) => new THREE.Vector2(x, -z))); sh.holes.push(new THREE.Path(vi.map(([x, z]) => new THREE.Vector2(x, -z)))); geo = new THREE.ShapeGeometry(sh); } else geo = new THREE.RingGeometry(mo.r0 + mo.wd * .08, mo.r0 + mo.wd * .92, 64, 1); const m = new THREE.Mesh(geo, moatMat); m.rotation.x = -Math.PI / 2; m.position.set(s.x, s.gy - 1.4, s.y); m.receiveShadow = true; scene.add(m); });
-  const posts = [], rails = [], hay = [];
-  FIELDS.forEach(([fx0, fz0, fw, fd, ang, fenced]) => { const ca = Math.cos(ang), sa = Math.sin(ang), pt = (u, v) => [fx0 + u * ca - v * sa, fz0 + u * sa + v * ca]; const edges = [[-fw / 2, -fd / 2, fw / 2, -fd / 2], [fw / 2, -fd / 2, fw / 2, fd / 2], [fw / 2, fd / 2, -fw / 2, fd / 2], [-fw / 2, fd / 2, -fw / 2, -fd / 2]]; (fenced ? edges : []).forEach(([u0, v0, u1, v1], ei) => { const L = Math.hypot(u1 - u0, v1 - v0), n = Math.max(1, Math.round(L / 30)); for (let k = 0; k < n; k++) { const a0 = pt(u0 + (u1 - u0) * k / n, v0 + (v1 - v0) * k / n), a1 = pt(u0 + (u1 - u0) * (k + 1) / n, v0 + (v1 - v0) * (k + 1) / n), mx = (a0[0] + a1[0]) / 2, mz = (a0[1] + a1[1]) / 2, hh = hAt(mx, mz); if (hh < 3 || Math.hypot(mx - fx0, mz - fz0) < 0) continue; posts.push([a0[0], hAt(a0[0], a0[1]), a0[1]]); rails.push([mx, hh + 4.4, mz, Math.atan2(a1[1] - a0[1], a1[0] - a0[0]), Math.hypot(a1[0] - a0[0], a1[1] - a0[1])]); } }); for (let k = 0; k < (fenced ? 0 : 2); k++) { const p = pt((hash(k, 5) - .5) * fw * .7, (hash(k, 9) - .5) * fd * .7); hay.push([p[0], hAt(p[0], p[1]), p[1], hash(k, ang * 99)]); } });
+  const posts = [], rails = [];
+  FENCES.forEach(([x0, z0, x1, z1]) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 30)); for (let k = 0; k < n; k++) { const ax = x0 + (x1 - x0) * k / n, az = z0 + (z1 - z0) * k / n, bx = x0 + (x1 - x0) * (k + 1) / n, bz = z0 + (z1 - z0) * (k + 1) / n, mx = (ax + bx) / 2, mz = (az + bz) / 2, hh = hAt(mx, mz); if (hh < 3) continue; posts.push([ax, hAt(ax, az), az]); rails.push([mx, hh + 4.4, mz, Math.atan2(bz - az, bx - ax), Math.hypot(bx - ax, bz - az)]); } });
   const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(1.3, 6.5, 1.3), mWood, posts.length), rm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .8, .8), mWood, rails.length), d = new THREE.Object3D();
   posts.forEach((p, i) => { d.position.set(p[0], p[1] + 2.5, p[2]); d.rotation.set(0, 0, 0); d.scale.set(1, 1, 1); d.updateMatrix(); pm.setMatrixAt(i, d.matrix); });
   rails.forEach((p, i) => { d.position.set(p[0], p[1], p[2]); d.rotation.set(0, -p[3], 0); d.scale.set(p[4], 1, 1); d.updateMatrix(); rm.setMatrixAt(i, d.matrix); });
   
   [pm, rm].forEach((m) => { m.castShadow = true; m.receiveShadow = true; scene.add(m); });
+  { const wall = [], roof = [], stack = [], ni = (g) => (g.index ? g.toNonIndexed() : g);
+    const hut = (x, z, w, d, h, ry) => { const g = new THREE.BoxGeometry(w, h, d); scaleUV(g, Math.max(1, w / 30), Math.max(1, h / 30)); g.translate(0, h / 2, 0); place(g, x, hAt(x, z) - 1, z, ry); wall.push(ni(g));
+      const sh = new THREE.Shape(); sh.moveTo(-d * .54, 0); sh.lineTo(d * .54, 0); sh.lineTo(0, h * .62); sh.closePath(); const r = new THREE.ExtrudeGeometry(sh, { depth: w * 1.08, bevelEnabled: false }); r.translate(0, 0, -w * .54); r.rotateY(Math.PI / 2); scaleUV(r, .06, .06); place(r, x, hAt(x, z) - 1 + h, z, ry); roof.push(ni(r)); };
+    FARMSTEADS.forEach((f) => { const c = Math.cos(f.ry), sn = Math.sin(f.ry), at = (u, v) => [f.x + u * c + v * sn, f.z - u * sn + v * c]; let p = at(-34, 0); hut(p[0], p[1], 44, 28, 22, f.ry);
+      if (f.tier >= 2) { p = at(34, 6); hut(p[0], p[1], 58, 34, 28, f.ry); p = at(0, -34); hut(p[0], p[1], 26, 20, 14, f.ry + 1.5708); }
+      for (let k = 0; k < (f.tier >= 2 ? 3 : 1); k++) { p = at(-10 + k * 22, 40 + hash(f.i, k) * 8); const g = new THREE.CylinderGeometry(6, 8, 10, 8); scaleUV(g, 2, 1); g.translate(p[0], hAt(p[0], p[1]) + 4, p[1]); stack.push(ni(g)); const t = new THREE.ConeGeometry(7, 6, 8); t.translate(p[0], hAt(p[0], p[1]) + 12, p[1]); stack.push(ni(t)); } });
+    [[wall, mWood], [roof, mThatch], [stack, mThatch]].forEach(([arr, mat]) => { if (!arr.length) return; const m = new THREE.Mesh(mergeGeometries(arr), mat); m.castShadow = true; m.receiveShadow = true; scene.add(m); });
+    const sheep = [], cattle = [];
+    PASTURES.forEach(([px, pz, pw, pd, pang, n, si]) => { const c = Math.cos(pang), sn = Math.sin(pang); for (let k = 0; k < n; k++) { const u = (hash(si, k * 5 + 1) - .5) * (pw - 30), v = (hash(si, k * 5 + 2) - .5) * (pd - 30), x = px + u * c - v * sn, z = pz + u * sn + v * c; (k % 3 === 2 ? cattle : sheep).push([x, hAt(x, z), z, hash(si, k * 5 + 3) * 6.28]); } });
+    const herd = (list, w, h, d, cols) => { if (!list.length) return; const im = new THREE.InstancedMesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ roughness: 1 }), list.length), o = new THREE.Object3D(); list.forEach((q, k) => { o.position.set(q[0], q[1] + h / 2 + 1.5, q[2]); o.rotation.set(0, q[3], 0); o.updateMatrix(); im.setMatrixAt(k, o.matrix); im.setColorAt(k, new THREE.Color(cols[k % cols.length])); }); im.castShadow = true; scene.add(im); };
+    herd(sheep, 6, 5, 9, [0xeeeadd, 0xdcd6c4, 0xf4f0e6]); herd(cattle, 8, 8, 15, [0x5a3a22, 0x2d2a26, 0xd9d0bd, 0x7b4a2a]); }
 }
 {
   marks.push(['  castles+fields posts', performance.now()]);

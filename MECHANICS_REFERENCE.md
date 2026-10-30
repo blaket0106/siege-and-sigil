@@ -2018,3 +2018,9 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - Tier 2 and 3 castles pick a footprint by seeded roll: keepBailey (square or rectangle, aspect 1 to 1.75), roundShell, polyKeep (hexagon or octagon), starFort (pentagon with gate and bridge), concentric, or citadel on rocky ground. Tier 1 and river castles have no moat.
 - A moat is a set of half-planes (rectangle, regular polygon) or a radius, built in castle-local units by `moatLocal` and rotated by the castle's face toward its nearest neighbour. Terrain carving uses the signed distance to the moat's inner edge, so the carved bed and the water mesh match the footprint.
 - `s.pl` (platform radius) is the farthest moat corner plus 10, so rectangular and polygon castles flatten a larger area than circular ones.
+
+## 63. Farms and river clearance (3D, cosmetic)
+
+- Each castle that is not a junction, river castle or pass picks the best of 16 directions by 3 distances for a block of equal-size fields: 2x1 (tier 1), 3x2 (tier 2), 4x2 (tier 3). A cell is valid on dry land, below 36 percent elevation, wet enough, clear of rivers (hw x 1.9 plus cell size), trails (55) and other castles' platforms, and flat within 26 units. Cells that fail are dropped; at least two must survive.
+- Crop kind runs in columns; one (tier 2) or two (tier 3) corner cells are pastures with sheep and cattle. Each cell is fenced; a farmstead (house, barn, haystacks) sits on the castle side of the block.
+- River paths, including their extension to the sea, are pushed away from non-crossing castles until they clear `hw x 1.4 + platform + 70`, so castles are never inside a river valley.
