@@ -2228,7 +2228,7 @@
       const shape = cards(Object.entries(SHAPE_INFO).map(([k, [t, d]]) => [k, t, d, `shape_${k}`]), 'continent', changed, { min: 140 });
       const size = cards(Object.entries(SIZE_COUNT).map(([k, n]) => [k, { tiny: 'Tiny', compact: 'Compact', small: 'Small', standard: 'Standard', large: 'Large' }[k], `${n} castles per house`, rawPict(dotsMarkup(n))]), 'standard', changed, { compact: true, min: 130 });
       const scaleMarkup = (k) => { const s = 8 + 5 * k; return `<rect x="${24 - s / 2}" y="${24 - s / 2}" width="${s}" height="${s}" rx="2"/><circle cx="${24 - s / 4}" cy="${24 - s / 4}" r="1.8" fill="currentColor" stroke="none"/><circle cx="${24 + s / 4}" cy="${24 + s / 5}" r="1.8" fill="currentColor" stroke="none"/>`; };
-      const scale = cards([['6', 'Classic 0.3x', 'Room between castles', 1], ['12', 'Wide 0.6x', 'More room to maneuver', 2], ['20', 'Standard 1x', 'The base game: wide land and long marches', 3], ['24', 'Immense 1.2x', 'A true expanse', 4], ['30', 'Colossal 1.5x', 'Weeks of marching', 5], ['36', 'Titanic 1.8x', 'Enormous', 6]].map(([k, t, d, n]) => [k, t, d, rawPict(scaleMarkup(n))]), '20', changed, { compact: true, min: 130 });
+      const scale = cards([['6', 'Classic 0.3x', 'Room between castles', 1], ['12', 'Wide 0.6x', 'More room to maneuver', 2], ['20', 'Standard 1x', 'The base game: wide land and long marches', 3], ['24', 'Immense 1.2x', 'A true expanse', 3.5], ['27', 'Roomy 1.35x', 'More space around every castle. The default', 4], ['30', 'Colossal 1.5x', 'Weeks of marching', 5], ['36', 'Titanic 1.8x', 'Enormous', 6]].map(([k, t, d, n]) => [k, t, d, rawPict(scaleMarkup(n))]), '27', changed, { compact: true, min: 130 });
       const style = cards([['scatter', 'Scattered', 'Castles spread evenly across the land.', 'layout_scatter'], ['continents', 'Clustered', 'Castles gather in regions with open ground between.', 'layout_clusters']], 'scatter', changed, { compact: true, min: 220 });
       const pattern = cards([['random', 'Natural', 'Neutral castles sit wherever the land allows.', 'layout_natural'], ['twin_rings', 'Twin rings', 'Two rings of neutral castles, a rich inner ring and a poorer outer one. Perfectly symmetrical.', 'layout_rings']], 'random', changed, { compact: true, min: 220 });
       const mirror = toggle({ icon: 'mirror', title: 'Mirrored lands', help: 'The map is mirrored on both axes so every house starts on identical ground. Needs 2, 4 or 8 seats.', onChange: changed });
@@ -2373,7 +2373,7 @@
       const FOG_L = { off: 'Clear', fog: 'Fog', dark: 'Dark' };
       const ALL_L = { none: 'no alliances', '0': 'alliances end instantly', '24': 'alliances with 24 tick warning', '48': 'alliances with 48 tick warning' };
       const VIS_L = { open: 'Open', friends: 'Friends only', invite: 'Invite only' };
-      const SCALE_L = { '6': 'Classic', '12': 'Wide', '20': 'Standard scale', '24': 'Immense', '30': 'Colossal', '36': 'Titanic' };
+      const SCALE_L = { '6': 'Classic', '12': 'Wide', '20': 'Standard scale', '27': 'Roomy', '24': 'Immense', '30': 'Colossal', '36': 'Titanic' };
       const COST_L = { '0.5': 'cheap', '1': 'standard', '2': 'costly' };
 
       const submit = (btn) => run(btn, async () => {
@@ -2464,7 +2464,7 @@
           sxGroup('Alliances', 'Houses can ally, share victory conditions and fight together.', alliances.el),
           sxGroup('Player names', null, anon.el)),
         fold('realm', 'Realm detail', () => `${SCALE_L[scale.value]} · ${PRESET_INFO[mapPreset.value].split(':')[0]} · ${style.value === 'scatter' ? 'scattered' : 'clustered'}${pattern.value === 'twin_rings' ? ', twin rings' : ''}${mirror.checked ? ', mirrored' : ''} · ${travel.value === 'trails' ? 'trails' : 'free travel'} · ${roads.value === 'disabled' ? 'no roads' : roads.value + ' roads'} · ${richness.value} wealth · ${home.value} start`,
-          sxGroup('Map scale', 'How far apart the castles sit. Larger maps mean longer marches and slower games.', scale.el),
+          sxGroup('Map scale', 'How far apart the castles sit. Marching speed, vision and trade range grow with the map, so journeys take about as long; there is just more room around every castle.', scale.el),
           sxGroup('Terrain', 'The mix of rivers, ranges and forests.', mapPreset.el),
           sxGroup('Castle layout', 'How the castles are placed on the land.', style.el, pattern.el, mirror.el),
           sxGroup('Travel', 'How armies move between castles.', travel.el),

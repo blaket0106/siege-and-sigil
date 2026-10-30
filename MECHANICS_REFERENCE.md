@@ -2045,3 +2045,9 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 
 - The rocky tier 3 citadel (stepped terraces) gets its town in front of the gate: `town()` with a region of z 90 to 160 and |x| under 150 (castle-local units), a market square at z 110, and no crop plots.
 - Tributary ribbons and the ribbons of extended rivers fade out over their last 8 points, so confluences and river ends no longer show hard seams. Extended rivers now stay at least 1.6 above sea level and taper, so the sea plane never floods their valleys.
+
+## 68. Default scale 1.35x, scale ties unit scale
+
+- New games default to `world_scale` 27 and `unit_scale` 13.5 (1.35x). `create_game` sets `unit_scale = world_scale / 2` whenever a scale is chosen, so march speed, scan radius, intercept distance and trade range grow with the map. Hop time is unchanged: distance and speed both scale by the same factor (checked: a gap of about 5100 at speed 17.5 x 3 x 13.5 is 7.2 ticks, the same as 3780 at 525 on a 1x map).
+- The create form has a "Roomy 1.35x" card as the default. Existing games keep their stored scales.
+- Quick start (no scale in its settings) uses the column defaults.
