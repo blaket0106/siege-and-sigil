@@ -913,7 +913,7 @@
         ['h', 'The secondary screens'],
         ['list', [
           'Research lists every realm area with its level, progress bar, prestige collected and an estimate: the time to the next level for the active area, and the time it would take if you made another area active. Make active switches at once.',
-          'Intel has two tabs. Charts plots one measure per house or per group, one point per production cycle. Groups is where you put houses into private colour groups to compare alliances; the group strength shows castles toward the win and troops seen. Standings and diplomacy stay in the Realm panel.',
+          'Intel has three tabs. Standings puts every house in one table: castles against the number needed to win, total troops, commanders and buildings. Click a column to sort and a row to open that house. Charts plots one measure per house or per group, one point per production cycle. Groups is where you put houses into private colour groups to compare alliances; the group strength shows castles toward the win and troops seen. Standings and diplomacy stay in the Realm panel.',
           'Ledger has By house (gold given and received, with the net) and Entries (every line, newest first). Recorder lists public events and your battles, filtered by house and kind. Castles is the sortable table.',
         ]],
         ['h', 'How orders respond'],
@@ -4624,11 +4624,34 @@
         metric.addEventListener('change', draw);
         mode.addEventListener('change', draw);
         draw();
+        const standingsPanel = () => {
+          const last = data[data.length - 1];
+          if (!last) return [h('div', { class: 'empty' }, 'No standings yet. They appear after the first production cycle.')];
+          const winAtS = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
+          const cols = [['name', 'House', 0], ['castles', `Castles (${winAtS} wins)`, 1], ['troops', 'Troops', 1], ['commanders', 'Commanders', 1], ['buildings', 'Buildings', 1]];
+          const rowsS = [...ms.players.values()].map((p) => {
+            const r = last.payload.players.find((q) => q.player_id === p.id);
+            return r ? { p, name: p.display_name, castles: r.territories, troops: r.garrison_troops + r.commander_troops, commanders: r.commanders, buildings: r.treasury_levels + r.industry_levels + r.prestige_levels, out: p.eliminated_at_tick != null } : null;
+          }).filter(Boolean);
+          const st = { key: 'castles', dir: -1 };
+          const body = h('div', { class: 'tablewrap' });
+          const drawS = () => {
+            rowsS.sort((a, b) => (st.key === 'name' ? a.name.localeCompare(b.name) : a[st.key] - b[st.key]) * st.dir || b.castles - a.castles);
+            const best = Object.fromEntries(cols.slice(1).map(([k]) => [k, Math.max(...rowsS.map((r) => r[k]))]));
+            body.replaceChildren(h('table', { class: 'standings' },
+              h('thead', {}, h('tr', {}, cols.map(([k, label, num]) => h('th', { class: num ? 'num' : '', 'aria-sort': st.key === k ? (st.dir < 0 ? 'descending' : 'ascending') : 'none' }, h('button', { type: 'button', onclick: () => { if (st.key === k) st.dir = -st.dir; else { st.key = k; st.dir = k === 'name' ? 1 : -1; } drawS(); } }, label, st.key === k ? (st.dir < 0 ? ' \u25BE' : ' \u25B4') : ''))))),
+              h('tbody', {}, rowsS.map((r) => h('tr', { class: `${r.out ? 'out' : ''} ${r.p.id === ms.me.id ? 'me' : ''}`, onclick: () => empireDialog(r.p.id) },
+                h('td', {}, h('span', { class: 'who' }, sigil(r.p.faction_slug, 26), h('b', { style: `color:${color(r.p.id)}` }, r.name), r.p.id === ms.me.id ? h('span', { class: 'chip you' }, 'You') : null, r.out ? h('span', { class: 'chip warn' }, 'Out') : null)),
+                cols.slice(1).map(([k]) => h('td', { class: `num${r[k] === best[k] && best[k] > 0 ? ' top' : ''}` }, String(r[k]))))))));
+          };
+          drawS();
+          return [body, h('p', { class: 'tip' }, `As of tick ${last.tick}, one reading per production cycle. Troops include every garrison and army. Click a column to sort and a row to open that house.`)];
+        };
         let scr = null;
         scr = screen('Intel', null, { help: 'fog',
           wide: true,
-          tabs: [['charts', 'Charts'], ['groups', 'Groups']],
-          render: (k) => (k === 'charts'
+          tabs: [['table', 'Standings'], ['charts', 'Charts'], ['groups', 'Groups']],
+          render: (k) => (k === 'table' ? standingsPanel() : k === 'charts'
             ? (data.length ? [h('div', { class: 'scr-toolbar' }, h('label', {}, 'Measure', metric), h('label', {}, 'Compare', mode)), chart, h('p', { class: 'tip' }, 'One point per production cycle. Totals only: where an army or castle stands is still hidden by the fog.')] : h('div', { class: 'empty' }, 'Intel charts start after the first production cycle. Until then, the standings in the Realm panel show castles held.'))
             : groupsPanel(() => scr.show('groups'))),
         });

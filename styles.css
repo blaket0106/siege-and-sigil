@@ -1879,3 +1879,16 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 .rrow .sw { width: 14px; height: 14px; border-radius: 50%; border: 2px dashed; }
 .rrow .sw.scan { border-color: #7fd0e0; background: rgba(120,205,228,0.15); }
 .rrow .sw.range { border-color: #f0cf7d; background: rgba(240,207,125,0.12); }
+
+.standings { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.standings th, .standings td { padding: 9px 10px; border-bottom: 1px solid var(--rule-soft); text-align: left; }
+.standings th.num, .standings td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.standings th button { all: unset; cursor: pointer; font-family: var(--font-display); letter-spacing: 0.04em; color: var(--gilt-hi); }
+.standings th button:focus-visible { outline: 2px solid var(--gilt-hi); outline-offset: 2px; }
+.standings tbody tr { cursor: pointer; }
+.standings tbody tr:hover { background: color-mix(in srgb, var(--gilt) 10%, transparent); }
+.standings tr.me { background: color-mix(in srgb, var(--gilt) 14%, transparent); }
+.standings tr.out { opacity: 0.55; }
+.standings td.top { color: var(--gilt-hi); font-weight: 700; }
+.standings .who { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tablewrap { overflow-x: auto; }

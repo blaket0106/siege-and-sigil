@@ -2067,3 +2067,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 71. Arrival labels on marching routes
 
 - Every visible marching army's route now carries labels at its stops: "Stop in 1 h 20 min" for intermediate castles and "Arrives in 3 h 10 min" at the destination (your own and allied armies show all stops; enemy armies show the destination only). Times come from `path_arrival_ticks` minus the current fractional tick, multiplied by the tick length; turn-based games show ticks. Drawn as SVG text in 2D and as overlay badges in 3D.
+
+## 72. Standings table
+
+- Intel (key G) opens on a Standings tab: one sortable table of every house with castles (against the victory target), troops (garrisons plus armies), commanders and infrastructure levels, taken from the latest `intel_live` reading (one per production cycle). The best value in each column is highlighted, your row is marked, eliminated houses are dimmed, and a row opens that house's Empires page.
