@@ -7091,11 +7091,14 @@
         return;
       }
       if (state.view === 'recovery') return;
-      if (['home', 'room', 'map', 'create', 'picking'].includes(state.view)) return;
-      await loadProfile();
-      const back = /^#g(\d+)/.exec(location.hash);
-      if (back) { await openGame(Number(back[1])); return; }
-      await showHome();
+      if (['home', 'room', 'map', 'create', 'picking'].includes(state.view) || state.opening) return;
+      state.opening = true;
+      try {
+        await loadProfile();
+        const back = /^#g(\d+)/.exec(location.hash);
+        if (back) { await openGame(Number(back[1])); return; }
+        await showHome();
+      } finally { state.opening = false; }
     }
 
     initStage();

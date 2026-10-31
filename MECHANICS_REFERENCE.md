@@ -2090,3 +2090,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 76. Route preview labels
 
 - While a march is being planned, every stop on the dashed preview line carries "Stop in 6h 0m" and the last stop "Arrives in 17h 0m" (not on loops), using the same cumulative ticks as the panel's "+N" column and the tick length. In 3D the numbered stop badges carry the time too ("1  6h 0m").
+
+## 77. Single setup on load
+
+- Several auth events fire at page load (initial session, signed in, token refresh), and each one used to start opening the game before the first had set the view, so the map was set up twice (double timers, double realtime handlers, a duplicate tour card). `onSession` now holds a `state.opening` flag while it loads the profile and opens the game or the home screen, so a second event is ignored. Measured with a counter on `showMap`: 2 runs before, 1 after.
