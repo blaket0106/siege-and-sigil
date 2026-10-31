@@ -538,7 +538,7 @@ ROADS.forEach((r) => r.pts.forEach((q) => stamp(q.x, q.z, 56, 2)));
 for (let k = 0; k < RVX.length; k++) { stamp(RVX[k], RVZ[k], Math.max(40, RVW[k] * 1.5), 4); stamp(RVX[k], RVZ[k], Math.max(60, RVW[k] * 4.6), 128); }
 LAKES.forEach((l) => stamp(l.x, l.z, l.r * 1.3, 8));
 FIELDS.forEach(([fx, fz, fw, fd]) => stamp(fx, fz, Math.hypot(fw, fd) * .55, 16)); FARMSTEADS.forEach((f) => stamp(f.x, f.z, 90, 16)); VILLAGES.forEach((v) => { v.houses.forEach(([x, z]) => stamp(x, z, 34, 16)); v.lane.forEach(([x, z]) => stamp(x, z, 30, 16)); });
-const SP = { spruce: [], fir: [], pine: [], oak: [], birch: [], poplar: [], cactus: [], palm: [], acacia: [], dead: [], willow: [] }, STEP = LO ? (RICH ? 64 : 80) : (RICH ? 54 : 62);
+const SP = { spruce: [], fir: [], pine: [], oak: [], birch: [], poplar: [], cactus: [], palm: [], acacia: [], dead: [], willow: [] }, STEP = (LO ? (RICH ? 64 : 80) : (RICH ? 54 : 62)) * Math.max(1, Math.sqrt(W / 54000));
 for (let z = 20; z < W; z += STEP) for (let x = 20; x < W; x += STEP) {
   const px = x + (rnd() - .5) * STEP, pz = z + (rnd() - .5) * STEP; if (blockedAt(px, pz, 31)) continue; const h = H(px, pz); if (h < SEA + .018) continue;
   const el = (h - SEA) / (1 - SEA), m = Mo(px, pz); if (el > .62) continue;

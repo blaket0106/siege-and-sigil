@@ -2081,3 +2081,8 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 74. Guided first turn
 
 - A six-step coach card (bottom left) runs in any active game up to tick 40 until finished or skipped: select your capital (pulsing ring), read the rings (Next), buy any upgrade, give a commander troops, send an army (a commander status of moving), then a closing step (Finish). Steps advance on game state, so they tick over as you act. Progress is stored in `localStorage` (`ss-coach` is the step number or `done`, `ss-coach-base` is the infrastructure total when the upgrade step began) and is read on every draw, so duplicate map instances stay in step. Menu, Options, Restart the tour starts it again.
+
+## 75. Rival rings and 3D build time
+
+- `rival_reach(game)` returns each other house's Watchtowers and Stables levels, but only for houses with at least one castle the caller currently sees (`fog_sees`); in games without fog every house is visible. Selecting a visible rival castle draws its scan ring (purple, fog games) and march range ring (red) and the castle panel shows "Their march range N leagues" with how many of your castles fall inside it.
+- The 3D tree sampling step grows with the map: `STEP x max(1, sqrt(W / 54000))`. At 3.6x on Lean the build fell from about 4.5 s to 2.3 s; maps at scale 20 are unchanged. Forests on very large maps are sparser per area as a result.

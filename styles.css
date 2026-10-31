@@ -1906,3 +1906,6 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 .coach-pulse { animation: coachpulse 1.6s ease-in-out infinite; }
 @keyframes coachpulse { 0%, 100% { opacity: 1; stroke-width: 4px; } 50% { opacity: 0.35; stroke-width: 9px; } }
 @media (prefers-reduced-motion: reduce) { .coach-pulse { animation: none; } }
+
+.reach.rival .rrow .sw.scan { border-color: #d49ad8; background: rgba(212,154,216,0.15); }
+.reach.rival .rrow .sw.range { border-color: #ff7a66; background: rgba(255,122,102,0.12); }
