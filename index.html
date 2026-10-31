@@ -3766,6 +3766,19 @@
         return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f, i, dx: B.x - A.x, dy: B.y - A.y };
       };
 
+      const arrivals = (c, m, tf) => {
+        const friend = isFriend(c.owner_player_id), pos = movementPos(m, tf), n = m.path.length, tm = TICK_MS[ms.game.tick_speed], out = [];
+        for (let j = pos.i + 1; j < n; j++) {
+          if (!friend && j !== n - 1) continue;
+          const t = ms.t.get(m.path[j]);
+          if (!t) continue;
+          const left = Math.max(0, m.path_arrival_ticks[j] - tf);
+          const when = tm ? fmtLeft(left * tm) : `${Math.ceil(left)} ticks`;
+          out.push({ x: t.x, y: t.y, final: j === n - 1, text: left <= 0 ? 'Arriving' : `${j === n - 1 ? 'Arrives' : 'Stop'} in ${when}`, friend });
+        }
+        return out;
+      };
+
       const cmdPos = (c, tf) => {
         if (c.current_territory_id) {
           const t = ms.t.get(c.current_territory_id);
@@ -4289,6 +4302,7 @@
             const toMe = !friend && destT && destT.owner_player_id === ms.me.id;
             out.push(sv('polyline', { class: friend ? 'marchline' : 'enemyline', points: pts.join(' '), fill: 'none', stroke: friend ? '#f5dc94' : toMe ? '#ff4a3a' : color(c.owner_player_id), 'stroke-width': friend ? 3.5 : toMe ? 4 : 2.6, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', 'stroke-dasharray': friend ? '8 8' : toMe ? '10 6' : '3 7', 'stroke-opacity': friend ? 1 : 0.85, style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
           }
+          arrivals(c, m, tf).forEach((a) => out.push(sv('text', { x: a.x, y: a.y - 44 * M(), 'text-anchor': 'middle', fill: a.friend ? '#f5dc94' : '#ffb3a6', class: 'eta-label', style: 'font-size:calc(var(--mk) * 13px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--mk) * 3px);paint-order:stroke;pointer-events:none' }, a.text)));
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
           const label = friend || typeof c.troops === 'number' ? String(c.troops) : '?';
           const nm = c.name ? String(c.name) : '';
@@ -4398,6 +4412,15 @@
             lines.push({ pts: [[ra.x, ra.y], [rb.x, rb.y]], color: 0xf5dc94, w: 4 });
             badges.push({ x: (ra.x + rb.x) / 2, z: (ra.y + rb.y) / 2, text: `${(Math.hypot(ra.x - rb.x, ra.y - rb.y) / 1500).toFixed(1)} leagues`, wide: true, up: 40 });
           }
+        }
+        if (!ms.replay) {
+          const tfm = viewTick();
+          ms.cmd.forEach((c2) => {
+            if (c2.status !== 'moving') return;
+            const m2 = ms.mov.get(c2.id);
+            if (!m2 || !commanderSeen(c2, tfm)) return;
+            arrivals(c2, m2, tfm).forEach((a) => badges.push({ x: a.x, z: a.y, text: a.text, wide: true, up: 56 }));
+          });
         }
         const sr3 = selReach();
         if (sr3) {

@@ -2063,3 +2063,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 70. Selected-castle reach rings
 
 - Selecting one of your own castles draws two labelled rings in 2D and 3D: scan radius `(90 + 60 x watchtowers) x unit_scale` (fog games only) and march range `rangeOf(stables)` (gap x (0.8 + 0.2 x stables) on trail maps). The castle panel gets a Reach block with both radii in leagues and the count of castles inside the range circle (straight line). Not drawn while marching, or with the ruler active; allies' and enemies' castles show no rings because their Watchtower and Stables levels are not visible to you.
+
+## 71. Arrival labels on marching routes
+
+- Every visible marching army's route now carries labels at its stops: "Stop in 1 h 20 min" for intermediate castles and "Arrives in 3 h 10 min" at the destination (your own and allied armies show all stops; enemy armies show the destination only). Times come from `path_arrival_ticks` minus the current fractional tick, multiplied by the tick length; turn-based games show ticks. Drawn as SVG text in 2D and as overlay badges in 3D.
