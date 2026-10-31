@@ -861,6 +861,7 @@
         ['h', 'How time works'],
         ['p', 'The game runs in ticks. The host picks the speed: a tick is 2 hours, 1 hour, 30 minutes or 15 minutes, or the game is turn-based and moves forward when everyone ends their turn or the deadline passes. The game keeps running while you are away, so orders you give now are carried out as ticks pass.'],
         ['h', 'Your first ten minutes'],
+        ['p', 'The first time you open a game, a short guided turn walks you through it in six steps: select your castle, read its rings, buy an upgrade, give a commander troops, send an army, and what happens next. A card in the bottom left says what to do, and the step ticks over as soon as you do it. Skip the tour at any time, or restart it from Menu, Options, Guided first turn.'],
         ['list', [
           'Click your starting castle and look at its three [[economy|upgrade tracks]].',
           'Spend your first gold on [[economy|Treasury]] at your richest castle, then on Recruitment. Income first, army second.',
@@ -3454,6 +3455,7 @@
         h('label', {}, 'Map text: army troop counts'), armiesSel,
         h('label', {}, 'Map text: castle upgrade levels'), infra,
         h('label', {}, '3D map detail'), detail3d,
+        h('label', {}, 'Guided first turn'), h('button', { type: 'button', class: 'small', onclick: () => { try { localStorage.setItem('ss-coach', '0'); localStorage.removeItem('ss-coach-base'); } catch {} if (window.__ssRestartCoach) window.__ssRestartCoach(); toast('The guided turn will start on your next game, or now if a game is open.', true); } }, 'Restart the tour'),
         h('div', { class: 'tip' }, 'Automatic starts Rich on a strong machine and switches to Lean if the map runs below about 22 frames a second.'),
         h('label', { class: 'check', style: 'margin-top:10px' }, sound, 'Sound effects'),
         extras.length ? h('div', { class: 'row wrap2', style: 'margin-top:14px;padding-top:12px;border-top:1px solid var(--rule-soft)' }, h('span', { class: 'dim', style: 'width:100%;font-family:var(--font-sc);font-size:.72rem;letter-spacing:.1em;color:var(--faint)' }, 'This game'), ...extras) : null,
@@ -4234,7 +4236,7 @@
         }
         L.rings.replaceChildren(...(ms.rings && ms.game.fog_of_war
           ? ms.sources.map((s) => sv('circle', { cx: s.x, cy: s.y, r: s.r, fill: 'none', stroke: 'rgba(212,169,74,0.28)', 'stroke-dasharray': '5 5', style: 'pointer-events:none' }))
-          : []), ...srEls);
+          : []), ...srEls, ...(() => { const id = coachTarget(), t = id && ms.t.get(id); return t ? [sv('circle', { class: 'coach-pulse', cx: t.x, cy: t.y, r: 60 * M(), fill: 'none', stroke: '#f5dc94', 'stroke-width': 4, 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none;r:calc(var(--px) * 38px)' })] : []; })());
 
         const pv = [];
         if (ms.marching && ms.sel && ms.sel.type === 'c') {
@@ -4435,6 +4437,7 @@
         }
         const vision = ms.rings && ms.game.fog_of_war ? ms.sources.map((q) => ({ x: q.x, z: q.y, r: q.r })) : [];
         const rings = ms.reachable ? [...ms.reachable] : [];
+        { const ct = coachTarget(); if (ct) rings.push(ct); }
         if (ms.reachFrom) rings.push(ms.reachFrom);
         ms.m3.setOverlays({ rings, routes, circles, badges, lines, vision });
         ms.syncing3d = false;
@@ -5042,7 +5045,44 @@
         const pop = h('div', { class: 'menu-pop drawer', role: 'menu', 'aria-label': 'Menu' }, ...menuContent(() => closeMenu()));
         openPop(pop, btn);
       };
+      const COACH_KEY = 'ss-coach';
+      const coachLoad = () => { try { const v = localStorage.getItem(COACH_KEY); return v === 'done' ? -1 : Number(v) || 0; } catch { return 0; } };
+      const coachSave = (i) => { try { localStorage.setItem(COACH_KEY, i < 0 ? 'done' : String(i)); if (i === 0) localStorage.removeItem('ss-coach-base'); } catch {} };
+      const myLevels = () => [...ms.t.values()].filter((t) => !t.is_junction && t.owner_player_id === ms.me.id).reduce((n, t) => n + (t.treasury_level || 0) + (t.industry_level || 0) + (t.prestige_level || 0), 0);
+      const COACH = [
+        { title: 'Select your castle', text: 'Click your starting castle, the one with the crown. It is pulsing on the map.', done: () => ms.sel && ms.sel.type === 't' && ms.sel.id === ms.me.capital_territory_id, target: () => ms.me.capital_territory_id },
+        { title: 'Read the rings', text: 'The blue ring is what this castle can see. The gold ring is how far an army can march from it. The castle panel lists both in leagues and counts the castles you can reach.', next: 'Next' },
+        { title: 'Grow your income', text: 'In the castle panel, press Buy under Treasury, Recruitment or Prestige. Gold pays for upgrades and commanders, and troops win the war.', enter: () => { try { localStorage.setItem('ss-coach-base', String(myLevels())); } catch {} }, done: () => { let b = null; try { b = localStorage.getItem('ss-coach-base'); } catch {} return b !== null && myLevels() > Number(b); } },
+        { title: 'Give a commander troops', text: 'Armies are led by commanders. Under Commanders in the castle panel, press Move troops, then All to commander.', done: () => ms.cmd.some((c) => c.owner_player_id === ms.me.id && typeof c.troops === 'number' && c.troops > 0) },
+        { title: 'Send an army', text: 'Press March next to that commander, click a castle, then press Send. The route shows its arrival time on the map.', done: () => ms.cmd.some((c) => c.owner_player_id === ms.me.id && c.status === 'moving') },
+        { title: 'You are under way', text: 'Orders carry on as ticks pass, even if you close the game. Reports appear as alerts while it is open. Press ? for the manual, or Menu, Intel to compare houses.', next: 'Finish' },
+      ];
+      const coachOn = () => (ms.coach || (ms.coach = { i: coachLoad(), base: 0 })) && ms.me && ms.game && ms.game.status === 'active' && !ms.replay && ms.me.eliminated_at_tick == null && ms.game.current_tick <= 40 && ms.coach && ms.coach.i >= 0;
+      const coachTarget = () => (coachOn() && COACH[ms.coach.i].target ? COACH[ms.coach.i].target() : null);
+      const setCoach = (i) => { ms.coach.i = i; coachSave(i); if (i >= 0 && COACH[i].enter) COACH[i].enter(); };
+      const drawCoach = () => {
+        if (!ms.coach) ms.coach = { i: coachLoad(), base: 0 };
+        ms.coach.i = coachLoad();
+        if (!coachOn()) { document.querySelectorAll('.coach').forEach((el) => el.remove()); ms.coachEl = null; return; }
+        for (let guard = 0; guard < COACH.length && ms.coach.i >= 0 && COACH[ms.coach.i].done && COACH[ms.coach.i].done(); guard++) setCoach(ms.coach.i + 1 < COACH.length ? ms.coach.i + 1 : -1);
+        if (ms.coach.i < 0) { if (ms.coachEl) { ms.coachEl.remove(); ms.coachEl = null; } render(); return; }
+        const i = ms.coach.i, st = COACH[i];
+        try { if (st.enter && localStorage.getItem('ss-coach-base') === null) st.enter(); } catch {}
+        const card = h('div', { class: 'coach', role: 'region', 'aria-label': 'Guided first turn' },
+          h('div', { class: 'coach-step' }, `Guided turn, step ${i + 1} of ${COACH.length}`),
+          h('b', {}, st.title), h('p', {}, st.text),
+          h('div', { class: 'row' }, st.next ? h('button', { type: 'button', class: 'primary small', onclick: () => { setCoach(i + 1 < COACH.length ? i + 1 : -1); drawCoach(); render(); } }, st.next) : null,
+            h('button', { type: 'button', class: 'ghost small', onclick: () => { setCoach(-1); drawCoach(); render(); } }, 'Skip the tour')));
+        document.querySelectorAll('.coach').forEach((el) => { if (el !== ms.coachEl) el.remove(); });
+        if (ms.coachEl && ms.coachEl.isConnected) ms.coachEl.replaceWith(card); else document.body.append(card);
+        ms.coachEl = card;
+      };
+      state.cleanup.push(() => { if (ms.coachEl) ms.coachEl.remove(); });
+      window.__ssRestartCoach = () => { ms.coach = { i: 0, base: 0 }; coachSave(0); drawCoach(); render(); };
+      state.cleanup.push(() => { window.__ssRestartCoach = null; });
+
       const drawHud = () => {
+        drawCoach();
         const g = ms.game;
         const winAt = ms.winAt || Math.ceil(ms.t.size * g.victory_pct);
         const winner = ms.players.get(g.winner_player_id);

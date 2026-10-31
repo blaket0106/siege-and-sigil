@@ -2077,3 +2077,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 - New `player_inbox` rows that arrive while a game is open raise a toast (up to three, then one "N more" toast) with a Show button when the row's body carries a `territory_id` and Open mail otherwise. Rows whose type or title matches siege, battle, lost, captured, attack, intercept, war or eliminated use the warning tone. The tab title shows the unread count `(N) Siege & Sigil`. Nothing is sent outside the page: no email, no push (decided 31 Oct 2026).
 
 - Test notes (31 Oct 2026, live game): inbox types are `system`, `combat`, `diplomacy` and `message` (a check constraint), so the warning tone keys on `combat` among others. Standings falls back to a live view built from what you can see when no Intel reading exists yet. Route labels and ring labels use true on-screen pixel sizes (`--px`), because the marker scale shrinks on large maps.
+
+## 74. Guided first turn
+
+- A six-step coach card (bottom left) runs in any active game up to tick 40 until finished or skipped: select your capital (pulsing ring), read the rings (Next), buy any upgrade, give a commander troops, send an army (a commander status of moving), then a closing step (Finish). Steps advance on game state, so they tick over as you act. Progress is stored in `localStorage` (`ss-coach` is the step number or `done`, `ss-coach-base` is the infrastructure total when the upgrade step began) and is read on every draw, so duplicate map instances stay in step. Menu, Options, Restart the tour starts it again.

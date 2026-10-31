@@ -1897,3 +1897,12 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 .standings .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9em; }
 .standings .who .chip { flex: none; font-size: 0.7rem; padding: 0 6px; }
 .standings th button { white-space: nowrap; }
+
+.coach { position: fixed; z-index: 60; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: min(340px, calc(100vw - 32px)); display: grid; gap: 8px; padding: 14px 16px; background: var(--ink-2); border: 1px solid var(--gilt-lo); border-left: 4px solid var(--gilt-hi); border-radius: var(--radius); box-shadow: var(--shadow); font-family: var(--font-sans); }
+.coach p { margin: 0; line-height: 1.45; color: var(--text); font-size: 0.93rem; }
+.coach b { font-family: var(--font-display); font-size: 1.1rem; color: var(--gilt-hi); letter-spacing: 0.03em; }
+.coach-step { font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim, #b9ad93); }
+.coach .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.coach-pulse { animation: coachpulse 1.6s ease-in-out infinite; }
+@keyframes coachpulse { 0%, 100% { opacity: 1; stroke-width: 4px; } 50% { opacity: 0.35; stroke-width: 9px; } }
+@media (prefers-reduced-motion: reduce) { .coach-pulse { animation: none; } }
