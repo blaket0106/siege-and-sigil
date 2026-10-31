@@ -1088,6 +1088,7 @@
         ['h', 'Range'],
         ['p', 'One order can cover only so much distance. Your [[areas|Stables]] level sets that distance. Nothing outside that distance can be targeted, even a castle joined to yours by a trail: a dotted circle on the map shows how far the army can go from where it is, or from the last stop you added, and the castles inside it that your trails reach glow.'],
         ['p', 'Distance is measured in leagues. One league is the spacing between neighbouring castles on a standard map. Range, scan radius and march speed are fixed in leagues and leagues per tick, so a bigger map means castles lie more leagues apart and journeys take longer. Games created before leagues keep their old scaling.'],
+        ['p', 'Click one of your castles and two rings appear around it. The blue ring is its scan radius, the ground it can see. The gold ring is its march range, how far a commander can be sent from there. Each ring is labelled in leagues, and the castle panel lists both with the number of castles inside your range. Scan rings show in fog games.'],
         ['h', 'The ruler'],
         ['p', 'Press Ruler in the top bar and click two castles. It shows the straight-line distance in leagues, how long the trip takes on foot and by road, your range, and the Stables level you need to reach it in one march. The ETA uses the commander you have selected, or your king. On trail and road maps it measures the route the march would take, through castles you hold, so it agrees with the march preview. If there is no such route it says so.'],
         ['h', 'March types'],
@@ -3592,6 +3593,13 @@
       const rangeOf = (stables) => (trailsOn() ? ((ms.game.gap || 3780) * (0.8 + 0.2 * stables)) : ms.game.free_travel ? (210 + 60 * stables) * U() : (90 + 60 * stables) * (ms.game.league ? U() : 1));
       const trailsOn = () => ms.game.travel_mode === 'trails';
       const myStables = () => (ms.areas.find((a) => a.area === 'stables') || { level: 0 }).level;
+      const reachOf = (t) => {
+        if (!t || t.is_junction || !ms.me || t.owner_player_id !== ms.me.id) return null;
+        const wt = (ms.areas.find((a) => a.area === 'watchtowers') || { level: 0 }).level;
+        const range = rangeOf(myStables());
+        return { scan: (90 + 60 * wt) * U(), range, showScan: !!ms.game.fog_of_war, inRange: [...ms.t.values()].filter((q) => !q.is_junction && q.id !== t.id && Math.hypot(q.x - t.x, q.y - t.y) <= range).length };
+      };
+      const selReach = () => (ms.sel && ms.sel.type === 't' && !ms.marching && !(ms.ruler && ms.ruler.a) ? (() => { const t = ms.t.get(ms.sel.id); const rf = reachOf(t); return rf ? { t, ...rf } : null; })() : null);
       const reachableFrom = (tid) => {
         const range = rangeOf(myStables());
         const out = new Map();
@@ -4199,9 +4207,15 @@
           }));
         }
 
+        const sr = selReach(), srEls = [];
+        if (sr) {
+          const lab = (r, txt, col) => sv('text', { x: sr.t.x, y: sr.t.y - r - 6 * M(), 'text-anchor': 'middle', fill: col, style: 'font-size:calc(var(--mk) * 15px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--mk) * 3px);paint-order:stroke;pointer-events:none' }, txt);
+          if (sr.showScan) srEls.push(sv('circle', { cx: sr.t.x, cy: sr.t.y, r: sr.scan, fill: 'rgba(120,205,228,0.07)', stroke: '#7fd0e0', 'stroke-width': 2.5, 'stroke-dasharray': '7 5', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }), lab(sr.scan, `Scan ${leagueText(sr.scan)} leagues`, '#9fe0ee'));
+          srEls.push(sv('circle', { cx: sr.t.x, cy: sr.t.y, r: sr.range, fill: 'rgba(240,207,125,0.05)', stroke: '#f0cf7d', 'stroke-width': 3, 'stroke-dasharray': '3 8', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }), lab(sr.range, `March range ${leagueText(sr.range)} leagues`, '#f5dc94'));
+        }
         L.rings.replaceChildren(...(ms.rings && ms.game.fog_of_war
           ? ms.sources.map((s) => sv('circle', { cx: s.x, cy: s.y, r: s.r, fill: 'none', stroke: 'rgba(212,169,74,0.28)', 'stroke-dasharray': '5 5', style: 'pointer-events:none' }))
-          : []));
+          : []), ...srEls);
 
         const pv = [];
         if (ms.marching && ms.sel && ms.sel.type === 'c') {
@@ -4384,6 +4398,11 @@
             lines.push({ pts: [[ra.x, ra.y], [rb.x, rb.y]], color: 0xf5dc94, w: 4 });
             badges.push({ x: (ra.x + rb.x) / 2, z: (ra.y + rb.y) / 2, text: `${(Math.hypot(ra.x - rb.x, ra.y - rb.y) / 1500).toFixed(1)} leagues`, wide: true, up: 40 });
           }
+        }
+        const sr3 = selReach();
+        if (sr3) {
+          if (sr3.showScan) { circles.push({ x: sr3.t.x, z: sr3.t.y, r: sr3.scan, color: 0x7fd0e0, w: 3, op: 0.85 }); badges.push({ x: sr3.t.x, z: sr3.t.y - sr3.scan, text: `Scan ${leagueText(sr3.scan)} leagues`, wide: true, up: 30 }); }
+          circles.push({ x: sr3.t.x, z: sr3.t.y, r: sr3.range, w: 4, op: 0.95 }); badges.push({ x: sr3.t.x, z: sr3.t.y - sr3.range, text: `March range ${leagueText(sr3.range)} leagues`, wide: true, up: 30 });
         }
         const vision = ms.rings && ms.game.fog_of_war ? ms.sources.map((q) => ({ x: q.x, z: q.y, r: q.r })) : [];
         const rings = ms.reachable ? [...ms.reachable] : [];
@@ -6288,6 +6307,7 @@
               stat(troopsTxt, mine && seen ? `troops · +${t.industry_level * 5} a cycle` : 'troops'),
               stat(`Tier ${t.tier}`, `${t.natural_resources} resources${t.terrain ? ' · ' + (TERRAIN_NAMES[t.terrain] || t.terrain).toLowerCase() : ''}`),
               seen ? stat(`${t.treasury_level} · ${t.industry_level} · ${t.prestige_level}`, 'treasury · recruit · prestige') : stat(lastSeenTxt ? `t${ms.mem[t.id].tk != null ? ms.mem[t.id].tk : '?'}` : '?', lastSeenTxt ? 'last seen' : 'never seen'))));
+          { const rf = reachOf(t); if (rf) parts.push(h('div', { class: 'sec reach' }, rf.showScan ? h('div', { class: 'rrow' }, h('span', { class: 'sw scan' }), h('b', {}, `Scan ${leagueText(rf.scan)} leagues`), h('span', {}, 'what this castle can see')) : null, h('div', { class: 'rrow' }, h('span', { class: 'sw range' }), h('b', {}, `March range ${leagueText(rf.range)} leagues`), h('span', {}, `${rf.inRange} castle${rf.inRange === 1 ? '' : 's'} within range`)))); }
           if (lastSeenTxt) parts.push(h('div', { class: 'tip sel-tip' }, lastSeenTxt));
           if (t.garrison_commander_id && seen) parts.push(h('div', { class: 'tip sel-tip' }, `Garrison led by ${(ms.cmd.find((c) => c.id === t.garrison_commander_id) || {}).name || 'a commander'}`));
           if (seen && t.has_road) parts.push(h('div', { class: 'tip sel-tip' }, 'A road is built here.'));

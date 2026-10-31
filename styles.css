@@ -1872,3 +1872,10 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 .campmenu-list { position: absolute; top: 46px; right: 10px; z-index: 6; min-width: 160px; display: grid; gap: 2px; padding: 6px; background: var(--ink-2); border: 1px solid var(--gilt-lo); border-radius: var(--radius); box-shadow: var(--shadow); }
 .campmenu-list[hidden] { display: none; }
 .campmenu-list button { width: 100%; text-align: left; }
+
+.reach { display: grid; gap: 6px; }
+.rrow { display: grid; grid-template-columns: 18px auto 1fr; gap: 8px; align-items: center; font-size: 0.88rem; }
+.rrow span:last-child { color: var(--text-dim, #b9ad93); text-align: right; }
+.rrow .sw { width: 14px; height: 14px; border-radius: 50%; border: 2px dashed; }
+.rrow .sw.scan { border-color: #7fd0e0; background: rgba(120,205,228,0.15); }
+.rrow .sw.range { border-color: #f0cf7d; background: rgba(240,207,125,0.12); }

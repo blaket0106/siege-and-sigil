@@ -2059,3 +2059,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 
 - Above scale 20 the 2D map no longer scales what it draws with the map. The opening view is a fixed 18,000 units wide (about 3.3 castle spacings at 1.8x, 1.7 at 3.6x), centred on your capital regardless of how far your other castles are; sprites are drawn at the scale-20 size (`M()` capped at the square root of 20); and screen markers shrink with the map (`mkScale` base 0.5 x sqrt(20 / scale), floor 0.3: about 0.37 at 1.8x and 0.26 at 3.6x). Castles therefore look small and far apart, and armies cross the screen faster, while hop times stay the same.
 - Games at scale 20 or below behave as before.
+
+## 70. Selected-castle reach rings
+
+- Selecting one of your own castles draws two labelled rings in 2D and 3D: scan radius `(90 + 60 x watchtowers) x unit_scale` (fog games only) and march range `rangeOf(stables)` (gap x (0.8 + 0.2 x stables) on trail maps). The castle panel gets a Reach block with both radii in leagues and the count of castles inside the range circle (straight line). Not drawn while marching, or with the ruler active; allies' and enemies' castles show no rings because their Watchtower and Stables levels are not visible to you.
