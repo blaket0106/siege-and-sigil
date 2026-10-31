@@ -3709,6 +3709,7 @@
           return at;
         });
       };
+      const planWhen = (n) => { const iv = TICK_MS[ms.game.tick_speed]; return iv ? fmtDuration(n * iv) : `${n} ticks`; };
       const tickText = (n) => {
         const interval = TICK_MS[ms.game.tick_speed];
         return interval ? `${n} ticks (about ${fmtDuration(n * interval)})` : `${n} ticks`;
@@ -4260,8 +4261,10 @@
             const pts = trailsOn() && c.current_territory_id ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [pos, ...ms.stops.map((st) => ms.t.get(st.id))];
             pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#1a140c', 'stroke-width': 7, 'stroke-opacity': 0.75, 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }));
             pv.push(sv('polyline', { points: pts.map((q) => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: '#f0cf7d', 'stroke-width': 3.5, 'vector-effect': 'non-scaling-stroke', 'stroke-dasharray': '9 6', style: 'pointer-events:none' }));
+            const whenP = stopTicks();
             ms.stops.forEach((st, i) => {
               const q = ms.t.get(st.id);
+              if (st.cost || i > 0) pv.push(sv('text', { x: q.x, y: q.y - 90 * M() - 62 * M(), 'text-anchor': 'middle', fill: '#f5dc94', style: 'font-size:calc(var(--px) * 13px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--px) * 3.5px);paint-order:stroke;pointer-events:none' }, `${i === ms.stops.length - 1 && !ms.loop ? 'Arrives' : 'Stop'} in ${planWhen(whenP[i])}`));
               pv.push(sv('circle', { cx: q.x, cy: q.y - 90 * M(), r: 40 * M(), fill: '#3a2f12', stroke: '#f0cf7d', 'stroke-width': 3 * M(), style: 'pointer-events:none' }));
               pv.push(sv('text', { x: q.x, y: q.y - 90 * M() + 12 * M(), 'text-anchor': 'middle', 'font-size': 34 * M(), style: 'fill:#f0cf7d;font-weight:bold;pointer-events:none' }, String(i + 1)));
             });
@@ -4414,7 +4417,7 @@
           if (ms.stops.length) {
             const pts = trailsOn() ? trailPoly([c.current_territory_id, ...ms.stops.flatMap((st) => st.path.slice(1))]) : [ms.t.get(c.current_territory_id), ...ms.stops.map((st) => ms.t.get(st.id))];
             routes.push({ pts: pts.map((q) => [q.x, q.y]), color: 0xf0cf7d });
-            ms.stops.forEach((st, i) => { const q = ms.t.get(st.id); badges.push({ x: q.x, z: q.y, text: String(i + 1) }); });
+            { const whenP = stopTicks(); ms.stops.forEach((st, i) => { const q = ms.t.get(st.id); badges.push({ x: q.x, z: q.y, text: `${i + 1}  ${planWhen(whenP[i])}`, wide: true }); }); }
           }
         }
         if (ms.ruler && ms.ruler.a) {

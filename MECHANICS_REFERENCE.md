@@ -2086,3 +2086,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 
 - `rival_reach(game)` returns each other house's Watchtowers and Stables levels, but only for houses with at least one castle the caller currently sees (`fog_sees`); in games without fog every house is visible. Selecting a visible rival castle draws its scan ring (purple, fog games) and march range ring (red) and the castle panel shows "Their march range N leagues" with how many of your castles fall inside it.
 - The 3D tree sampling step grows with the map: `STEP x max(1, sqrt(W / 54000))`. At 3.6x on Lean the build fell from about 4.5 s to 2.3 s; maps at scale 20 are unchanged. Forests on very large maps are sparser per area as a result.
+
+## 76. Route preview labels
+
+- While a march is being planned, every stop on the dashed preview line carries "Stop in 6h 0m" and the last stop "Arrives in 17h 0m" (not on loops), using the same cumulative ticks as the panel's "+N" column and the tick length. In 3D the numbered stop badges carry the time too ("1  6h 0m").
