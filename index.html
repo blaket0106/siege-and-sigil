@@ -3767,6 +3767,11 @@
         return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f, i, dx: B.x - A.x, dy: B.y - A.y };
       };
 
+      const fmtDur = (ms2) => {
+        if (ms2 <= 0) return 'any moment now';
+        const mins = Math.round(ms2 / 60000);
+        return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`;
+      };
       const arrivals = (c, m, tf) => {
         const friend = isFriend(c.owner_player_id), pos = movementPos(m, tf), n = m.path.length, tm = TICK_MS[ms.game.tick_speed], out = [];
         for (let j = pos.i + 1; j < n; j++) {
@@ -3774,7 +3779,7 @@
           const t = ms.t.get(m.path[j]);
           if (!t) continue;
           const left = Math.max(0, m.path_arrival_ticks[j] - tf);
-          const when = tm ? fmtLeft(left * tm) : `${Math.ceil(left)} ticks`;
+          const when = tm ? fmtDur(left * tm) : `${Math.ceil(left)} ticks`;
           out.push({ x: t.x, y: t.y, final: j === n - 1, text: left <= 0 ? 'Arriving' : `${j === n - 1 ? 'Arrives' : 'Stop'} in ${when}`, friend });
         }
         return out;
@@ -4223,7 +4228,7 @@
 
         const sr = selReach(), srEls = [];
         if (sr) {
-          const lab = (r, txt, col) => sv('text', { x: sr.t.x, y: sr.t.y - r - 6 * M(), 'text-anchor': 'middle', fill: col, style: 'font-size:calc(var(--mk) * 15px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--mk) * 3px);paint-order:stroke;pointer-events:none' }, txt);
+          const lab = (r, txt, col) => sv('text', { x: sr.t.x, y: sr.t.y - r - 6 * M(), 'text-anchor': 'middle', fill: col, style: 'font-size:calc(var(--px) * 14px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--px) * 3.5px);paint-order:stroke;pointer-events:none' }, txt);
           if (sr.showScan) srEls.push(sv('circle', { cx: sr.t.x, cy: sr.t.y, r: sr.scan, fill: 'rgba(120,205,228,0.07)', stroke: '#7fd0e0', 'stroke-width': 2.5, 'stroke-dasharray': '7 5', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }), lab(sr.scan, `Scan ${leagueText(sr.scan)} leagues`, '#9fe0ee'));
           srEls.push(sv('circle', { cx: sr.t.x, cy: sr.t.y, r: sr.range, fill: 'rgba(240,207,125,0.05)', stroke: '#f0cf7d', 'stroke-width': 3, 'stroke-dasharray': '3 8', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', style: 'pointer-events:none' }), lab(sr.range, `March range ${leagueText(sr.range)} leagues`, '#f5dc94'));
         }
@@ -4303,7 +4308,7 @@
             const toMe = !friend && destT && destT.owner_player_id === ms.me.id;
             out.push(sv('polyline', { class: friend ? 'marchline' : 'enemyline', points: pts.join(' '), fill: 'none', stroke: friend ? '#f5dc94' : toMe ? '#ff4a3a' : color(c.owner_player_id), 'stroke-width': friend ? 3.5 : toMe ? 4 : 2.6, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', 'stroke-dasharray': friend ? '8 8' : toMe ? '10 6' : '3 7', 'stroke-opacity': friend ? 1 : 0.85, style: 'pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }));
           }
-          arrivals(c, m, tf).forEach((a) => out.push(sv('text', { x: a.x, y: a.y - 44 * M(), 'text-anchor': 'middle', fill: a.friend ? '#f5dc94' : '#ffb3a6', class: 'eta-label', style: 'font-size:calc(var(--mk) * 13px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--mk) * 3px);paint-order:stroke;pointer-events:none' }, a.text)));
+          arrivals(c, m, tf).forEach((a) => out.push(sv('text', { x: a.x, y: a.y - 44 * M(), 'text-anchor': 'middle', fill: a.friend ? '#f5dc94' : '#ffb3a6', class: 'eta-label', style: 'font-size:calc(var(--px) * 13px);font-weight:700;stroke:#120d07;stroke-width:calc(var(--px) * 3.5px);paint-order:stroke;pointer-events:none' }, a.text)));
           const sel = ms.sel && ms.sel.type === 'c' && ms.sel.id === c.id;
           const label = friend || typeof c.troops === 'number' ? String(c.troops) : '?';
           const nm = c.name ? String(c.name) : '';
@@ -4626,10 +4631,14 @@
         mode.addEventListener('change', draw);
         draw();
         const standingsPanel = () => {
-          const last = data[data.length - 1];
-          if (!last) return [h('div', { class: 'empty' }, 'No standings yet. They appear after the first production cycle.')];
+          const liveRow = () => ({ tick: ms.game.current_tick, live: true, payload: { players: [...ms.players.values()].map((p) => {
+            const cs = [...ms.t.values()].filter((t) => !t.is_junction && t.owner_player_id === p.id);
+            const tf2 = tickF();
+            return { player_id: p.id, territories: cs.length, garrison_troops: cs.reduce((n, t) => n + (ms.vis.has(t.id) && typeof t.troops === 'number' ? t.troops : 0), 0), commander_troops: ms.cmd.filter((c) => c.owner_player_id === p.id && commanderSeen(c, tf2) && typeof c.troops === 'number').reduce((n, c) => n + c.troops, 0), commanders: ms.cmd.filter((c) => c.owner_player_id === p.id && commanderSeen(c, tf2)).length, treasury_levels: 0, industry_levels: 0, prestige_levels: 0 };
+          }) } });
+          const last = data[data.length - 1] || liveRow();
           const winAtS = ms.winAt || Math.ceil(ms.t.size * ms.game.victory_pct);
-          const cols = [['name', 'House', 0], ['castles', `Castles (${winAtS} wins)`, 1], ['troops', 'Troops', 1], ['commanders', 'Commanders', 1], ['buildings', 'Buildings', 1]];
+          const cols = [['name', 'House', 0, 'House'], ['castles', 'Castles', 1, `Castles held. ${winAtS} wins`], ['troops', 'Troops', 1, 'Troops in garrisons and armies'], ['commanders', 'Cmdrs', 1, 'Commanders'], ['buildings', 'Build', 1, 'Infrastructure levels']];
           const rowsS = [...ms.players.values()].map((p) => {
             const r = last.payload.players.find((q) => q.player_id === p.id);
             return r ? { p, name: p.display_name, castles: r.territories, troops: r.garrison_troops + r.commander_troops, commanders: r.commanders, buildings: r.treasury_levels + r.industry_levels + r.prestige_levels, out: p.eliminated_at_tick != null } : null;
@@ -4640,13 +4649,13 @@
             rowsS.sort((a, b) => (st.key === 'name' ? a.name.localeCompare(b.name) : a[st.key] - b[st.key]) * st.dir || b.castles - a.castles);
             const best = Object.fromEntries(cols.slice(1).map(([k]) => [k, Math.max(...rowsS.map((r) => r[k]))]));
             body.replaceChildren(h('table', { class: 'standings' },
-              h('thead', {}, h('tr', {}, cols.map(([k, label, num]) => h('th', { class: num ? 'num' : '', 'aria-sort': st.key === k ? (st.dir < 0 ? 'descending' : 'ascending') : 'none' }, h('button', { type: 'button', onclick: () => { if (st.key === k) st.dir = -st.dir; else { st.key = k; st.dir = k === 'name' ? 1 : -1; } drawS(); } }, label, st.key === k ? (st.dir < 0 ? ' \u25BE' : ' \u25B4') : ''))))),
+              h('thead', {}, h('tr', {}, cols.map(([k, label, num, tip]) => h('th', { class: num ? 'num' : '', title: tip, 'aria-sort': st.key === k ? (st.dir < 0 ? 'descending' : 'ascending') : 'none' }, h('button', { type: 'button', onclick: () => { if (st.key === k) st.dir = -st.dir; else { st.key = k; st.dir = k === 'name' ? 1 : -1; } drawS(); } }, label, st.key === k ? (st.dir < 0 ? ' \u25BE' : ' \u25B4') : ''))))),
               h('tbody', {}, rowsS.map((r) => h('tr', { class: `${r.out ? 'out' : ''} ${r.p.id === ms.me.id ? 'me' : ''}`, onclick: () => empireDialog(r.p.id) },
-                h('td', {}, h('span', { class: 'who' }, sigil(r.p.faction_slug, 26), h('b', { style: `color:${color(r.p.id)}` }, r.name), r.p.id === ms.me.id ? h('span', { class: 'chip you' }, 'You') : null, r.out ? h('span', { class: 'chip warn' }, 'Out') : null)),
+                h('td', {}, h('span', { class: 'who' }, sigil(r.p.faction_slug, 22), h('b', { title: r.name }, r.name), r.p.id === ms.me.id ? h('span', { class: 'chip you' }, 'You') : null, r.out ? h('span', { class: 'chip warn' }, 'Out') : null)),
                 cols.slice(1).map(([k]) => h('td', { class: `num${r[k] === best[k] && best[k] > 0 ? ' top' : ''}` }, String(r[k]))))))));
           };
           drawS();
-          return [body, h('p', { class: 'tip' }, `As of tick ${last.tick}, one reading per production cycle. Troops include every garrison and army. Click a column to sort and a row to open that house.`)];
+          return [body, h('p', { class: 'tip' }, last.live ? `Live view at tick ${last.tick} (${winAtS} castles win): only what you can see right now. Buildings stay at 0 and troops count the garrisons and armies in sight. Full readings start after the first production cycle. Click a column to sort and a row to open that house.` : `As of tick ${last.tick}, one reading per production cycle. Troops include every garrison and army. Click a column to sort and a row to open that house.`)];
         };
         let scr = null;
         scr = screen('Intel', null, { help: 'fog',
@@ -6612,6 +6621,7 @@
         const mkBase = S() > 20 ? 0.5 * Math.sqrt(20 / S()) : 0.5;
         ms.mkScale = Math.min(S() > 20 ? 1.9 * mkBase : 1.3, Math.max(S() > 20 ? 0.3 : 0.5, mkBase * Math.sqrt(pxu / fit)));
         svg.style.setProperty('--mk', String(ms.mkScale / pxu));
+        svg.style.setProperty('--px', String(1 / pxu));
         const plateW = 72 * (ms.terr ? M() * 1.3 : 1) * pxu;
         svg.classList.toggle('mk-on', plateW < 60);
         svg.classList.toggle('mk-far', plateW < 14);
@@ -6845,7 +6855,7 @@
         ms.inboxSeen = ib.data.length ? Math.max(...ib.data.map((i) => i.id)) : 0;
         if (prevInbox !== null) {
           const fresh = ib.data.filter((i) => i.id > prevInbox && !i.is_read).sort((a, b) => a.id - b.id);
-          const grave = /siege|battle|lost|captured|attack|intercept|war|eliminated/i;
+          const grave = /combat|siege|battle|lost|captured|attack|intercept|war|eliminated/i;
           fresh.slice(-3).forEach((i) => {
             const tid = i.body && (i.body.territory_id || (i.body.territory && i.body.territory.id));
             const where = tid && ms.t.get(tid);

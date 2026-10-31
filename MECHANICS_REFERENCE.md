@@ -2075,3 +2075,5 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 73. In-game alerts
 
 - New `player_inbox` rows that arrive while a game is open raise a toast (up to three, then one "N more" toast) with a Show button when the row's body carries a `territory_id` and Open mail otherwise. Rows whose type or title matches siege, battle, lost, captured, attack, intercept, war or eliminated use the warning tone. The tab title shows the unread count `(N) Siege & Sigil`. Nothing is sent outside the page: no email, no push (decided 31 Oct 2026).
+
+- Test notes (31 Oct 2026, live game): inbox types are `system`, `combat`, `diplomacy` and `message` (a check constraint), so the warning tone keys on `combat` among others. Standings falls back to a live view built from what you can see when no Intel reading exists yet. Route labels and ring labels use true on-screen pixel sizes (`--px`), because the marker scale shrinks on large maps.
