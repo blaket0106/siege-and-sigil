@@ -1912,3 +1912,7 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 
 svg.mk-names-2 .mk.p2 .mk-name, svg.mk-names-2 .mk.p3 .mk-name, svg.mk-names-3 .mk.p3 .mk-name { display: inline; }
 svg.plates-thin .mk.p0 .mk-tp, svg.plates-thin .mk.p1 .mk-tp { display: none; }
+
+.mk:focus { outline: none; }
+.mk:focus-visible .mk-i { filter: drop-shadow(0 0 3px #f5dc94) drop-shadow(0 0 7px #f5dc94); }
+.side:focus-visible, svg:focus-visible { outline: 2px solid var(--gilt-hi); outline-offset: -2px; }

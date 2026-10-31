@@ -2098,3 +2098,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 78. Label thinning on the 2D map
 
 - Each castle marker carries a priority class: `p3` for your castles, capitals, threatened, besieged and the selected castle; `p2` for tier 3; `p1` for tier 2; `p0` for the rest. With `sp` the on-screen distance between castles in pixels: above 70 every name shows; 38 to 70 only `p2` and `p3`; 18 to 38 only `p3`; troop plates of `p0` and `p1` castles hide below 38. Checked on a live 3.6x map: at full-map zoom 49 tier 1 and 30 tier 2 names hid while 16 tier 3 and 4 priority names stayed.
+
+## 79. Keyboard access on the 2D map
+
+- Castle markers are `role="button"` with a spoken label ("Fairhold, tier 3, yours, 10 troops, under threat"). Your own castles, capitals, threatened, besieged and the selected castle are tab stops (`tabindex 0`); the rest are focusable by script and reachable through Menu, Castles. Enter or Space selects, and a glow shows focus. The map is `role="application"` and the side panel `role="complementary"`.

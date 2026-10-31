@@ -3523,8 +3523,8 @@
       ms.threadInput = h('textarea', { rows: '2', maxlength: '2000', placeholder: 'Write a message. Shift and Enter for a new line.', onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.target.form.requestSubmit(); } } });
       ms.subjectInput = h('input', { type: 'text', maxlength: '80', placeholder: 'Subject (optional)' });
       const hud = h('div', { class: 'hud' });
-      const sideEl = h('div', { class: 'side' });
-      const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet' });
+      const sideEl = h('div', { class: 'side', role: 'complementary', 'aria-label': 'Selected castle and realm panel' });
+      const svg = sv('svg', { preserveAspectRatio: 'xMidYMid meet', role: 'application', 'aria-label': 'Realm map. Tab to your castles, press Enter to select one.' });
       const L = { terrain: sv('g', { class: 'terrain-layer' }), rivers: sv('g'), crossings: sv('g'), fog: sv('g'), cells: sv('g'), edges: sv('g'), junctions: sv('g'), rings: sv('g'), preview: sv('g'), castles: sv('g', { class: 'castles-layer' }), marks: sv('g', { class: 'mk-layer' }), dyn: sv('g') };
       svg.append(sv('defs', {},
         sv('radialGradient', { id: 'gDirt' }, sv('stop', { offset: '0', 'stop-color': '#8a6a3c', 'stop-opacity': 0.62 }), sv('stop', { offset: '0.6', 'stop-color': '#6f5530', 'stop-opacity': 0.4 }), sv('stop', { offset: '1', 'stop-color': '#4a3a20', 'stop-opacity': 0 })),
@@ -4170,7 +4170,7 @@
           const MW = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
           const ms2 = tier >= 3 ? 1.0 : tier === 2 ? 1.15 : 1.35;
           const cw = count.length * 9 + 14 + (owner ? 16 : 0);
-          marks.push(sv('g', { class: `mk p${mine || isCap || threatened.has(t.id) || sieged || selected ? 3 : tier >= 3 ? 2 : tier === 2 ? 1 : 0}`, transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${(seen ? 1 : 0.7) * (reach ? 1 : 0.45)}`, onclick: pick },
+          marks.push(sv('g', { class: `mk p${mine || isCap || threatened.has(t.id) || sieged || selected ? 3 : tier >= 3 ? 2 : tier === 2 ? 1 : 0}`, role: 'button', tabindex: mine || isCap || threatened.has(t.id) || sieged || selected ? '0' : '-1', 'aria-label': `${t.name}, tier ${tier}, ${mine ? 'yours' : owner ? 'House ' + (houseOf(owner) || '') : 'unclaimed'}${count && count !== '' ? ', ' + count + ' troops' : ''}${threatened.has(t.id) ? ', under threat' : ''}`, onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } }, transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${(seen ? 1 : 0.7) * (reach ? 1 : 0.45)}`, onclick: pick },
             sv('g', { class: 'mk-i' },
               sv('circle', { cy: -8, r: 34, fill: 'transparent' }),
               owner ? sv('ellipse', { cy: 4, rx: 40, ry: 17, fill: oc, opacity: 0.35, style: 'pointer-events:none' }) : null,
