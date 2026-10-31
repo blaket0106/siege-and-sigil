@@ -2071,3 +2071,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 72. Standings table
 
 - Intel (key G) opens on a Standings tab: one sortable table of every house with castles (against the victory target), troops (garrisons plus armies), commanders and infrastructure levels, taken from the latest `intel_live` reading (one per production cycle). The best value in each column is highlighted, your row is marked, eliminated houses are dimmed, and a row opens that house's Empires page.
+
+## 73. In-game alerts
+
+- New `player_inbox` rows that arrive while a game is open raise a toast (up to three, then one "N more" toast) with a Show button when the row's body carries a `territory_id` and Open mail otherwise. Rows whose type or title matches siege, battle, lost, captured, attack, intercept, war or eliminated use the warning tone. The tab title shows the unread count `(N) Siege & Sigil`. Nothing is sent outside the page: no email, no push (decided 31 Oct 2026).

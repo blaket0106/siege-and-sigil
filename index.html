@@ -921,6 +921,7 @@
           'An order shows in the panel the moment you give it: troops move, gold is spent, the button shows a spinner until the server confirms. If the server refuses, the panel reverts and a message explains why.',
           'Marching and the ruler are modes. A bar across the top of the map says what to click next and has a Cancel button; Escape also ends the mode.',
           'Anything that cannot be undone (conceding, abandoning a castle, declaring war, jumping ticks) asks first in a dialog that names the action on its button.',
+          'While a game is open, new reports appear as an alert at the bottom of the screen with a Show button that takes you to the castle, or Open mail. Sieges, battles and lost castles sound a harsher tone. The browser tab title shows how many unread items you have, for example (3) Siege & Sigil. If you were away for four ticks or more, a summary opens when you return. Alerts only work while the game is open in a tab; nothing is sent by email or push.',
           'The panel never rebuilds under your pointer. If something changes while you hover a section, it updates when you move away.',
         ]],
         ['h', 'Finding your way'],
@@ -5046,6 +5047,7 @@
         const kpi = (cls, k, v, title, onclick) => h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `kpi ${cls}${onclick ? ' link ghost' : ''}`, title, onclick }, h('span', { class: 'k' }, Array.isArray(k) ? [h('span', { class: 'long' }, k[0]), h('span', { class: 'short' }, k[1])] : k), v);
         const props = pendingProposals();
         const mailN = ms.inbox.filter((i) => !i.is_read).length + battlesUnread() + chatUnread() + [...ms.threads.values()].filter(threadUnread).length;
+        document.title = mailN ? `(${mailN}) Siege & Sigil` : 'Siege & Sigil';
         const tile = (cls, label, value, small, title, onclick, extra) => h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `tile ${cls}${onclick ? ' go' : ''}`, title, onclick }, h('span', { class: 'k' }, label), h('span', { class: 'v' }, value), small ? h('small', {}, small) : null, extra || null);
         const barTiles = () => {
           const marching = ms.cmd.filter((c) => c.owner_player_id === ms.me.id && c.status === 'moving');
@@ -6601,6 +6603,7 @@
       const roMap = new ResizeObserver(() => { if (ms.view && !ms.view3d) applyView(); });
       roMap.observe(svg);
       state.cleanup.push(() => roMap.disconnect());
+      state.cleanup.push(() => { document.title = 'Siege & Sigil'; });
       state.cleanup.push(() => window.removeEventListener('ss-prefs', onPrefs));
       const applyView = () => {
         svg.setAttribute('viewBox', `${ms.view.x} ${ms.view.y} ${ms.view.w} ${ms.view.h}`);
@@ -6760,6 +6763,7 @@
         ms.loadDone = seq;
         const prevTick = ms.game ? ms.game.current_tick : null;
         const prevBattle = ms.battles && ms.battles.length ? Math.max(...ms.battles.map((b) => b.id)) : null;
+        const prevInbox = ms.inboxSeen === undefined ? null : ms.inboxSeen;
         ms.game = view.game;
         if (prevTick !== null && view.game.current_tick > prevTick && view.game.current_tick - prevTick <= 3) ms.slide = { from: prevTick, at: Date.now() };
         else if (prevTick === null || view.game.current_tick !== prevTick) ms.slide = null;
@@ -6838,6 +6842,17 @@
         ms.locks = of.data.locks;
         ms.moments = mo.data;
         ms.inbox = ib.data;
+        ms.inboxSeen = ib.data.length ? Math.max(...ib.data.map((i) => i.id)) : 0;
+        if (prevInbox !== null) {
+          const fresh = ib.data.filter((i) => i.id > prevInbox && !i.is_read).sort((a, b) => a.id - b.id);
+          const grave = /siege|battle|lost|captured|attack|intercept|war|eliminated/i;
+          fresh.slice(-3).forEach((i) => {
+            const tid = i.body && (i.body.territory_id || (i.body.territory && i.body.territory.id));
+            const where = tid && ms.t.get(tid);
+            toast(i.title, !grave.test(`${i.type} ${i.title}`), where ? { label: 'Show', fn: () => ms.focusOn && ms.focusOn(tid) } : { label: 'Open mail', fn: () => openTab('mail') });
+          });
+          if (fresh.length > 3) toast(`${fresh.length - 3} more new reports in your mail`, true, { label: 'Open mail', fn: () => openTab('mail') });
+        }
         ms.battles = br.data;
         if (prevTick !== null && view.game.current_tick > prevTick) Sfx.bell();
         if (prevBattle !== null && br.data.some((b) => b.id > prevBattle)) setTimeout(Sfx.horn, 700);
