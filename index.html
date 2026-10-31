@@ -874,6 +874,7 @@
         ['list', [
           'The strip at the top is you: your crest, your name (click it to rename), and your record of campaigns, victories and [[diplomacy#honor|honor]]. Quick start raises a four-house game against three AI rivals in one click. Raise a campaign opens the full setup.',
           'Your campaigns are cards. Each shows the house you play, a state (the current tick, In the lobby, Choose your start, Paused or Finished), when the next production lands, how many ticks have passed since your last visit, and a count of unread reports and messages. Campaigns that need you sort first.',
+          'The ... button on a campaign card opens its menu. A host can Delete game on any campaign, or Cancel game while it is still in the lobby; anyone else seated in a lobby can Leave game. Every choice asks first, and deleting cannot be undone.',
           'Invitations from friends appear above your campaigns with Join and Decline.',
           'Open lobbies lists games waiting for players, with the seats already taken shown as sigils. Join by code takes the short code a host shares with you.',
           'The roll of honor ranks players by honor across finished campaigns.',
@@ -1817,10 +1818,28 @@
         if (g.status === 'finished') lines.push(h('span', { class: 'cl' }, g.winner_player_id ? 'The war is over' : 'No winner recorded'));
         if (g.status === 'lobby') lines.push(h('span', { class: 'cl' }, `${g.max_players} seats at the table`));
         if (g.status === 'picking') lines.push(h('span', { class: 'cl hot' }, 'Your start is waiting to be chosen'));
-        return h('button', { type: 'button', class: `camp s-${g.status}`, style: `--tint:${f.color};--tint2:${f.color2}`, onclick: () => openGame(g.id) },
+        const btn = h('button', { type: 'button', class: `camp s-${g.status}`, style: `--tint:${f.color};--tint2:${f.color2}`, onclick: () => openGame(g.id) },
           h('div', { class: 'camp-top' }, h('span', { class: 'camp-sig' }, sigil(r.faction_slug, 44)), h('div', { class: 'camp-id' }, h('b', {}, g.name), h('span', {}, `House ${f.name}`)), h('span', { class: `chip ${tone}` }, label)),
           h('div', { class: 'camp-body' }, lines),
           h('div', { class: 'camp-foot' }, h('span', { class: 'camp-cta' }, cta), n ? h('span', { class: 'pill', title: 'Unread reports and messages' }, `${n} new`) : null));
+        const host = g.created_by === state.session.user.id, items = [];
+        const act = (label, text, confirmLabel, rpc, done) => items.push([label, async (e) => { if (await confirmDialog(text, confirmLabel)) run(e.currentTarget, async () => { const { error } = await sb.rpc(rpc, { p_game_id: g.id }); if (error) throw error; toast(done, true); await showHome(); }); }]);
+        if (g.status === 'lobby' && host) act('Cancel game', 'Cancel this game for everyone?', 'Cancel game', 'cancel_game', 'Game cancelled');
+        else if (g.status === 'lobby') act('Leave game', 'Leave this game?', 'Leave game', 'leave_game', 'You left the game');
+        if (g.status !== 'lobby' && host) act('Delete game', g.status === 'finished' ? 'Delete this finished game and all its data?' : 'Delete this game for everyone? Any other players in it lose it too. The game and all its data are removed and this cannot be undone.', 'Delete game', 'delete_game', 'Game deleted');
+        if (!items.length) return btn;
+        const list = h('div', { class: 'campmenu-list', role: 'menu', hidden: true }, items.map(([label, fn]) => h('button', { type: 'button', role: 'menuitem', class: 'danger', onclick: fn }, label)));
+        let off = null;
+        const close = () => { list.hidden = true; toggle.setAttribute('aria-expanded', 'false'); if (off) { off(); off = null; } };
+        const toggle = h('button', { type: 'button', class: 'campmenu', 'aria-label': `Manage ${g.name}`, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: (e) => {
+          e.stopPropagation();
+          if (!list.hidden) { close(); return; }
+          list.hidden = false; toggle.setAttribute('aria-expanded', 'true');
+          const onDoc = (ev) => { if (!list.contains(ev.target)) close(); }, onKey = (ev) => { if (ev.key === 'Escape') { close(); toggle.focus(); } };
+          setTimeout(() => document.addEventListener('click', onDoc), 0); document.addEventListener('keydown', onKey);
+          off = () => { document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey); };
+        } }, '\u22EF');
+        return h('div', { class: 'campwrap has-menu' }, btn, toggle, list);
       };
       const newCard = (any) => h('button', { type: 'button', class: 'camp new', onclick: createDialog },
         h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), h('span', {}, any ? 'Raise another campaign' : 'Raise your first campaign'),
