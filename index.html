@@ -3780,6 +3780,7 @@
         const mins = Math.round(ms2 / 60000);
         return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`;
       };
+      const destT0 = (m) => ms.t.get(m.path[m.path.length - 1]);
       const arrivals = (c, m, tf) => {
         const friend = isFriend(c.owner_player_id), pos = movementPos(m, tf), n = m.path.length, tm = TICK_MS[ms.game.tick_speed], out = [];
         for (let j = pos.i + 1; j < n; j++) {
@@ -4171,6 +4172,7 @@
           const ms2 = tier >= 3 ? 1.0 : tier === 2 ? 1.15 : 1.35;
           const cw = count.length * 9 + 14 + (owner ? 16 : 0);
           marks.push(sv('g', { class: `mk p${mine || isCap || threatened.has(t.id) || sieged || selected ? 3 : tier >= 3 ? 2 : tier === 2 ? 1 : 0}`, role: 'button', tabindex: mine || isCap || threatened.has(t.id) || sieged || selected ? '0' : '-1', 'aria-label': `${t.name}, tier ${tier}, ${mine ? 'yours' : owner ? 'House ' + (houseOf(owner) || '') : 'unclaimed'}${count && count !== '' ? ', ' + count + ' troops' : ''}${threatened.has(t.id) ? ', under threat' : ''}`, onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } }, transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${(seen ? 1 : 0.7) * (reach ? 1 : 0.45)}`, onclick: pick },
+            sv('title', {}, `${t.name}, tier ${tier}, ${mine ? 'yours' : owner ? 'House ' + (houseOf(owner) || '') : 'unclaimed'}${count && count !== '' ? ', ' + count + ' troops' : ''}${threatened.has(t.id) ? ', under threat' : ''}`),
             sv('g', { class: 'mk-i' },
               sv('circle', { cy: -8, r: 34, fill: 'transparent' }),
               owner ? sv('ellipse', { cy: 4, rx: 40, ry: 17, fill: oc, opacity: 0.35, style: 'pointer-events:none' }) : null,
@@ -4326,6 +4328,7 @@
           const bw = Math.max(34, label.length * 10 + 14, nm.length * 6.4 + 14);
           const lh = nm ? 31 : 17;
           out.push(sv('g', { class: 'army-fig', transform: `translate(${pos.x},${pos.y}) scale(${M() * 1.3},${M() * 1.3})`, style: 'cursor:pointer', onclick: (e) => { e.stopPropagation(); select('c', c.id); } },
+            sv('title', {}, `${nm || 'Army'}, ${friend ? 'yours' : 'House ' + (houseOf(c.owner_player_id) || '')}, ${label} troops${destT0(m) ? `, heading to ${destT0(m).name}` : ''}${(() => { const a = arrivals(c, m, tf); return a.length ? ', ' + a[a.length - 1].text.toLowerCase() : ''; })()}`),
             sv('ellipse', { cx: 2, cy: 2, rx: 11, ry: 3.6, fill: 'rgba(0,0,0,0.4)' }),
             sel ? sv('ellipse', { class: 'selring', cx: 0, cy: 1, rx: 17, ry: 6, fill: 'none', stroke: '#f5dc94', 'stroke-width': 2, 'stroke-dasharray': '6 5' }) : null,
             armyFigure(color(c.owner_player_id), color2(c.owner_player_id), armyTier(c.troops), (pos.dx || 0) < 0, Math.floor(Date.now() / 250)),

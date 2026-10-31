@@ -2102,3 +2102,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 79. Keyboard access on the 2D map
 
 - Castle markers are `role="button"` with a spoken label ("Fairhold, tier 3, yours, 10 troops, under threat"). Your own castles, capitals, threatened, besieged and the selected castle are tab stops (`tabindex 0`); the rest are focusable by script and reachable through Menu, Castles. Enter or Space selects, and a glow shows focus. The map is `role="application"` and the side panel `role="complementary"`.
+
+## 80. Hover tooltips
+
+- Castle markers and marching armies carry native SVG tooltips (also read by screen readers): "Fairhold, tier 3, yours, 10 troops, under threat" for castles and "Edric Thornwick, yours, 9 troops, heading to Rookfield, arrives in 6 h 0 min" for armies. Measured on 3.6x maps: 3D GPU time 3 to 4 ms on Lean and 9 to 10 ms on Rich at every zoom, build 2.5 to 2.8 s.
