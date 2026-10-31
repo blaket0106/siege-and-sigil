@@ -2094,3 +2094,7 @@ Under 760 px `.mapbody` stacks the map, a `.sheetbar` handle and the panel. The 
 ## 77. Single setup on load
 
 - Several auth events fire at page load (initial session, signed in, token refresh), and each one used to start opening the game before the first had set the view, so the map was set up twice (double timers, double realtime handlers, a duplicate tour card). `onSession` now holds a `state.opening` flag while it loads the profile and opens the game or the home screen, so a second event is ignored. Measured with a counter on `showMap`: 2 runs before, 1 after.
+
+## 78. Label thinning on the 2D map
+
+- Each castle marker carries a priority class: `p3` for your castles, capitals, threatened, besieged and the selected castle; `p2` for tier 3; `p1` for tier 2; `p0` for the rest. With `sp` the on-screen distance between castles in pixels: above 70 every name shows; 38 to 70 only `p2` and `p3`; 18 to 38 only `p3`; troop plates of `p0` and `p1` castles hide below 38. Checked on a live 3.6x map: at full-map zoom 49 tier 1 and 30 tier 2 names hid while 16 tier 3 and 4 priority names stayed.

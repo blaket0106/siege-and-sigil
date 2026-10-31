@@ -4170,7 +4170,7 @@
           const MW = tier >= 3 ? 64 : tier === 2 ? 50 : 36;
           const ms2 = tier >= 3 ? 1.0 : tier === 2 ? 1.15 : 1.35;
           const cw = count.length * 9 + 14 + (owner ? 16 : 0);
-          marks.push(sv('g', { class: 'mk', transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${(seen ? 1 : 0.7) * (reach ? 1 : 0.45)}`, onclick: pick },
+          marks.push(sv('g', { class: `mk p${mine || isCap || threatened.has(t.id) || sieged || selected ? 3 : tier >= 3 ? 2 : tier === 2 ? 1 : 0}`, transform: `translate(${t.x},${t.y})`, style: `cursor:pointer;opacity:${(seen ? 1 : 0.7) * (reach ? 1 : 0.45)}`, onclick: pick },
             sv('g', { class: 'mk-i' },
               sv('circle', { cy: -8, r: 34, fill: 'transparent' }),
               owner ? sv('ellipse', { cy: 4, rx: 40, ry: 17, fill: oc, opacity: 0.35, style: 'pointer-events:none' }) : null,
@@ -6675,7 +6675,11 @@
         const plateW = 72 * (ms.terr ? M() * 1.3 : 1) * pxu;
         svg.classList.toggle('mk-on', plateW < 60);
         svg.classList.toggle('mk-far', plateW < 14);
-        svg.classList.toggle('mk-names', 150 * S() * pxu > 70);
+        const sp = 150 * S() * pxu;
+        svg.classList.toggle('mk-names', sp > 70);
+        svg.classList.toggle('mk-names-2', sp <= 70 && sp > 38);
+        svg.classList.toggle('mk-names-3', sp <= 38 && sp > 18);
+        svg.classList.toggle('plates-thin', sp <= 38);
         const ratio = ms.full ? ms.view.w / ms.full.w : 1;
         const shown = (setting) => setting === 'always' || (setting === 'zoomed' && ratio < 0.5) || (setting === 'close' && ratio < 0.25);
         svg.classList.toggle('hide-plates', !shown(PREFS.plates));

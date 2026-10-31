@@ -1909,3 +1909,6 @@ svg.quick .mk-q text { font-family: var(--font-sans); paint-order: normal; strok
 
 .reach.rival .rrow .sw.scan { border-color: #d49ad8; background: rgba(212,154,216,0.15); }
 .reach.rival .rrow .sw.range { border-color: #ff7a66; background: rgba(255,122,102,0.12); }
+
+svg.mk-names-2 .mk.p2 .mk-name, svg.mk-names-2 .mk.p3 .mk-name, svg.mk-names-3 .mk.p3 .mk-name { display: inline; }
+svg.plates-thin .mk.p0 .mk-tp, svg.plates-thin .mk.p1 .mk-tp { display: none; }
